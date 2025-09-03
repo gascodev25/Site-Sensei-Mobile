@@ -27,7 +27,7 @@ export default function Header() {
       <div className="container mx-auto px-6 py-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-8">
-            <h1 className="text-xl font-bold">Brightpearl</h1>
+            <h1 className="text-xl font-bold">ACG Works</h1>
             <nav className="hidden md:flex space-x-6">
               {navItems.map((item) => (
                 <Link key={item.href} href={item.href}>

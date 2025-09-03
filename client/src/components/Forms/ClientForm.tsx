@@ -28,7 +28,7 @@ export default function ClientForm({ client, onSuccess, onCancel }: ClientFormPr
       longitude: client?.longitude || "0",
       city: client?.city || "",
       postcode: client?.postcode || "",
-      country: client?.country || "Australia",
+      country: client?.country || "South Africa",
       contactPerson: client?.contactPerson || "",
       phone: client?.phone || "",
     },

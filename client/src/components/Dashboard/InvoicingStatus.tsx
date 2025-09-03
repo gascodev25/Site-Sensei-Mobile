@@ -42,7 +42,7 @@ export default function InvoicingStatus() {
               </div>
               <div className="text-right">
                 <div className="text-sm font-medium text-foreground">
-                  ${invoice.amount.toFixed(2)}
+                  R{invoice.amount.toFixed(2)}
                 </div>
                 <Button 
                   variant="ghost" 
@@ -61,7 +61,7 @@ export default function InvoicingStatus() {
           <div className="flex items-center justify-between text-sm">
             <span className="text-muted-foreground">Total Pending:</span>
             <span className="font-medium text-foreground" data-testid="text-total-pending">
-              ${totalPending.toFixed(2)}
+              R{totalPending.toFixed(2)}
             </span>
           </div>
         </div>

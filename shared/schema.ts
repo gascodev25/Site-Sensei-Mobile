@@ -47,7 +47,7 @@ export const clients = pgTable("clients", {
   longitude: decimal("longitude", { precision: 9, scale: 6 }).notNull(),
   city: varchar("city", { length: 100 }),
   postcode: varchar("postcode", { length: 20 }),
-  country: varchar("country", { length: 100 }).default("Australia"),
+  country: varchar("country", { length: 100 }).default("South Africa"),
   contactPerson: varchar("contact_person", { length: 100 }),
   phone: varchar("phone", { length: 20 }),
   createdAt: timestamp("created_at").defaultNow(),

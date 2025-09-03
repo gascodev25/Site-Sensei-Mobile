@@ -180,7 +180,7 @@ export default function Dashboard() {
             </div>
             <div>
               <div className="text-2xl font-bold text-primary" data-testid="text-monthly-revenue">
-                ${(metrics?.monthlyRevenue || 0).toLocaleString()}
+                R{(metrics?.monthlyRevenue || 0).toLocaleString()}
               </div>
               <div className="text-sm text-muted-foreground">Revenue This Month</div>
             </div>

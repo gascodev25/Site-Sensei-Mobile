@@ -1,10 +1,10 @@
-# Warehouse & Service Management System
+# ACG Works Warehouse & Service Management System
 
 ## Overview
 
-This is a comprehensive warehouse and service management system designed for field service operations. The application provides a unified control center for scheduling contract installations and recurring services, tracking equipment and consumables from warehouse to field, managing team assignments and stock issuance, and monitoring key operational metrics. It features a dashboard-driven interface inspired by Brightpearl's design philosophy with color-coded alerts, intuitive navigation, and data visualization capabilities.
+This is a comprehensive warehouse and service management system designed specifically for ACG Works' field service operations in South Africa. The application provides a unified control center for scheduling contract installations and recurring services, tracking equipment and consumables from warehouse to field, managing team assignments and stock issuance, and monitoring key operational metrics. It features a professional dashboard with color-coded alerts, intuitive navigation, and data visualization capabilities.
 
-The system is built as a full-stack web application using modern technologies including React for the frontend, Express.js for the backend API, PostgreSQL with Drizzle ORM for data persistence, and comprehensive UI components for a professional user experience.
+The system is built as a full-stack web application using modern technologies including React for the frontend, Express.js for the backend API, PostgreSQL with Drizzle ORM for data persistence, and comprehensive UI components for a professional user experience. All pricing is displayed in South African Rands (R) and the address search functionality is optimized for South African locations.
 
 ## User Preferences
 
@@ -84,7 +84,7 @@ Preferred communication style: Simple, everyday language.
 **Mapping & Location Services**
 - OpenStreetMap Nominatim API for address autocomplete and geocoding
 - Geographic coordinate storage for client locations
-- Support for Australian address formatting and validation
+- Support for South African address formatting and validation
 
 **Development & Build Tools**
 - Vite with React plugin for fast development and optimized builds

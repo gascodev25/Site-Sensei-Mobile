@@ -38,7 +38,7 @@ export default function AddressAutocomplete({
   const searchAddressMutation = useMutation({
     mutationFn: async (query: string) => {
       const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5&countrycodes=au`
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5&countrycodes=za`
       );
       if (!response.ok) {
         throw new Error("Failed to search addresses");

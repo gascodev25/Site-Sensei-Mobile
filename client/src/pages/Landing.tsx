@@ -70,7 +70,7 @@ export default function Landing() {
         {/* Dashboard Preview */}
         <Card className="max-w-4xl mx-auto">
           <CardHeader>
-            <CardTitle className="text-center">Brightpearl-Inspired Dashboard</CardTitle>
+            <CardTitle className="text-center">Professional Dashboard</CardTitle>
             <CardDescription className="text-center">
               Get real-time insights into your operations with KPI cards, service overviews, and actionable alerts
             </CardDescription>
