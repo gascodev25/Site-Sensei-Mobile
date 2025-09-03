@@ -17,8 +17,23 @@ export default function Clients() {
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const { toast } = useToast();
 
-  const { data: clients = [], isLoading } = useQuery({
-    queryKey: ["/api/clients", ...(searchQuery ? [{ search: searchQuery }] : [])],
+  const { data: clients = [], isLoading } = useQuery<Client[]>({
+    queryKey: ["/api/clients", searchQuery],
+    queryFn: async () => {
+      const url = searchQuery 
+        ? `/api/clients?search=${encodeURIComponent(searchQuery)}`
+        : '/api/clients';
+      
+      const response = await fetch(url, {
+        credentials: 'include'
+      });
+      
+      if (!response.ok) {
+        throw new Error(`${response.status}: ${response.statusText}`);
+      }
+      
+      return response.json();
+    },
   });
 
   const deleteClientMutation = useMutation({
