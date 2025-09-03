@@ -24,7 +24,7 @@ import {
   type AuditLogEntry,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, sql, desc, asc, ilike, lt, gte, lte } from "drizzle-orm";
+import { eq, and, or, sql, desc, asc, ilike, lt, gte, lte } from "drizzle-orm";
 
 export interface IStorage {
   // User operations (required for Replit Auth)
@@ -138,7 +138,13 @@ export class DatabaseStorage implements IStorage {
     return await db
       .select()
       .from(clients)
-      .where(ilike(clients.addressText, `%${query}%`))
+      .where(
+        or(
+          ilike(clients.name, `%${query}%`),
+          ilike(clients.addressText, `%${query}%`),
+          ilike(clients.city, `%${query}%`)
+        )
+      )
       .orderBy(asc(clients.name));
   }
 
