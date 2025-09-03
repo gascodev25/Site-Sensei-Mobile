@@ -10,8 +10,14 @@ interface AddressSuggestion {
   lat: string;
   lon: string;
   address?: {
+    house_number?: string;
+    road?: string;
     city?: string;
     town?: string;
+    village?: string;
+    municipality?: string;
+    county?: string;
+    suburb?: string;
     postcode?: string;
   };
 }
@@ -87,30 +93,52 @@ export default function AddressAutocomplete({
   const handleSuggestionClick = async (suggestion: AddressSuggestion) => {
     const lat = parseFloat(suggestion.lat);
     const lng = parseFloat(suggestion.lon);
-    const city = suggestion.address?.city || suggestion.address?.town;
-    const postcode = suggestion.address?.postcode;
 
-    // Re-geocode to get precise coordinates
+    // Re-geocode to get precise coordinates and detailed address information
     try {
       const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(suggestion.display_name)}&limit=1`
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(suggestion.display_name)}&limit=1&addressdetails=1`
       );
       const data = await response.json();
 
       if (data.length > 0) {
-        const preciseLat = parseFloat(data[0].lat);
-        const preciseLng = parseFloat(data[0].lon);
+        const result = data[0];
+        const preciseLat = parseFloat(result.lat);
+        const preciseLng = parseFloat(result.lon);
+        
+        // Extract city from multiple possible fields
+        const city = result.address?.city || 
+                    result.address?.town || 
+                    result.address?.village || 
+                    result.address?.municipality ||
+                    result.address?.county ||
+                    result.address?.suburb;
+        
+        const postcode = result.address?.postcode;
 
-        setInputValue(suggestion.display_name);
-        onAddressSelect(suggestion.display_name, preciseLat, preciseLng, city, postcode);
+        // Extract only the street address part, not the full display name
+        const streetAddress = [
+          result.address?.house_number,
+          result.address?.road
+        ].filter(Boolean).join(' ') || suggestion.display_name;
+
+        setInputValue(streetAddress);
+        onAddressSelect(streetAddress, preciseLat, preciseLng, city, postcode);
         setShowSuggestions(false);
         setSuggestions([]);
       }
     } catch (error) {
       console.error("Re-geocoding error:", error);
-      // Fallback to original coordinates
-      setInputValue(suggestion.display_name);
-      onAddressSelect(suggestion.display_name, lat, lng, city, postcode);
+      // Fallback to original coordinates with basic city extraction
+      const city = suggestion.address?.city || suggestion.address?.town;
+      const postcode = suggestion.address?.postcode;
+      
+      // Try to extract just the street address from display_name
+      const parts = suggestion.display_name.split(',');
+      const streetAddress = parts[0] || suggestion.display_name;
+      
+      setInputValue(streetAddress);
+      onAddressSelect(streetAddress, lat, lng, city, postcode);
       setShowSuggestions(false);
       setSuggestions([]);
     }
