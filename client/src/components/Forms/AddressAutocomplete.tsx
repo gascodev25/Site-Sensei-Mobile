@@ -23,9 +23,9 @@ interface AddressAutocompleteProps {
   "data-testid"?: string;
 }
 
-export default function AddressAutocomplete({ 
-  value, 
-  onAddressSelect, 
+export default function AddressAutocomplete({
+  value,
+  onAddressSelect,
   placeholder = "Start typing address...",
   "data-testid": testId
 }: AddressAutocompleteProps) {
@@ -68,7 +68,7 @@ export default function AddressAutocomplete({
           setShowSuggestions(false);
           return;
         }
-        
+
         timeoutId = setTimeout(() => {
           setIsLoading(true);
           searchAddressMutation.mutate(query);
@@ -96,11 +96,11 @@ export default function AddressAutocomplete({
         `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(suggestion.display_name)}&limit=1`
       );
       const data = await response.json();
-      
+
       if (data.length > 0) {
         const preciseLat = parseFloat(data[0].lat);
         const preciseLng = parseFloat(data[0].lon);
-        
+
         setInputValue(suggestion.display_name);
         onAddressSelect(suggestion.display_name, preciseLat, preciseLng, city, postcode);
         setShowSuggestions(false);
