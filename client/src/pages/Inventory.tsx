@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import Header from "@/components/Layout/Header";
@@ -9,8 +11,15 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Plus, Search, Edit, Trash2, Package, AlertTriangle, MapPin, Calendar, Barcode, QrCode } from "lucide-react";
-import type { Equipment, Consumable } from "@shared/schema";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Plus, Search, Edit, Trash2, Package, AlertTriangle, MapPin, Calendar as CalendarIcon, Barcode, QrCode } from "lucide-react";
+import { format } from "date-fns";
+import { cn } from "@/lib/utils";
+import type { Equipment, Consumable, Client, InsertEquipment, InsertConsumable } from "@shared/schema";
+import { z } from "zod";
 
 export default function Inventory() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -34,7 +43,95 @@ export default function Inventory() {
     queryKey: ["/api/consumables", { lowStock: "true" }],
   });
 
+  const { data: clients = [] } = useQuery<Client[]>({
+    queryKey: ["/api/clients"],
+  });
+
+  // Equipment form schema
+  const equipmentFormSchema = z.object({
+    name: z.string().min(1, "Equipment name is required"),
+    stockCode: z.string().min(1, "Stock code is required"),
+    price: z.string().optional(),
+    dateInstalled: z.date().optional(),
+    installedAtClientId: z.string().optional(),
+    status: z.string().default("in_warehouse"),
+    barcode: z.string().optional(),
+    qrCode: z.string().optional(),
+  });
+
+  // Consumable form schema
+  const consumableFormSchema = z.object({
+    name: z.string().min(1, "Consumable name is required"),
+    stockCode: z.string().min(1, "Stock code is required"),
+    price: z.string().optional(),
+    minStockLevel: z.string().optional(),
+    currentStock: z.string().optional(),
+    barcode: z.string().optional(),
+    qrCode: z.string().optional(),
+  });
+
+  // Equipment form
+  const equipmentForm = useForm<z.infer<typeof equipmentFormSchema>>({
+    resolver: zodResolver(equipmentFormSchema),
+    defaultValues: {
+      name: "",
+      stockCode: "",
+      price: "",
+      dateInstalled: undefined,
+      installedAtClientId: "",
+      status: "in_warehouse",
+      barcode: "",
+      qrCode: "",
+    },
+  });
+
+  // Consumable form
+  const consumableForm = useForm<z.infer<typeof consumableFormSchema>>({
+    resolver: zodResolver(consumableFormSchema),
+    defaultValues: {
+      name: "",
+      stockCode: "",
+      price: "",
+      minStockLevel: "0",
+      currentStock: "0",
+      barcode: "",
+      qrCode: "",
+    },
+  });
+
   // Equipment mutations
+  const createEquipmentMutation = useMutation({
+    mutationFn: async (data: z.infer<typeof equipmentFormSchema>) => {
+      const formattedData: InsertEquipment = {
+        name: data.name,
+        stockCode: data.stockCode,
+        price: data.price || null,
+        dateInstalled: data.dateInstalled || null,
+        installedAtClientId: data.installedAtClientId ? parseInt(data.installedAtClientId) : null,
+        status: data.status,
+        barcode: data.barcode || null,
+        qrCode: data.qrCode || null,
+      };
+      return await apiRequest("POST", "/api/equipment", formattedData);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/equipment"] });
+      toast({
+        title: "Success",
+        description: "Equipment created successfully",
+      });
+      equipmentForm.reset();
+      setIsCreateEquipmentOpen(false);
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const deleteEquipmentMutation = useMutation({
     mutationFn: async (equipmentId: number) => {
       await apiRequest("DELETE", `/api/equipment/${equipmentId}`);
@@ -56,6 +153,37 @@ export default function Inventory() {
   });
 
   // Consumables mutations
+  const createConsumableMutation = useMutation({
+    mutationFn: async (data: z.infer<typeof consumableFormSchema>) => {
+      const formattedData: InsertConsumable = {
+        name: data.name,
+        stockCode: data.stockCode,
+        price: data.price || null,
+        minStockLevel: data.minStockLevel ? parseInt(data.minStockLevel) : 0,
+        currentStock: data.currentStock ? parseInt(data.currentStock) : 0,
+        barcode: data.barcode || null,
+        qrCode: data.qrCode || null,
+      };
+      return await apiRequest("POST", "/api/consumables", formattedData);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/consumables"] });
+      toast({
+        title: "Success",
+        description: "Consumable created successfully",
+      });
+      consumableForm.reset();
+      setIsCreateConsumableOpen(false);
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const deleteConsumableMutation = useMutation({
     mutationFn: async (consumableId: number) => {
       await apiRequest("DELETE", `/api/consumables/${consumableId}`);
@@ -249,13 +377,208 @@ export default function Inventory() {
                       Add Equipment
                     </Button>
                   </DialogTrigger>
-                  <DialogContent className="max-w-2xl">
+                  <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
                     <DialogHeader>
                       <DialogTitle>Add New Equipment</DialogTitle>
                     </DialogHeader>
-                    <div className="p-4 text-center text-muted-foreground">
-                      Equipment form coming soon...
-                    </div>
+                    <Form {...equipmentForm}>
+                      <form onSubmit={equipmentForm.handleSubmit((data) => createEquipmentMutation.mutate(data))} className="space-y-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <FormField
+                            control={equipmentForm.control}
+                            name="name"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Equipment Name *</FormLabel>
+                                <FormControl>
+                                  <Input placeholder="Enter equipment name" {...field} data-testid="input-equipment-name" />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          
+                          <FormField
+                            control={equipmentForm.control}
+                            name="stockCode"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Stock Code *</FormLabel>
+                                <FormControl>
+                                  <Input placeholder="Enter stock code" {...field} data-testid="input-equipment-stock-code" />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <FormField
+                            control={equipmentForm.control}
+                            name="price"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Price (R)</FormLabel>
+                                <FormControl>
+                                  <Input 
+                                    type="number" 
+                                    step="0.01" 
+                                    placeholder="0.00" 
+                                    {...field} 
+                                    data-testid="input-equipment-price" 
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          
+                          <FormField
+                            control={equipmentForm.control}
+                            name="status"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Status</FormLabel>
+                                <Select onValueChange={field.onChange} defaultValue={field.value} data-testid="select-equipment-status">
+                                  <FormControl>
+                                    <SelectTrigger>
+                                      <SelectValue placeholder="Select status" />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    <SelectItem value="in_warehouse">In Warehouse</SelectItem>
+                                    <SelectItem value="in_field">In Field</SelectItem>
+                                    <SelectItem value="issued">Issued</SelectItem>
+                                    <SelectItem value="maintenance">Maintenance</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <FormField
+                            control={equipmentForm.control}
+                            name="dateInstalled"
+                            render={({ field }) => (
+                              <FormItem className="flex flex-col">
+                                <FormLabel>Date Installed</FormLabel>
+                                <Popover>
+                                  <PopoverTrigger asChild>
+                                    <FormControl>
+                                      <Button
+                                        variant={"outline"}
+                                        className={cn(
+                                          "pl-3 text-left font-normal",
+                                          !field.value && "text-muted-foreground"
+                                        )}
+                                        data-testid="button-equipment-date-installed"
+                                      >
+                                        {field.value ? (
+                                          format(field.value, "PPP")
+                                        ) : (
+                                          <span>Pick a date</span>
+                                        )}
+                                        <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                                      </Button>
+                                    </FormControl>
+                                  </PopoverTrigger>
+                                  <PopoverContent className="w-auto p-0" align="start">
+                                    <Calendar
+                                      mode="single"
+                                      selected={field.value}
+                                      onSelect={field.onChange}
+                                      disabled={(date) =>
+                                        date > new Date() || date < new Date("1900-01-01")
+                                      }
+                                      initialFocus
+                                    />
+                                  </PopoverContent>
+                                </Popover>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            control={equipmentForm.control}
+                            name="installedAtClientId"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Installed at Client</FormLabel>
+                                <Select onValueChange={field.onChange} value={field.value} data-testid="select-equipment-client">
+                                  <FormControl>
+                                    <SelectTrigger>
+                                      <SelectValue placeholder="Select client" />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    <SelectItem value="">No client selected</SelectItem>
+                                    {clients.map((client) => (
+                                      <SelectItem key={client.id} value={client.id.toString()}>
+                                        {client.name}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <FormField
+                            control={equipmentForm.control}
+                            name="barcode"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Barcode</FormLabel>
+                                <FormControl>
+                                  <Input placeholder="Enter barcode" {...field} data-testid="input-equipment-barcode" />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          
+                          <FormField
+                            control={equipmentForm.control}
+                            name="qrCode"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>QR Code</FormLabel>
+                                <FormControl>
+                                  <Input placeholder="Enter QR code" {...field} data-testid="input-equipment-qr-code" />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+
+                        <div className="flex justify-end space-x-2 pt-4">
+                          <Button 
+                            type="button" 
+                            variant="outline" 
+                            onClick={() => setIsCreateEquipmentOpen(false)}
+                            data-testid="button-cancel-equipment"
+                          >
+                            Cancel
+                          </Button>
+                          <Button 
+                            type="submit" 
+                            disabled={createEquipmentMutation.isPending}
+                            data-testid="button-save-equipment"
+                          >
+                            {createEquipmentMutation.isPending ? "Creating..." : "Create Equipment"}
+                          </Button>
+                        </div>
+                      </form>
+                    </Form>
                   </DialogContent>
                 </Dialog>
               )}
@@ -268,13 +591,151 @@ export default function Inventory() {
                       Add Consumable
                     </Button>
                   </DialogTrigger>
-                  <DialogContent className="max-w-2xl">
+                  <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
                     <DialogHeader>
                       <DialogTitle>Add New Consumable</DialogTitle>
                     </DialogHeader>
-                    <div className="p-4 text-center text-muted-foreground">
-                      Consumable form coming soon...
-                    </div>
+                    <Form {...consumableForm}>
+                      <form onSubmit={consumableForm.handleSubmit((data) => createConsumableMutation.mutate(data))} className="space-y-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <FormField
+                            control={consumableForm.control}
+                            name="name"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Consumable Name *</FormLabel>
+                                <FormControl>
+                                  <Input placeholder="Enter consumable name" {...field} data-testid="input-consumable-name" />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          
+                          <FormField
+                            control={consumableForm.control}
+                            name="stockCode"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Stock Code *</FormLabel>
+                                <FormControl>
+                                  <Input placeholder="Enter stock code" {...field} data-testid="input-consumable-stock-code" />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          <FormField
+                            control={consumableForm.control}
+                            name="price"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Price (R)</FormLabel>
+                                <FormControl>
+                                  <Input 
+                                    type="number" 
+                                    step="0.01" 
+                                    placeholder="0.00" 
+                                    {...field} 
+                                    data-testid="input-consumable-price" 
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          
+                          <FormField
+                            control={consumableForm.control}
+                            name="currentStock"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Current Stock</FormLabel>
+                                <FormControl>
+                                  <Input 
+                                    type="number" 
+                                    placeholder="0" 
+                                    {...field} 
+                                    data-testid="input-consumable-current-stock" 
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            control={consumableForm.control}
+                            name="minStockLevel"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Min Stock Level</FormLabel>
+                                <FormControl>
+                                  <Input 
+                                    type="number" 
+                                    placeholder="0" 
+                                    {...field} 
+                                    data-testid="input-consumable-min-stock" 
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <FormField
+                            control={consumableForm.control}
+                            name="barcode"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Barcode</FormLabel>
+                                <FormControl>
+                                  <Input placeholder="Enter barcode" {...field} data-testid="input-consumable-barcode" />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          
+                          <FormField
+                            control={consumableForm.control}
+                            name="qrCode"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>QR Code</FormLabel>
+                                <FormControl>
+                                  <Input placeholder="Enter QR code" {...field} data-testid="input-consumable-qr-code" />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+
+                        <div className="flex justify-end space-x-2 pt-4">
+                          <Button 
+                            type="button" 
+                            variant="outline" 
+                            onClick={() => setIsCreateConsumableOpen(false)}
+                            data-testid="button-cancel-consumable"
+                          >
+                            Cancel
+                          </Button>
+                          <Button 
+                            type="submit" 
+                            disabled={createConsumableMutation.isPending}
+                            data-testid="button-save-consumable"
+                          >
+                            {createConsumableMutation.isPending ? "Creating..." : "Create Consumable"}
+                          </Button>
+                        </div>
+                      </form>
+                    </Form>
                   </DialogContent>
                 </Dialog>
               )}
