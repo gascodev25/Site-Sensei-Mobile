@@ -52,8 +52,6 @@ export default function Inventory() {
     name: z.string().min(1, "Equipment name is required"),
     stockCode: z.string().min(1, "Stock code is required"),
     price: z.string().optional(),
-    dateInstalled: z.date().optional(),
-    installedAtClientId: z.string().optional(),
     status: z.string().default("in_warehouse"),
     barcode: z.string().optional(),
     qrCode: z.string().optional(),
@@ -77,8 +75,6 @@ export default function Inventory() {
       name: "",
       stockCode: "",
       price: "",
-      dateInstalled: undefined,
-      installedAtClientId: "none",
       status: "in_warehouse",
       barcode: "",
       qrCode: "",
@@ -106,8 +102,8 @@ export default function Inventory() {
         name: data.name,
         stockCode: data.stockCode,
         price: data.price || null,
-        dateInstalled: data.dateInstalled || null,
-        installedAtClientId: data.installedAtClientId && data.installedAtClientId !== "none" ? parseInt(data.installedAtClientId) : null,
+        dateInstalled: null,
+        installedAtClientId: null,
         status: data.status,
         barcode: data.barcode || null,
         qrCode: data.qrCode || null,
@@ -459,76 +455,6 @@ export default function Inventory() {
                           />
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <FormField
-                            control={equipmentForm.control}
-                            name="dateInstalled"
-                            render={({ field }) => (
-                              <FormItem className="flex flex-col">
-                                <FormLabel>Date Installed</FormLabel>
-                                <Popover>
-                                  <PopoverTrigger asChild>
-                                    <FormControl>
-                                      <Button
-                                        variant={"outline"}
-                                        className={cn(
-                                          "pl-3 text-left font-normal",
-                                          !field.value && "text-muted-foreground"
-                                        )}
-                                        data-testid="button-equipment-date-installed"
-                                      >
-                                        {field.value ? (
-                                          format(field.value, "PPP")
-                                        ) : (
-                                          <span>Pick a date</span>
-                                        )}
-                                        <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                                      </Button>
-                                    </FormControl>
-                                  </PopoverTrigger>
-                                  <PopoverContent className="w-auto p-0" align="start">
-                                    <Calendar
-                                      mode="single"
-                                      selected={field.value}
-                                      onSelect={field.onChange}
-                                      disabled={(date) =>
-                                        date > new Date() || date < new Date("1900-01-01")
-                                      }
-                                      initialFocus
-                                    />
-                                  </PopoverContent>
-                                </Popover>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-
-                          <FormField
-                            control={equipmentForm.control}
-                            name="installedAtClientId"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Installed at Client</FormLabel>
-                                <Select onValueChange={field.onChange} value={field.value} data-testid="select-equipment-client">
-                                  <FormControl>
-                                    <SelectTrigger>
-                                      <SelectValue placeholder="Select client" />
-                                    </SelectTrigger>
-                                  </FormControl>
-                                  <SelectContent>
-                                    <SelectItem value="none">No client selected</SelectItem>
-                                    {clients.map((client) => (
-                                      <SelectItem key={client.id} value={client.id.toString()}>
-                                        {client.name}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                        </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <FormField
