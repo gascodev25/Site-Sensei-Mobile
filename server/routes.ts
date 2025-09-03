@@ -225,10 +225,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Services routes
   app.get('/api/services', isAuthenticated, async (req, res) => {
     try {
-      const { status, date } = req.query;
+      const { status, date, search } = req.query;
       let services;
       
-      if (status && typeof status === 'string') {
+      if (search && typeof search === 'string') {
+        services = await storage.searchServices(search);
+      } else if (status && typeof status === 'string') {
         services = await storage.getServicesByStatus(status);
       } else if (date && typeof date === 'string') {
         services = await storage.getServicesForDate(new Date(date));

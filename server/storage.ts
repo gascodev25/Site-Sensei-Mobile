@@ -17,6 +17,7 @@ import {
   type InsertConsumable,
   type Service,
   type InsertService,
+  type ServiceWithDetails,
   type TeamMember,
   type InsertTeamMember,
   type ServiceTeam,
@@ -38,6 +39,14 @@ export interface IStorage {
   updateClient(id: number, client: Partial<InsertClient>): Promise<Client>;
   deleteClient(id: number): Promise<void>;
   searchClients(query: string): Promise<Client[]>;
+  
+  // Service operations
+  getServices(): Promise<ServiceWithDetails[]>;
+  getService(id: number): Promise<Service | undefined>;
+  createService(service: InsertService): Promise<Service>;
+  updateService(id: number, service: Partial<InsertService>): Promise<Service>;
+  deleteService(id: number): Promise<void>;
+  searchServices(query: string): Promise<ServiceWithDetails[]>;
   
   // Equipment operations
   getEquipment(): Promise<Equipment[]>;
@@ -148,6 +157,115 @@ export class DatabaseStorage implements IStorage {
       .orderBy(asc(clients.name));
   }
 
+  // Service operations
+  async getServices(): Promise<ServiceWithDetails[]> {
+    const results = await db
+      .select({
+        service: services,
+        client: clients,
+        team: serviceTeams,
+      })
+      .from(services)
+      .leftJoin(clients, eq(services.clientId, clients.id))
+      .leftJoin(serviceTeams, eq(services.teamId, serviceTeams.id))
+      .orderBy(desc(services.installationDate));
+    
+    return results.map(row => ({
+      ...row.service,
+      client: row.client,
+      team: row.team
+    }));
+  }
+
+  async getService(id: number): Promise<Service | undefined> {
+    const [service] = await db.select().from(services).where(eq(services.id, id));
+    return service;
+  }
+
+  async createService(service: InsertService): Promise<Service> {
+    const [newService] = await db.insert(services).values(service).returning();
+    return newService;
+  }
+
+  async updateService(id: number, service: Partial<InsertService>): Promise<Service> {
+    const [updatedService] = await db
+      .update(services)
+      .set(service)
+      .where(eq(services.id, id))
+      .returning();
+    return updatedService;
+  }
+
+  async deleteService(id: number): Promise<void> {
+    await db.delete(services).where(eq(services.id, id));
+  }
+
+  async searchServices(query: string): Promise<ServiceWithDetails[]> {
+    const results = await db
+      .select({
+        service: services,
+        client: clients,
+        team: serviceTeams,
+      })
+      .from(services)
+      .leftJoin(clients, eq(services.clientId, clients.id))
+      .leftJoin(serviceTeams, eq(services.teamId, serviceTeams.id))
+      .where(
+        or(
+          ilike(clients.name, `%${query}%`),
+          ilike(services.type, `%${query}%`),
+          ilike(services.status, `%${query}%`)
+        )
+      )
+      .orderBy(desc(services.installationDate));
+    
+    return results.map(row => ({
+      ...row.service,
+      client: row.client,
+      team: row.team
+    }));
+  }
+
+  async getServicesByStatus(status: string): Promise<Service[]> {
+    return await db
+      .select()
+      .from(services)
+      .where(eq(services.status, status))
+      .orderBy(desc(services.installationDate));
+  }
+
+  async getServicesForDate(date: Date): Promise<Service[]> {
+    const startOfDay = new Date(date);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(date);
+    endOfDay.setHours(23, 59, 59, 999);
+    
+    return await db
+      .select()
+      .from(services)
+      .where(
+        and(
+          gte(services.installationDate, startOfDay),
+          lte(services.installationDate, endOfDay)
+        )
+      )
+      .orderBy(asc(services.installationDate));
+  }
+
+  async getServicesReadyForInvoicing(): Promise<Service[]> {
+    return await db
+      .select()
+      .from(services)
+      .where(
+        and(
+          eq(services.status, 'completed'),
+          eq(services.markedForInvoicing, true),
+          eq(services.invoicedStatus, 'ready')
+        )
+      )
+      .orderBy(desc(services.completedAt));
+  }
+
   // Equipment operations
   async getEquipment(): Promise<Equipment[]> {
     return await db.select().from(equipment).orderBy(asc(equipment.name));
@@ -208,61 +326,6 @@ export class DatabaseStorage implements IStorage {
 
   async deleteConsumable(id: number): Promise<void> {
     await db.delete(consumables).where(eq(consumables.id, id));
-  }
-
-  // Services operations
-  async getServices(): Promise<Service[]> {
-    return await db.select().from(services).orderBy(desc(services.createdAt));
-  }
-
-  async getServicesForDate(date: Date): Promise<Service[]> {
-    const startOfDay = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-    const endOfDay = new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1);
-    
-    return await db
-      .select()
-      .from(services)
-      .where(
-        and(
-          gte(services.installationDate, startOfDay),
-          lt(services.installationDate, endOfDay)
-        )
-      )
-      .orderBy(asc(services.installationDate));
-  }
-
-  async getServicesByStatus(status: string): Promise<Service[]> {
-    return await db
-      .select()
-      .from(services)
-      .where(eq(services.status, status))
-      .orderBy(desc(services.installationDate));
-  }
-
-  async getServicesReadyForInvoicing(): Promise<Service[]> {
-    return await db
-      .select()
-      .from(services)
-      .where(eq(services.invoicedStatus, "ready"))
-      .orderBy(desc(services.completedAt));
-  }
-
-  async createService(serviceData: InsertService): Promise<Service> {
-    const [newService] = await db.insert(services).values(serviceData).returning();
-    return newService;
-  }
-
-  async updateService(id: number, serviceData: Partial<InsertService>): Promise<Service> {
-    const [updatedService] = await db
-      .update(services)
-      .set(serviceData)
-      .where(eq(services.id, id))
-      .returning();
-    return updatedService;
-  }
-
-  async deleteService(id: number): Promise<void> {
-    await db.delete(services).where(eq(services.id, id));
   }
 
   // Team operations

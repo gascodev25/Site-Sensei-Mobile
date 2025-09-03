@@ -251,6 +251,10 @@ export type Consumable = typeof consumables.$inferSelect;
 export type InsertConsumable = z.infer<typeof insertConsumableSchema>;
 export type Service = typeof services.$inferSelect;
 export type InsertService = z.infer<typeof insertServiceSchema>;
+export type ServiceWithDetails = Service & {
+  client?: Client;
+  team?: ServiceTeam;
+};
 export type TeamMember = typeof teamMembers.$inferSelect;
 export type InsertTeamMember = z.infer<typeof insertTeamMemberSchema>;
 export type ServiceTeam = typeof serviceTeams.$inferSelect;
