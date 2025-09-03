@@ -78,7 +78,7 @@ export default function Inventory() {
       stockCode: "",
       price: "",
       dateInstalled: undefined,
-      installedAtClientId: "",
+      installedAtClientId: "none",
       status: "in_warehouse",
       barcode: "",
       qrCode: "",
@@ -107,7 +107,7 @@ export default function Inventory() {
         stockCode: data.stockCode,
         price: data.price || null,
         dateInstalled: data.dateInstalled || null,
-        installedAtClientId: data.installedAtClientId ? parseInt(data.installedAtClientId) : null,
+        installedAtClientId: data.installedAtClientId && data.installedAtClientId !== "none" ? parseInt(data.installedAtClientId) : null,
         status: data.status,
         barcode: data.barcode || null,
         qrCode: data.qrCode || null,
@@ -516,7 +516,7 @@ export default function Inventory() {
                                     </SelectTrigger>
                                   </FormControl>
                                   <SelectContent>
-                                    <SelectItem value="">No client selected</SelectItem>
+                                    <SelectItem value="none">No client selected</SelectItem>
                                     {clients.map((client) => (
                                       <SelectItem key={client.id} value={client.id.toString()}>
                                         {client.name}
