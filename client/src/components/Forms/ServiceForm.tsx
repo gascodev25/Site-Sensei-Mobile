@@ -1,0 +1,400 @@
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { insertServiceSchema, type Service, type InsertService } from "@shared/schema";
+import { Button } from "@/components/ui/button";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
+import { CalendarIcon, Repeat } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { format } from "date-fns";
+import { cn } from "@/lib/utils";
+
+interface ServiceFormProps {
+  service?: Service;
+  onSuccess: () => void;
+  onCancel: () => void;
+}
+
+const serviceTypes = [
+  { value: "installation", label: "Installation" },
+  { value: "service_contract", label: "Service Contract" },
+];
+
+const servicePriorities = [
+  { value: "Routine", label: "Routine" },
+  { value: "Urgent", label: "Urgent" },
+  { value: "Emergency", label: "Emergency" },
+];
+
+const recurrenceIntervals = [
+  { value: "7d", label: "Weekly (7 days)" },
+  { value: "14d", label: "Bi-weekly (14 days)" },
+  { value: "30d", label: "Monthly (30 days)" },
+  { value: "60d", label: "Bi-monthly (60 days)" },
+  { value: "90d", label: "Quarterly (90 days)" },
+  { value: "180d", label: "Semi-annually (180 days)" },
+  { value: "once", label: "Once-off" },
+];
+
+export default function ServiceForm({ service, onSuccess, onCancel }: ServiceFormProps) {
+  const { toast } = useToast();
+  const isEditing = !!service;
+
+  const { data: clients = [] } = useQuery({
+    queryKey: ["/api/clients"],
+  });
+
+  const { data: teams = [] } = useQuery({
+    queryKey: ["/api/service-teams"],
+  });
+
+  const form = useForm<InsertService>({
+    resolver: zodResolver(insertServiceSchema),
+    defaultValues: {
+      clientId: service?.clientId || 0,
+      type: service?.type || "installation",
+      installationDate: service?.installationDate ? new Date(service.installationDate) : undefined,
+      teamId: service?.teamId || 0,
+      status: service?.status || "scheduled",
+      servicePriority: service?.servicePriority || "Routine",
+      estimatedDuration: service?.estimatedDuration || 60,
+      contractLengthMonths: service?.contractLengthMonths || undefined,
+      recurrencePattern: service?.recurrencePattern || null,
+    },
+  });
+
+  const watchType = form.watch("type");
+  const watchInstallationDate = form.watch("installationDate");
+
+  const createServiceMutation = useMutation({
+    mutationFn: async (data: InsertService) => {
+      // Format the data properly
+      const formattedData = {
+        ...data,
+        installationDate: data.installationDate ? new Date(data.installationDate).toISOString() : null,
+        recurrencePattern: data.recurrencePattern ? JSON.stringify(data.recurrencePattern) : null,
+      };
+
+      if (isEditing) {
+        return await apiRequest("PUT", `/api/services/${service.id}`, formattedData);
+      } else {
+        return await apiRequest("POST", "/api/services", formattedData);
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/services"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/metrics"] });
+      toast({
+        title: "Success",
+        description: `Service ${isEditing ? "updated" : "created"} successfully`,
+      });
+      onSuccess();
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const onSubmit = (data: InsertService) => {
+    createServiceMutation.mutate(data);
+  };
+
+  const handleConvertToServiceContract = () => {
+    if (watchType === "installation") {
+      form.setValue("type", "service_contract");
+      form.setValue("contractLengthMonths", 12);
+      form.setValue("recurrencePattern", { interval: "30d", end_date: null });
+    } else {
+      form.setValue("type", "installation");
+      form.setValue("contractLengthMonths", undefined);
+      form.setValue("recurrencePattern", null);
+    }
+  };
+
+  return (
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <FormField
+            control={form.control}
+            name="clientId"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Client *</FormLabel>
+                <FormControl>
+                  <Select 
+                    value={field.value?.toString()} 
+                    onValueChange={(value) => field.onChange(parseInt(value))}
+                  >
+                    <SelectTrigger data-testid="select-client">
+                      <SelectValue placeholder="Select client" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {clients.map((client: any) => (
+                        <SelectItem key={client.id} value={client.id.toString()}>
+                          {client.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="type"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Service Type *</FormLabel>
+                <FormControl>
+                  <div className="flex items-center space-x-2">
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <SelectTrigger data-testid="select-service-type">
+                        <SelectValue placeholder="Select service type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {serviceTypes.map((type) => (
+                          <SelectItem key={type.value} value={type.value}>
+                            {type.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button 
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleConvertToServiceContract}
+                      data-testid="button-convert-service"
+                    >
+                      <Repeat className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <FormField
+            control={form.control}
+            name="installationDate"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Installation Date *</FormLabel>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <FormControl>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "w-full pl-3 text-left font-normal",
+                          !field.value && "text-muted-foreground"
+                        )}
+                        data-testid="button-installation-date"
+                      >
+                        {field.value ? (
+                          format(field.value, "PPP")
+                        ) : (
+                          <span>Pick a date</span>
+                        )}
+                        <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                      </Button>
+                    </FormControl>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={field.value}
+                      onSelect={field.onChange}
+                      disabled={(date) =>
+                        date < new Date() || date < new Date("1900-01-01")
+                      }
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="teamId"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Service Team</FormLabel>
+                <FormControl>
+                  <Select 
+                    value={field.value?.toString()} 
+                    onValueChange={(value) => field.onChange(value ? parseInt(value) : null)}
+                  >
+                    <SelectTrigger data-testid="select-team">
+                      <SelectValue placeholder="Select team" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {teams.map((team: any) => (
+                        <SelectItem key={team.id} value={team.id.toString()}>
+                          {team.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <FormField
+            control={form.control}
+            name="servicePriority"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Priority</FormLabel>
+                <FormControl>
+                  <Select value={field.value} onValueChange={field.onChange}>
+                    <SelectTrigger data-testid="select-priority">
+                      <SelectValue placeholder="Select priority" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {servicePriorities.map((priority) => (
+                        <SelectItem key={priority.value} value={priority.value}>
+                          {priority.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="estimatedDuration"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Estimated Duration (minutes)</FormLabel>
+                <FormControl>
+                  <Input
+                    type="number"
+                    placeholder="60"
+                    {...field}
+                    onChange={(e) => field.onChange(parseInt(e.target.value))}
+                    data-testid="input-duration"
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+
+        {watchType === "service_contract" && (
+          <div className="space-y-4 border-t border-border pt-4">
+            <h3 className="text-lg font-medium">Service Contract Details</h3>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="contractLengthMonths"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Contract Length (months)</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        placeholder="12"
+                        {...field}
+                        onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : undefined)}
+                        data-testid="input-contract-length"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="recurrencePattern"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Recurrence</FormLabel>
+                    <FormControl>
+                      <Select 
+                        value={field.value?.interval || ""}
+                        onValueChange={(value) => {
+                          if (value === "once") {
+                            field.onChange(null);
+                          } else {
+                            field.onChange({ 
+                              interval: value, 
+                              end_date: null 
+                            });
+                          }
+                        }}
+                      >
+                        <SelectTrigger data-testid="select-recurrence">
+                          <SelectValue placeholder="Select recurrence" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {recurrenceIntervals.map((interval) => (
+                            <SelectItem key={interval.value} value={interval.value}>
+                              {interval.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+          </div>
+        )}
+
+        <div className="flex justify-end space-x-4">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onCancel}
+            disabled={createServiceMutation.isPending}
+            data-testid="button-cancel"
+          >
+            Cancel
+          </Button>
+          <Button
+            type="submit"
+            disabled={createServiceMutation.isPending}
+            data-testid="button-submit"
+          >
+            {createServiceMutation.isPending ? "Saving..." : isEditing ? "Update" : "Create"}
+          </Button>
+        </div>
+      </form>
+    </Form>
+  );
+}
