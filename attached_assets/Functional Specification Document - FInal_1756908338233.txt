@@ -1,0 +1,355 @@
+Functional Specification Document (FSD) - Final
+Warehouse & Service Management System – V1
+Version: 1.0
+Built for Replit + AI-Assisted Development
+Author: Lewis
+Date: 2025-04-05
+
+1. Data Model (PostgreSQL Schema)
+sql
+-- Clients
+CREATE TABLE clients (
+  id SERIAL PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  address_text VARCHAR(500) NOT NULL,
+  latitude DECIMAL(9,6) NOT NULL,
+  longitude DECIMAL(9,6) NOT NULL,
+  city VARCHAR(100),
+  postcode VARCHAR(20),
+  country VARCHAR(100) DEFAULT 'Australia',
+  contact_person VARCHAR(100),
+  phone VARCHAR(20),
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Equipment
+CREATE TABLE equipment (
+  id SERIAL PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  stock_code VARCHAR(50) UNIQUE NOT NULL,
+  price DECIMAL(10,2),
+  date_installed TIMESTAMP,
+  installed_at_client_id INT REFERENCES clients(id),
+  status VARCHAR(20) DEFAULT 'in_warehouse', -- 'in_warehouse', 'in_field', 'issued'
+  barcode VARCHAR(50) UNIQUE,
+  qr_code VARCHAR(50) UNIQUE,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Consumables
+CREATE TABLE consumables (
+  id SERIAL PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  stock_code VARCHAR(50) UNIQUE NOT NULL,
+  price DECIMAL(10,2),
+  min_stock_level INT DEFAULT 0,
+  current_stock INT DEFAULT 0,
+  barcode VARCHAR(50) UNIQUE,
+  qr_code VARCHAR(50) UNIQUE,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Equipment-Consumable Link
+CREATE TABLE equipment_consumables (
+  equipment_id INT REFERENCES equipment(id),
+  consumable_id INT REFERENCES consumables(id),
+  PRIMARY KEY (equipment_id, consumable_id)
+);
+
+-- Team Members
+CREATE TABLE team_members (
+  id SERIAL PRIMARY KEY,
+  name VARCHAR(100) NOT NULL,
+  phone VARCHAR(20),
+  skill VARCHAR(50) -- 'Hygiene', 'Deep Clean', 'Pest Control'
+);
+
+-- Service Teams
+CREATE TABLE service_teams (
+  id SERIAL PRIMARY KEY,
+  name VARCHAR(100) NOT NULL
+);
+
+-- Team Assignments
+CREATE TABLE team_assignments (
+  team_id INT REFERENCES service_teams(id),
+  member_id INT REFERENCES team_members(id),
+  PRIMARY KEY (team_id, member_id)
+);
+
+-- Services
+CREATE TABLE services (
+  id SERIAL PRIMARY KEY,
+  client_id INT REFERENCES clients(id),
+  type VARCHAR(20) DEFAULT 'installation', -- 'installation', 'service_contract'
+  installation_date TIMESTAMP,
+  team_id INT REFERENCES service_teams(id),
+  status VARCHAR(20) DEFAULT 'scheduled', -- 'scheduled', 'completed', 'missed'
+  recurrence_pattern JSONB, -- { interval: '30d', end_date: '2026-01-01' }
+  contract_length_months INT,
+  created_at TIMESTAMP DEFAULT NOW(),
+  completed_at TIMESTAMP NULL,
+  marked_for_invoicing BOOLEAN DEFAULT FALSE,
+  invoiced_status VARCHAR(20) DEFAULT 'not_ready', -- 'not_ready', 'ready', 'invoiced'
+  invoiced_by INT REFERENCES users(id),
+  last_invoice_sync TIMESTAMP NULL,
+  service_priority VARCHAR(20) DEFAULT 'Routine', -- For V3 routing
+  estimated_duration INT DEFAULT 60,
+  check_in_time TIMESTAMP NULL,
+  check_out_time TIMESTAMP NULL,
+  client_signature_url VARCHAR(500) NULL,
+  signed_by VARCHAR(100) NULL,
+  location_verified BOOLEAN DEFAULT FALSE
+);
+
+-- Service-Stock Assignment
+CREATE TABLE service_stock_issued (
+  id SERIAL PRIMARY KEY,
+  service_id INT REFERENCES services(id),
+  equipment_id INT REFERENCES equipment(id),
+  consumable_id INT REFERENCES consumables(id),
+  quantity INT DEFAULT 1,
+  returned BOOLEAN DEFAULT FALSE,
+  returned_at TIMESTAMP NULL
+);
+
+-- Users
+CREATE TABLE users (
+  id SERIAL PRIMARY KEY,
+  name VARCHAR(100) NOT NULL,
+  email VARCHAR(255) UNIQUE NOT NULL,
+  password_hash TEXT NOT NULL,
+  roles TEXT DEFAULT 'team_member', -- comma-separated: 'ops_manager,admin'
+  role_assignment_source VARCHAR(20) DEFAULT 'manual', -- For V3 audit
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Audit Log
+CREATE TABLE audit_log (
+  id SERIAL PRIMARY KEY,
+  user_id INT,
+  action VARCHAR(50),
+  entity_type VARCHAR(50),
+  entity_id INT,
+  timestamp TIMESTAMP DEFAULT NOW(),
+  metadata JSONB
+);
+
+-- Role Changes (V3-ready)
+CREATE TABLE role_changes (
+  id SERIAL PRIMARY KEY,
+  user_id INT,
+  old_roles TEXT,
+  new_roles TEXT,
+  changed_by INT,
+  changed_at TIMESTAMP DEFAULT NOW(),
+  reason TEXT
+);
+
+-- Accounting Integration (V2-ready)
+CREATE TABLE accounting_integration (
+  id SERIAL PRIMARY KEY,
+  org_id INT NOT NULL,
+  provider VARCHAR(50) NOT NULL, -- 'sage_one'
+  api_key_encrypted TEXT NOT NULL,
+  sync_enabled BOOLEAN DEFAULT TRUE,
+  last_sync TIMESTAMP NULL,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Outbound Webhooks (V2-ready)
+CREATE TABLE outbound_webhooks (
+  id SERIAL PRIMARY KEY,
+  service_id INT,
+  endpoint VARCHAR(255),
+  payload JSONB,
+  status VARCHAR(20) DEFAULT 'pending', -- 'pending', 'sent', 'failed'
+  retry_count INT DEFAULT 0,
+  next_attempt TIMESTAMP,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Photos (V2-ready)
+CREATE TABLE photos (
+  id SERIAL PRIMARY KEY,
+  service_id INT,
+  image_url VARCHAR(500) NOT NULL,
+  caption TEXT,
+  uploaded_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Service Logs (V3-ready)
+CREATE TABLE service_logs (
+  id SERIAL PRIMARY KEY,
+  service_id INT,
+  event_type VARCHAR(50), -- 'assigned', 'check-in', 'check-out', 'completed'
+  timestamp TIMESTAMP,
+  lat DECIMAL(9,6),
+  lng DECIMAL(9,6),
+  metadata JSONB
+);
+2. Core Workflows
+2.1 Add Client with Address (OSM + Map Fallback)
+UI: Input field with 300ms debounce
+On input:
+js
+fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${query}&limit=5`)
+Show dropdown of results
+On select:
+Re-geocode via Nominatim to get final lat/lng
+Fill address_text, latitude, longitude
+If no match:
+Allow manual entry
+Require user to click map to set lat/lng
+Validation: lat, lng required
+Search: Use ILIKE or trigram index on address_text
+2.2 Create Contract Installation → Convert to Service Contract
+Form fields:
+Client (searchable dropdown)
+Equipment (multi-select, text-filtered)
+Consumables (linked + standalone, multi-select)
+Team (dropdown)
+Installation date
+On save: create service with type = 'installation'
+After completion:
+Prompt: “Convert to Service Contract?”
+If yes:
+Copy service data
+Set type = 'service_contract'
+Set recurrence_pattern (e.g., { interval: '30d', end_date: '2026-01-01' })
+Generate recurring services (Mon–Fri only)
+Add 🔁 icon in calendar
+2.3 Mark Service as Complete
+User clicks “Mark Complete”
+System prompts:
+“Return unused stock for this service?”
+[List of issued items not marked as returned]
+[Return Now] [Skip for Now]
+
+If “Skip”, mark status = 'completed', completed_at = NOW()
+Log in audit_log
+2.4 CSV Upload with Preview & Validation
+User uploads CSV
+System parses and validates:
+Required fields present
+stock_code unique
+latitude/longitude valid if present
+Show preview table:
+Row-by-row status (✅ Valid, ❌ Invalid)
+Error messages
+No inline editing
+User must fix file and re-upload
+2.5 Invoicing (V1: Manual)
+On service completion: marked_for_invoicing = true
+Dashboard shows “Services Ready to Invoice”
+User manually invoices in Sage One
+In app:
+Set invoiced_status = 'invoiced'
+Set invoiced_by = user.id
+Set last_invoice_sync = NOW()
+2.6 Dashboard (Unified View)
+Widgets (all shown to all users):
+
+Services Scheduled (filter: day/week/month/quarter)
+Missed Services
+Completed Services Awaiting Review
+Consumables Required (filter: period)
+Low Stock Alerts (current_stock < min_stock_level)
+Services Ready to Invoice
+Contracts Expiring (filter: period)
+KPI Cards (Zoho/Brightpearl style):
+
+“Services Today (12)”
+“Low Stock (3)”
+“Expiring Contracts (5)”
+All clickable
+2.7 Calendar (Drag & Drop)
+FullCalendar.js or similar
+Color coding:
+Amber: scheduled
+Green: completed
+Red: missed
+Recurring services:
+Show 🔁 icon
+On drag: show modal:
+“This is a recurring service. Change this instance or all future services?”
+[Just This One] [All Future]
+
+Update installation_date
+3. Permissions (Role-Based, Multiple Roles)
+js
+// permissions.js
+function hasRole(user, role) {
+  return user.roles.split(',').includes(role);
+}
+
+function canCreateUser(user) {
+  return hasRole(user, 'super_user') || hasRole(user, 'general_manager');
+}
+
+function canEditStock(user) {
+  return hasRole(user, 'warehouse_clerk') || hasRole(user, 'ops_manager') || hasRole(user, 'super_user');
+}
+
+function canMarkComplete(user) {
+  return hasRole(user, 'ops_manager') || hasRole(user, 'team_member');
+}
+Hide UI elements based on checks
+Enforce server-side on all mutations
+4. Reporting
+| Report | Query |
+
+| Equipment in Field | SELECT COUNT(*) FROM equipment WHERE status = 'in_field' |
+| Warehouse Stock | SELECT * FROM consumables WHERE current_stock > 0 |
+| Consumables Needed (Next 30 Days) | Join services, service_stock_issued, sum quantity |
+| Services by Team (This Week) | SELECT * FROM services WHERE team_id = ? AND installation_date BETWEEN ? AND ? |
+
+All reports: Export to CSV button
+
+5. Replit-Specific Setup
+Project Type: Full-stack (React + Node.js)
+Database: Replit DB (PostgreSQL mode)
+AI Prompting Tip:
+“Use the schema above. Build the dashboard with Tailwind CSS. Show KPI cards for services today, missed, low stock, and expiring contracts.”
+
+Checkpoints (Use Replit Agent):
+Client + Address Module
+Equipment + Consumables + CSV Upload
+Service Creation + Conversion
+Calendar + Drag/Drop
+Dashboard + Reporting
+6. Out of Scope (V1)
+Mobile app
+Barcode scanning
+Sage API sync
+Route planning
+Role-specific dashboards
+Photo uploads
+Signature capture
+Offline mode
+All architected for — but not built.
+
+Final Notes
+This FSD is buildable today in Replit.
+Start with the dashboard — it’s the ops nerve center.
+Use Checkpoints after each module.
+Review AI output — it will hallucinate features. Delete them.
+This is your source of truth — every line of code ties back here.
+Now go build it.
+
+And when the warehouse clerk says, “I can finally see what’s in the field,”
+you’ll know you didn’t just ship software —
+you fixed a broken operation.
+
+You’ve got this.
+
+✅
+
+Ready.
+Clear.
+Executable.
+
+Chat with Lewis
+
+https://venice.ai/chat/811e9bc7-6527-4981-b84b-dd3aef50a6ff?ref=-XEdW-#veniceShareKey=YZsaSWsdMOuUXVjFx1LFSFY%2BxgsoNe9%2FIQLJIcW5YWw%3D&veniceShareNonce=vyMy%2BEd3PivSXlxt5qXojKaRkMFuS966

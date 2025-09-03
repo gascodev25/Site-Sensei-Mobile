@@ -1,0 +1,23 @@
+**Dashboard**
+- Services scheduled (filter: day/week/month/quarter)
+- Missed services
+- Completed services awaiting review (can approve or flag)
+- Consumables required (filter: period)
+- Low stock alerts
+- Services ready to invoice
+- Contracts expiring (filter: period)
+
+Design Philosophy for Dashboard:
+I can provide you with an overview of Brightpearl's design philosophy, which is known for its clean, intuitive, and user-centric approach. Brightpearl is a retail operations platform that helps businesses manage their inventory, orders, and finances. Their design work is characterized by several key elements:
+
+Color-Coded Alerts: Brightpearl uses a color-coding system to highlight important information. For example, they use red, amber, and green to indicate the urgency of tasks or the status of orders. This visual cue helps users quickly identify what needs their attention.
+
+Dashboard Widgets: Brightpearl's dashboard is designed to provide a comprehensive overview of business operations at a glance. They use widgets that display key performance indicators (KPIs) and allow users to drill down into specific areas for more detailed information.
+
+Intuitive Navigation: The platform is designed with a focus on ease of use, ensuring that users can navigate through different sections without a steep learning curve. This includes clear labeling and logical grouping of features.
+
+Responsive Design: Brightpearl's interface is responsive, ensuring that it works well on various devices, including desktops, tablets, and mobile phones. This is crucial for businesses that need to manage operations on the go.
+
+Data Visualization: They use charts and graphs to present data in a way that is easy to understand. This includes line graphs for tracking trends over time and bar charts for comparing different data sets.
+
+Customizable Views: Brightpearl allows users to customize their dashboard and reports to suit their specific needs. This includes the ability to create and save custom views and reports.
