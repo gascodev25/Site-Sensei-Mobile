@@ -9,6 +9,9 @@ interface AddressSuggestion {
   display_name: string;
   lat: string;
   lon: string;
+  name?: string;
+  extracted_house_number?: string;
+  original_query?: string;
   address?: {
     house_number?: string;
     road?: string;
@@ -19,6 +22,7 @@ interface AddressSuggestion {
     county?: string;
     suburb?: string;
     postcode?: string;
+    state?: string;
   };
 }
 
@@ -43,13 +47,53 @@ export default function AddressAutocomplete({
 
   const searchAddressMutation = useMutation({
     mutationFn: async (query: string) => {
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5&countrycodes=za`
-      );
-      if (!response.ok) {
-        throw new Error("Failed to search addresses");
+      // Extract house number if present
+      const houseNumberMatch = query.match(/^(\d+)\s+(.+)/);
+      const houseNumber = houseNumberMatch ? houseNumberMatch[1] : null;
+      const streetQuery = houseNumberMatch ? houseNumberMatch[2] : query;
+      
+      // Try multiple search strategies
+      const searchUrls = [
+        // First try the full address with structured search if house number exists
+        ...(houseNumber ? [
+          `https://nominatim.openstreetmap.org/search?format=json&housenumber=${encodeURIComponent(houseNumber)}&street=${encodeURIComponent(streetQuery)}&countrycodes=za&addressdetails=1&limit=3`
+        ] : []),
+        // Then try the full query
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&countrycodes=za&addressdetails=1&limit=5`,
+        // Finally try just the street name if house number was present
+        ...(houseNumber ? [
+          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(streetQuery)}&countrycodes=za&addressdetails=1&limit=3`
+        ] : [])
+      ];
+
+      let allResults: any[] = [];
+      
+      for (const url of searchUrls) {
+        try {
+          const response = await fetch(url);
+          if (response.ok) {
+            const data = await response.json();
+            if (data.length > 0) {
+              // Add house number info to results if we extracted one
+              const enrichedData = data.map((result: any) => ({
+                ...result,
+                extracted_house_number: houseNumber,
+                original_query: query
+              }));
+              allResults = [...allResults, ...enrichedData];
+            }
+          }
+        } catch (error) {
+          console.warn("Search failed for URL:", url, error);
+        }
       }
-      return response.json();
+      
+      // Remove duplicates based on place_id and limit results
+      const uniqueResults = allResults.filter((result, index, self) => 
+        index === self.findIndex(r => r.place_id === result.place_id)
+      ).slice(0, 5);
+      
+      return uniqueResults;
     },
     onSuccess: (data) => {
       setSuggestions(data);
@@ -116,14 +160,25 @@ export default function AddressAutocomplete({
         
         const postcode = result.address?.postcode;
 
-        // Extract only the street address part, not the full display name
-        const streetAddress = [
-          result.address?.house_number,
-          result.address?.road
-        ].filter(Boolean).join(' ') || suggestion.display_name;
+        // Build the street address, preserving extracted house number if available
+        const streetAddress = (() => {
+          // If we have an extracted house number and no house number from API
+          if (suggestion.extracted_house_number && !result.address?.house_number) {
+            const road = result.address?.road;
+            return road ? `${suggestion.extracted_house_number} ${road}` : suggestion.original_query;
+          }
+          
+          // If API has house number, use it
+          if (result.address?.house_number && result.address?.road) {
+            return `${result.address.house_number} ${result.address.road}`;
+          }
+          
+          // Fallback to road only or original display name
+          return result.address?.road || suggestion.display_name;
+        })();
 
-        setInputValue(streetAddress);
-        onAddressSelect(streetAddress, preciseLat, preciseLng, city, postcode);
+        setInputValue(streetAddress || suggestion.display_name);
+        onAddressSelect(streetAddress || suggestion.display_name, preciseLat, preciseLng, city, postcode);
         setShowSuggestions(false);
         setSuggestions([]);
       }
@@ -133,12 +188,20 @@ export default function AddressAutocomplete({
       const city = suggestion.address?.city || suggestion.address?.town;
       const postcode = suggestion.address?.postcode;
       
-      // Try to extract just the street address from display_name
-      const parts = suggestion.display_name.split(',');
-      const streetAddress = parts[0] || suggestion.display_name;
+      // Build the street address, preserving extracted house number if available
+      const streetAddress = (() => {
+        // If we have an extracted house number, use the original query
+        if (suggestion.extracted_house_number) {
+          return suggestion.original_query;
+        }
+        
+        // Otherwise, extract just the street address from display_name
+        const parts = suggestion.display_name.split(',');
+        return parts[0] || suggestion.display_name;
+      })();
       
-      setInputValue(streetAddress);
-      onAddressSelect(streetAddress, lat, lng, city, postcode);
+      setInputValue(streetAddress || suggestion.display_name);
+      onAddressSelect(streetAddress || suggestion.display_name, lat, lng, city, postcode);
       setShowSuggestions(false);
       setSuggestions([]);
     }
@@ -180,20 +243,55 @@ export default function AddressAutocomplete({
             <div className="p-3 text-sm text-muted-foreground">Searching...</div>
           ) : suggestions.length > 0 ? (
             <>
-              {suggestions.map((suggestion, index) => (
-                <button
-                  key={index}
-                  type="button"
-                  className="w-full p-3 text-left hover:bg-accent hover:text-accent-foreground border-b border-border last:border-b-0 text-sm"
-                  onClick={() => handleSuggestionClick(suggestion)}
-                  data-testid={`suggestion-${index}`}
-                >
-                  <div className="flex items-start space-x-2">
-                    <MapPin className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
-                    <span>{suggestion.display_name}</span>
-                  </div>
-                </button>
-              ))}
+              {suggestions.map((suggestion, index) => {
+                // Create a display name that includes house number if available
+                const displayName = (() => {
+                  // If we have an extracted house number and this is a street-level result
+                  if (suggestion.extracted_house_number && !suggestion.address?.house_number) {
+                    const streetName = suggestion.address?.road || suggestion.name;
+                    if (streetName) {
+                      // Show house number + street + area info
+                      const areaInfo = [
+                        suggestion.address?.suburb,
+                        suggestion.address?.city || suggestion.address?.town,
+                        suggestion.address?.state
+                      ].filter(Boolean).join(', ');
+                      
+                      return `${suggestion.extracted_house_number} ${streetName}${areaInfo ? `, ${areaInfo}` : ''}`;
+                    }
+                  }
+                  
+                  // If the API returned a house number, use it
+                  if (suggestion.address?.house_number) {
+                    return suggestion.display_name;
+                  }
+                  
+                  // Default to the original display name
+                  return suggestion.display_name;
+                })();
+
+                return (
+                  <button
+                    key={index}
+                    type="button"
+                    className="w-full p-3 text-left hover:bg-accent hover:text-accent-foreground border-b border-border last:border-b-0 text-sm"
+                    onClick={() => handleSuggestionClick(suggestion)}
+                    data-testid={`suggestion-${index}`}
+                  >
+                    <div className="flex items-start space-x-2">
+                      <MapPin className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                      <div>
+                        <div className="font-medium">{displayName}</div>
+                        {suggestion.extracted_house_number && !suggestion.address?.house_number && (
+                          <div className="text-xs text-muted-foreground mt-1">
+                            House number preserved from your input
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
               <div className="p-2 border-t border-border">
                 <Button
                   type="button"
