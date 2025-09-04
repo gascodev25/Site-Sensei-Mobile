@@ -19,7 +19,7 @@ export default function Services() {
   const { toast } = useToast();
 
   const { data: services = [], isLoading } = useQuery<ServiceWithDetails[]>({
-    queryKey: ["/api/services", ...(searchQuery ? [{ search: searchQuery }] : [])],
+    queryKey: ["/api/services"],
   });
 
   const deleteServiceMutation = useMutation({
@@ -47,6 +47,20 @@ export default function Services() {
       deleteServiceMutation.mutate(service.id);
     }
   };
+
+  // Client-side filtering like Clients and Inventory pages
+  const filteredServices = services.filter(service => {
+    const searchLower = searchQuery.toLowerCase();
+    return (
+      (service.client?.name.toLowerCase().includes(searchLower)) ||
+      (service.client?.addressText.toLowerCase().includes(searchLower)) ||
+      (service.type.toLowerCase().includes(searchLower)) ||
+      (service.status.toLowerCase().includes(searchLower)) ||
+      (service.servicePriority?.toLowerCase().includes(searchLower)) ||
+      (service.team?.name.toLowerCase().includes(searchLower)) ||
+      (service.client?.contactPerson?.toLowerCase().includes(searchLower))
+    );
+  });
 
   const getStatusBadge = (status: string) => {
     const statusColors = {
@@ -199,7 +213,7 @@ export default function Services() {
         </div>
 
         {/* Services Grid */}
-        {services.length === 0 ? (
+        {filteredServices.length === 0 ? (
           <Card>
             <CardContent className="flex flex-col items-center justify-center py-12">
               <div className="text-muted-foreground text-center">
@@ -217,7 +231,7 @@ export default function Services() {
           </Card>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {services.map((service: ServiceWithDetails) => (
+            {filteredServices.map((service: ServiceWithDetails) => (
               <Card key={service.id} className="hover:shadow-md transition-shadow" data-testid={`card-service-${service.id}`}>
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between">
