@@ -1148,7 +1148,7 @@ export default function Inventory() {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {filteredEquipment.map((equipmentItem) => {
-                  console.log('Equipment item:', equipmentItem); // Debug log
+                  console.log('Equipment item:', JSON.stringify(equipmentItem, null, 2)); // Debug log
                   return (
                   <Card key={equipmentItem.id} className="hover:shadow-md transition-shadow" data-testid={`card-equipment-${equipmentItem.id}`}>
                     <CardHeader className="pb-3">

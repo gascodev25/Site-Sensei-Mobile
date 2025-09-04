@@ -1,0 +1,39 @@
+chunk-RPCDYKBN.js?v=6bdd940b:21551 Download the React DevTools for a better development experience: https://reactjs.org/link/react-devtools
+chunk-RPCDYKBN.js?v=6bdd940b:521 Warning: validateDOMNesting(...): <a> cannot appear as a descendant of <a>.
+    at a
+    at a
+    at https://f7e6bacf-83dd-45ee-80f6-f413f067de71-00-vdxv1g2r39fv.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/wouter.js?v=6bdd940b:337:18
+    at nav
+    at div
+    at div
+    at div
+    at header
+    at Header (https://f7e6bacf-83dd-45ee-80f6-f413f067de71-00-vdxv1g2r39fv.janeway.replit.dev/src/components/Layout/Header.tsx:24:20)
+    at div
+    at Inventory (https://f7e6bacf-83dd-45ee-80f6-f413f067de71-00-vdxv1g2r39fv.janeway.replit.dev/src/pages/Inventory.tsx:38:41)
+    at Route (https://f7e6bacf-83dd-45ee-80f6-f413f067de71-00-vdxv1g2r39fv.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/wouter.js?v=6bdd940b:323:16)
+    at Switch (https://f7e6bacf-83dd-45ee-80f6-f413f067de71-00-vdxv1g2r39fv.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/wouter.js?v=6bdd940b:379:17)
+    at Router (https://f7e6bacf-83dd-45ee-80f6-f413f067de71-00-vdxv1g2r39fv.janeway.replit.dev/src/App.tsx?v=bBesBMst34m73FFrVu6zc:34:42)
+    at Provider (https://f7e6bacf-83dd-45ee-80f6-f413f067de71-00-vdxv1g2r39fv.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-7SUNRGEF.js?v=6bdd940b:38:15)
+    at TooltipProvider (https://f7e6bacf-83dd-45ee-80f6-f413f067de71-00-vdxv1g2r39fv.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-tooltip.js?v=6bdd940b:59:5)
+    at QueryClientProvider (https://f7e6bacf-83dd-45ee-80f6-f413f067de71-00-vdxv1g2r39fv.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@tanstack_react-query.js?v=6bdd940b:2805:3)
+    at App
+printWarning @ chunk-RPCDYKBN.js?v=6bdd940b:521
+Inventory.tsx:1151 Equipment item: Object
+Inventory.tsx:1151 Equipment item: Object
+Inventory.tsx:1151 Equipment item: Object
+Inventory.tsx:1151 Equipment item: Object
+Inventory.tsx:1151 Equipment item: Object
+Inventory.tsx:1151 Equipment item: Object
+Inventory.tsx:1151 Equipment item: Object
+Inventory.tsx:1151 Equipment item: Object
+Inventory.tsx:1151 Equipment item: Object
+Inventory.tsx:1151 Equipment item: Object
+Inventory.tsx:1151 Equipment item: Object
+Inventory.tsx:1151 Equipment item: Object
+Inventory.tsx:1151 Equipment item: Object
+Inventory.tsx:1151 Equipment item: Object
+Inventory.tsx:1151 Equipment item: Object
+Inventory.tsx:1151 Equipment item: Object
+Inventory.tsx:1151 Equipment item: Object
+Inventory.tsx:1151 Equipment item: Object
