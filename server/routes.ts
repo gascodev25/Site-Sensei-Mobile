@@ -335,6 +335,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get('/api/equipment-templates/:id/consumables', isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const template = await storage.getEquipmentTemplateWithConsumables(id);
+      res.json(template?.templateConsumables || []);
+    } catch (error) {
+      console.error("Error fetching template consumables:", error);
+      res.status(500).json({ message: "Failed to fetch template consumables" });
+    }
+  });
+
   app.delete('/api/equipment-templates/:id', isAuthenticated, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
