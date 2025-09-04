@@ -1147,7 +1147,9 @@ export default function Inventory() {
               </Card>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filteredEquipment.map((equipmentItem) => (
+                {filteredEquipment.map((equipmentItem) => {
+                  console.log('Equipment item:', equipmentItem); // Debug log
+                  return (
                   <Card key={equipmentItem.id} className="hover:shadow-md transition-shadow" data-testid={`card-equipment-${equipmentItem.id}`}>
                     <CardHeader className="pb-3">
                       <div className="flex items-start justify-between">
@@ -1167,7 +1169,7 @@ export default function Inventory() {
                           {equipmentItem.templateId && (
                             <div className="flex items-center text-sm text-muted-foreground mt-1">
                               <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs font-medium">
-                                Template: {equipmentTemplates.find(t => t.id === parseInt(equipmentItem.templateId))?.name || 'Unknown'}
+                                Template: {equipmentTemplates.find(t => t.id === equipmentItem.templateId)?.name || 'Unknown'}
                               </span>
                             </div>
                           )}
@@ -1439,7 +1441,8 @@ export default function Inventory() {
                       </div>
                     </CardContent>
                   </Card>
-                ))}
+                  );
+                })}
               </div>
             )}
           </TabsContent>
