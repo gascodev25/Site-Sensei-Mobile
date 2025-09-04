@@ -465,6 +465,130 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.put('/api/team-members/:id', isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const memberData = insertTeamMemberSchema.partial().parse(req.body);
+      const member = await storage.updateTeamMember(id, memberData);
+      
+      // Audit log
+      await storage.createAuditLog({
+        userId: req.user?.claims?.sub,
+        action: 'update',
+        entityType: 'team_member',
+        entityId: member.id,
+        metadata: { memberName: member.name, skill: member.skill }
+      });
+      
+      res.json(member);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Validation error", errors: error.errors });
+      }
+      console.error("Error updating team member:", error);
+      res.status(500).json({ message: "Failed to update team member" });
+    }
+  });
+
+  app.delete('/api/team-members/:id', isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      await storage.deleteTeamMember(id);
+      
+      // Audit log
+      await storage.createAuditLog({
+        userId: req.user?.claims?.sub,
+        action: 'delete',
+        entityType: 'team_member',
+        entityId: id,
+        metadata: {}
+      });
+      
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting team member:", error);
+      res.status(500).json({ message: "Failed to delete team member" });
+    }
+  });
+
+  app.put('/api/service-teams/:id', isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const teamData = insertServiceTeamSchema.partial().parse(req.body);
+      const team = await storage.updateServiceTeam(id, teamData);
+      
+      // Audit log
+      await storage.createAuditLog({
+        userId: req.user?.claims?.sub,
+        action: 'update',
+        entityType: 'service_team',
+        entityId: team.id,
+        metadata: { teamName: team.name }
+      });
+      
+      res.json(team);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Validation error", errors: error.errors });
+      }
+      console.error("Error updating service team:", error);
+      res.status(500).json({ message: "Failed to update service team" });
+    }
+  });
+
+  app.delete('/api/service-teams/:id', isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      await storage.deleteServiceTeam(id);
+      
+      // Audit log
+      await storage.createAuditLog({
+        userId: req.user?.claims?.sub,
+        action: 'delete',
+        entityType: 'service_team',
+        entityId: id,
+        metadata: {}
+      });
+      
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting service team:", error);
+      res.status(500).json({ message: "Failed to delete service team" });
+    }
+  });
+
+  app.get('/api/team-assignments', isAuthenticated, async (req, res) => {
+    try {
+      const assignments = await storage.getTeamAssignments();
+      res.json(assignments);
+    } catch (error) {
+      console.error("Error fetching team assignments:", error);
+      res.status(500).json({ message: "Failed to fetch team assignments" });
+    }
+  });
+
+  app.put('/api/service-teams/:id/assignments', isAuthenticated, async (req, res) => {
+    try {
+      const teamId = parseInt(req.params.id);
+      const { memberIds } = req.body;
+      await storage.updateTeamAssignments(teamId, memberIds);
+      
+      // Audit log
+      await storage.createAuditLog({
+        userId: req.user?.claims?.sub,
+        action: 'update',
+        entityType: 'team_assignment',
+        entityId: teamId,
+        metadata: { memberIds }
+      });
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error updating team assignments:", error);
+      res.status(500).json({ message: "Failed to update team assignments" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

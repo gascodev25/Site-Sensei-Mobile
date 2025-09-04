@@ -6,6 +6,7 @@ import {
   services,
   teamMembers,
   serviceTeams,
+  teamAssignments,
   auditLog,
   type User,
   type UpsertUser,
@@ -75,7 +76,13 @@ export interface IStorage {
   getTeamMembers(): Promise<TeamMember[]>;
   getServiceTeams(): Promise<ServiceTeam[]>;
   createTeamMember(member: InsertTeamMember): Promise<TeamMember>;
+  updateTeamMember(id: number, member: Partial<InsertTeamMember>): Promise<TeamMember>;
+  deleteTeamMember(id: number): Promise<void>;
   createServiceTeam(team: InsertServiceTeam): Promise<ServiceTeam>;
+  updateServiceTeam(id: number, team: Partial<InsertServiceTeam>): Promise<ServiceTeam>;
+  deleteServiceTeam(id: number): Promise<void>;
+  getTeamAssignments(): Promise<{ teamId: number; memberId: number; }[]>;
+  updateTeamAssignments(teamId: number, memberIds: number[]): Promise<void>;
   
   // Dashboard metrics
   getDashboardMetrics(): Promise<{
@@ -330,11 +337,11 @@ export class DatabaseStorage implements IStorage {
 
   // Team operations
   async getTeamMembers(): Promise<TeamMember[]> {
-    return await db.select().from(teamMembers).orderBy(asc(teamMembers.name));
+    return await db.select().from(teamMembers).orderBy(teamMembers.createdAt);
   }
 
   async getServiceTeams(): Promise<ServiceTeam[]> {
-    return await db.select().from(serviceTeams).orderBy(asc(serviceTeams.name));
+    return await db.select().from(serviceTeams).orderBy(serviceTeams.createdAt);
   }
 
   async createTeamMember(memberData: InsertTeamMember): Promise<TeamMember> {
@@ -342,9 +349,54 @@ export class DatabaseStorage implements IStorage {
     return newMember;
   }
 
+  async updateTeamMember(id: number, memberData: Partial<InsertTeamMember>): Promise<TeamMember> {
+    const [member] = await db
+      .update(teamMembers)
+      .set(memberData)
+      .where(eq(teamMembers.id, id))
+      .returning();
+    return member;
+  }
+
+  async deleteTeamMember(id: number): Promise<void> {
+    await db.delete(teamMembers).where(eq(teamMembers.id, id));
+  }
+
   async createServiceTeam(teamData: InsertServiceTeam): Promise<ServiceTeam> {
     const [newTeam] = await db.insert(serviceTeams).values(teamData).returning();
     return newTeam;
+  }
+
+  async updateServiceTeam(id: number, teamData: Partial<InsertServiceTeam>): Promise<ServiceTeam> {
+    const [team] = await db
+      .update(serviceTeams)
+      .set(teamData)
+      .where(eq(serviceTeams.id, id))
+      .returning();
+    return team;
+  }
+
+  async deleteServiceTeam(id: number): Promise<void> {
+    await db.delete(serviceTeams).where(eq(serviceTeams.id, id));
+  }
+
+  // Team assignment methods
+  async getTeamAssignments(): Promise<{ teamId: number; memberId: number; }[]> {
+    return await db.select().from(teamAssignments);
+  }
+
+  async updateTeamAssignments(teamId: number, memberIds: number[]): Promise<void> {
+    // Remove existing assignments for this team
+    await db.delete(teamAssignments).where(eq(teamAssignments.teamId, teamId));
+    
+    // Add new assignments
+    if (memberIds.length > 0) {
+      const assignments = memberIds.map(memberId => ({
+        teamId,
+        memberId
+      }));
+      await db.insert(teamAssignments).values(assignments);
+    }
   }
 
   // Dashboard metrics
