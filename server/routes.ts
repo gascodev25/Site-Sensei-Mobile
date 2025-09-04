@@ -420,6 +420,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/team-members', isAuthenticated, async (req, res) => {
     try {
       const memberData = insertTeamMemberSchema.parse(req.body);
+      // Convert "none" to null for skill field
+      if (memberData.skill === "none") {
+        memberData.skill = null;
+      }
       const member = await storage.createTeamMember(memberData);
       
       // Audit log
@@ -469,6 +473,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const id = parseInt(req.params.id);
       const memberData = insertTeamMemberSchema.partial().parse(req.body);
+      // Convert "none" to null for skill field
+      if (memberData.skill === "none") {
+        memberData.skill = null;
+      }
       const member = await storage.updateTeamMember(id, memberData);
       
       // Audit log

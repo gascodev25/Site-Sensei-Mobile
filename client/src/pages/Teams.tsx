@@ -182,7 +182,7 @@ export default function Teams() {
     memberForm.reset({
       name: member.name,
       phone: member.phone || "",
-      skill: member.skill || "",
+      skill: member.skill || "none",
     });
   };
 
@@ -199,7 +199,7 @@ export default function Teams() {
   };
 
   const getSkillBadge = (skill: string | null) => {
-    if (!skill) return null;
+    if (!skill || skill === "none") return null;
     const skillColors = {
       "Hygiene": "bg-blue-100 text-blue-800",
       "Deep Clean": "bg-green-100 text-green-800", 
@@ -415,7 +415,7 @@ export default function Teams() {
                                   </SelectTrigger>
                                 </FormControl>
                                 <SelectContent>
-                                  <SelectItem value="">No specific skill</SelectItem>
+                                  <SelectItem value="none">No specific skill</SelectItem>
                                   <SelectItem value="Hygiene">Hygiene</SelectItem>
                                   <SelectItem value="Deep Clean">Deep Clean</SelectItem>
                                   <SelectItem value="Pest Control">Pest Control</SelectItem>
@@ -659,7 +659,7 @@ export default function Teams() {
                                             </SelectTrigger>
                                           </FormControl>
                                           <SelectContent>
-                                            <SelectItem value="">No specific skill</SelectItem>
+                                            <SelectItem value="none">No specific skill</SelectItem>
                                             <SelectItem value="Hygiene">Hygiene</SelectItem>
                                             <SelectItem value="Deep Clean">Deep Clean</SelectItem>
                                             <SelectItem value="Pest Control">Pest Control</SelectItem>
