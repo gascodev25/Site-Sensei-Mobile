@@ -128,6 +128,36 @@ export default function Inventory() {
     },
   });
 
+  const updateEquipmentMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: number; data: z.infer<typeof equipmentFormSchema> }) => {
+      const formattedData: Partial<InsertEquipment> = {
+        name: data.name,
+        stockCode: data.stockCode,
+        price: data.price || null,
+        status: data.status,
+        barcode: data.barcode || null,
+        qrCode: data.qrCode || null,
+      };
+      return await apiRequest("PUT", `/api/equipment/${id}`, formattedData);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/equipment"] });
+      toast({
+        title: "Success",
+        description: "Equipment updated successfully",
+      });
+      equipmentForm.reset();
+      setEditingEquipment(null);
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const deleteEquipmentMutation = useMutation({
     mutationFn: async (equipmentId: number) => {
       await apiRequest("DELETE", `/api/equipment/${equipmentId}`);
@@ -199,6 +229,18 @@ export default function Inventory() {
       });
     },
   });
+
+  const handleEditEquipment = (equipmentItem: Equipment) => {
+    setEditingEquipment(equipmentItem);
+    equipmentForm.reset({
+      name: equipmentItem.name,
+      stockCode: equipmentItem.stockCode,
+      price: equipmentItem.price || "",
+      status: equipmentItem.status || "in_warehouse",
+      barcode: equipmentItem.barcode || "",
+      qrCode: equipmentItem.qrCode || "",
+    });
+  };
 
   const handleDeleteEquipment = (equipmentItem: Equipment) => {
     if (confirm(`Are you sure you want to delete ${equipmentItem.name}?`)) {
@@ -707,24 +749,148 @@ export default function Inventory() {
                           </div>
                         </div>
                         <div className="flex space-x-1">
-                          <Dialog>
+                          <Dialog open={editingEquipment?.id === equipmentItem.id} onOpenChange={(open) => !open && setEditingEquipment(null)}>
                             <DialogTrigger asChild>
                               <Button 
                                 variant="ghost" 
                                 size="sm"
-                                onClick={() => setEditingEquipment(equipmentItem)}
+                                onClick={() => handleEditEquipment(equipmentItem)}
                                 data-testid={`button-edit-equipment-${equipmentItem.id}`}
                               >
                                 <Edit className="h-4 w-4" />
                               </Button>
                             </DialogTrigger>
-                            <DialogContent className="max-w-2xl">
+                            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
                               <DialogHeader>
                                 <DialogTitle>Edit Equipment</DialogTitle>
                               </DialogHeader>
-                              <div className="p-4 text-center text-muted-foreground">
-                                Equipment editing form coming soon...
-                              </div>
+                              <Form {...equipmentForm}>
+                                <form onSubmit={equipmentForm.handleSubmit((data) => updateEquipmentMutation.mutate({ id: equipmentItem.id, data }))} className="space-y-6">
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <FormField
+                                      control={equipmentForm.control}
+                                      name="name"
+                                      render={({ field }) => (
+                                        <FormItem>
+                                          <FormLabel>Equipment Name *</FormLabel>
+                                          <FormControl>
+                                            <Input placeholder="Enter equipment name" {...field} data-testid="input-edit-equipment-name" />
+                                          </FormControl>
+                                          <FormMessage />
+                                        </FormItem>
+                                      )}
+                                    />
+                                    
+                                    <FormField
+                                      control={equipmentForm.control}
+                                      name="stockCode"
+                                      render={({ field }) => (
+                                        <FormItem>
+                                          <FormLabel>Stock Code *</FormLabel>
+                                          <FormControl>
+                                            <Input placeholder="Enter stock code" {...field} data-testid="input-edit-equipment-stock-code" />
+                                          </FormControl>
+                                          <FormMessage />
+                                        </FormItem>
+                                      )}
+                                    />
+                                  </div>
+
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <FormField
+                                      control={equipmentForm.control}
+                                      name="price"
+                                      render={({ field }) => (
+                                        <FormItem>
+                                          <FormLabel>Price (R)</FormLabel>
+                                          <FormControl>
+                                            <Input 
+                                              type="number" 
+                                              step="0.01" 
+                                              placeholder="0.00" 
+                                              {...field} 
+                                              data-testid="input-edit-equipment-price" 
+                                            />
+                                          </FormControl>
+                                          <FormMessage />
+                                        </FormItem>
+                                      )}
+                                    />
+                                    
+                                    <FormField
+                                      control={equipmentForm.control}
+                                      name="status"
+                                      render={({ field }) => (
+                                        <FormItem>
+                                          <FormLabel>Status</FormLabel>
+                                          <Select onValueChange={field.onChange} value={field.value} data-testid="select-edit-equipment-status">
+                                            <FormControl>
+                                              <SelectTrigger>
+                                                <SelectValue placeholder="Select status" />
+                                              </SelectTrigger>
+                                            </FormControl>
+                                            <SelectContent>
+                                              <SelectItem value="in_warehouse">In Warehouse</SelectItem>
+                                              <SelectItem value="in_field">In Field</SelectItem>
+                                              <SelectItem value="issued">Issued</SelectItem>
+                                              <SelectItem value="maintenance">Maintenance</SelectItem>
+                                            </SelectContent>
+                                          </Select>
+                                          <FormMessage />
+                                        </FormItem>
+                                      )}
+                                    />
+                                  </div>
+
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <FormField
+                                      control={equipmentForm.control}
+                                      name="barcode"
+                                      render={({ field }) => (
+                                        <FormItem>
+                                          <FormLabel>Barcode</FormLabel>
+                                          <FormControl>
+                                            <Input placeholder="Enter barcode" {...field} data-testid="input-edit-equipment-barcode" />
+                                          </FormControl>
+                                          <FormMessage />
+                                        </FormItem>
+                                      )}
+                                    />
+                                    
+                                    <FormField
+                                      control={equipmentForm.control}
+                                      name="qrCode"
+                                      render={({ field }) => (
+                                        <FormItem>
+                                          <FormLabel>QR Code</FormLabel>
+                                          <FormControl>
+                                            <Input placeholder="Enter QR code" {...field} data-testid="input-edit-equipment-qr-code" />
+                                          </FormControl>
+                                          <FormMessage />
+                                        </FormItem>
+                                      )}
+                                    />
+                                  </div>
+
+                                  <div className="flex justify-end space-x-2 pt-4">
+                                    <Button 
+                                      type="button" 
+                                      variant="outline" 
+                                      onClick={() => setEditingEquipment(null)}
+                                      data-testid="button-cancel-edit-equipment"
+                                    >
+                                      Cancel
+                                    </Button>
+                                    <Button 
+                                      type="submit" 
+                                      disabled={updateEquipmentMutation.isPending}
+                                      data-testid="button-save-edit-equipment"
+                                    >
+                                      {updateEquipmentMutation.isPending ? "Updating..." : "Update Equipment"}
+                                    </Button>
+                                  </div>
+                                </form>
+                              </Form>
                             </DialogContent>
                           </Dialog>
                           <Button 

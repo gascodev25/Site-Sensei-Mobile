@@ -181,6 +181,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.put('/api/equipment/:id', isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const equipmentData = insertEquipmentSchema.partial().parse(req.body);
+      const equipment = await storage.updateEquipment(id, equipmentData);
+      
+      // Audit log
+      await storage.createAuditLog({
+        userId: req.user?.claims?.sub,
+        action: 'update',
+        entityType: 'equipment',
+        entityId: equipment.id,
+        metadata: { equipmentName: equipment.name, stockCode: equipment.stockCode }
+      });
+      
+      res.json(equipment);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Validation error", errors: error.errors });
+      }
+      console.error("Error updating equipment:", error);
+      res.status(500).json({ message: "Failed to update equipment" });
+    }
+  });
+
+  app.delete('/api/equipment/:id', isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      await storage.deleteEquipment(id);
+      
+      // Audit log
+      await storage.createAuditLog({
+        userId: req.user?.claims?.sub,
+        action: 'delete',
+        entityType: 'equipment',
+        entityId: id,
+        metadata: {}
+      });
+      
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting equipment:", error);
+      res.status(500).json({ message: "Failed to delete equipment" });
+    }
+  });
+
   // Consumables routes
   app.get('/api/consumables', isAuthenticated, async (req, res) => {
     try {
