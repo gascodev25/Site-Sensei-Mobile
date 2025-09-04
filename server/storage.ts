@@ -241,67 +241,16 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateService(id: number, service: Partial<InsertService>): Promise<Service> {
-    const { equipmentItems, consumableItems, ...serviceData } = service;
-    
     const [updatedService] = await db
       .update(services)
-      .set(serviceData)
+      .set(service)
       .where(eq(services.id, id))
       .returning();
-    
-    // Handle equipment and consumables updates if provided
-    if (equipmentItems !== undefined || consumableItems !== undefined) {
-      // Delete existing stock assignments for this service
-      await db.delete(serviceStockIssued).where(eq(serviceStockIssued.serviceId, id));
-      
-      // Add new equipment assignments
-      if (equipmentItems && equipmentItems.length > 0) {
-        const equipmentStockData = equipmentItems.map(item => ({
-          serviceId: id,
-          equipmentId: item.id,
-          quantity: item.quantity,
-          returned: false,
-        }));
-        await db.insert(serviceStockIssued).values(equipmentStockData);
-      }
-      
-      // Add new consumable assignments
-      if (consumableItems && consumableItems.length > 0) {
-        const consumableStockData = consumableItems.map(item => ({
-          serviceId: id,
-          consumableId: item.id,
-          quantity: item.quantity,
-          returned: false,
-        }));
-        await db.insert(serviceStockIssued).values(consumableStockData);
-      }
-    }
-    
     return updatedService;
   }
 
   async deleteService(id: number): Promise<void> {
     await db.delete(services).where(eq(services.id, id));
-  }
-
-  async getServiceStockAssignments(serviceId: number): Promise<{
-    equipmentItems: Array<{ id: number; quantity: number }>;
-    consumableItems: Array<{ id: number; quantity: number }>;
-  }> {
-    const stockAssignments = await db
-      .select()
-      .from(serviceStockIssued)
-      .where(eq(serviceStockIssued.serviceId, serviceId));
-
-    const equipmentItems = stockAssignments
-      .filter(item => item.equipmentId !== null)
-      .map(item => ({ id: item.equipmentId!, quantity: item.quantity }));
-
-    const consumableItems = stockAssignments
-      .filter(item => item.consumableId !== null)
-      .map(item => ({ id: item.consumableId!, quantity: item.quantity }));
-
-    return { equipmentItems, consumableItems };
   }
 
   async searchServices(query: string): Promise<ServiceWithDetails[]> {
