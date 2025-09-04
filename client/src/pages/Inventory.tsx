@@ -1164,6 +1164,13 @@ export default function Inventory() {
                             <Package className="h-3 w-3 mr-1" />
                             <span>Price: {formatPrice(equipmentItem.price)}</span>
                           </div>
+                          {equipmentItem.templateId && (
+                            <div className="flex items-center text-sm text-muted-foreground mt-1">
+                              <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs font-medium">
+                                Template: {equipmentTemplates.find(t => t.id === parseInt(equipmentItem.templateId))?.name || 'Unknown'}
+                              </span>
+                            </div>
+                          )}
                         </div>
                         <div className="flex space-x-1">
                           <Dialog open={editingEquipment?.id === equipmentItem.id} onOpenChange={(open) => !open && setEditingEquipment(null)}>
