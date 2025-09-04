@@ -108,7 +108,8 @@ export default function Inventory() {
       const fetchTemplateConsumables = async () => {
         try {
           const response = await apiRequest('GET', `/api/equipment-templates/${selectedTemplate}/consumables`);
-          const consumableIds = response.map((tc: any) => tc.consumable.id);
+          const data = await response.json();
+          const consumableIds = data.map((tc: any) => tc.consumable.id);
           equipmentForm.setValue('consumableIds', consumableIds);
         } catch (error) {
           console.error('Failed to fetch template consumables:', error);
@@ -397,7 +398,8 @@ export default function Inventory() {
     const fetchTemplateWithConsumables = async () => {
       try {
         const response = await apiRequest('GET', `/api/equipment-templates/${template.id}/consumables`);
-        const consumableIds = response.map((tc: any) => tc.consumable.id);
+        const data = await response.json();
+        const consumableIds = data.map((tc: any) => tc.consumable.id);
         
         templateForm.reset({
           name: template.name,
@@ -429,7 +431,8 @@ export default function Inventory() {
     const fetchEquipmentWithConsumables = async () => {
       try {
         const response = await apiRequest('GET', `/api/equipment/${equipmentItem.id}/consumables`);
-        const consumableIds = response.map((ec: any) => ec.consumable.id);
+        const data = await response.json();
+        const consumableIds = data.map((ec: any) => ec.consumable.id);
         
         equipmentForm.reset({
           name: equipmentItem.name,
