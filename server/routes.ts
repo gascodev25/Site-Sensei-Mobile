@@ -536,6 +536,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get('/api/services/:id/stock', isAuthenticated, async (req, res) => {
+    try {
+      const serviceId = parseInt(req.params.id);
+      const stockAssignments = await storage.getServiceStockAssignments(serviceId);
+      res.json(stockAssignments);
+    } catch (error) {
+      console.error("Error fetching service stock assignments:", error);
+      res.status(500).json({ message: "Failed to fetch service stock assignments" });
+    }
+  });
+
   // Team routes
   app.get('/api/team-members', isAuthenticated, async (req, res) => {
     try {
