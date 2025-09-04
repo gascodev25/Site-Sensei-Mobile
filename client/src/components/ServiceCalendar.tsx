@@ -42,15 +42,67 @@ export default function ServiceCalendar({ services, onServiceClick, onServiceMov
     return colors[status as keyof typeof colors] || 'bg-gray-100 border-gray-400 text-gray-800';
   };
 
-  // Get services for a specific date
-  const getServicesForDate = (date: Date) => {
-    return filteredServices.filter(service => {
-      if (!service.installationDate) return false;
-      const serviceDate = typeof service.installationDate === 'string' 
+  // Generate recurring service instances based on service intervals
+  const generateRecurringInstances = (service: ServiceWithDetails, startDate: Date, endDate: Date): Date[] => {
+    if (!service.installationDate || !service.serviceInterval) {
+      return service.installationDate ? [typeof service.installationDate === 'string' 
         ? parseISO(service.installationDate)
-        : service.installationDate;
-      return isSameDay(serviceDate, date);
+        : service.installationDate] : [];
+    }
+
+    const instances: Date[] = [];
+    const baseDate = typeof service.installationDate === 'string' 
+      ? parseISO(service.installationDate)
+      : service.installationDate;
+    
+    let currentDate = new Date(baseDate);
+    
+    // Generate instances from base date backward to startDate
+    while (currentDate >= startDate) {
+      if (currentDate <= endDate) {
+        instances.push(new Date(currentDate));
+      }
+      currentDate = new Date(currentDate.getTime() - (service.serviceInterval * 24 * 60 * 60 * 1000));
+    }
+    
+    // Reset to base date and generate instances forward to endDate
+    currentDate = new Date(baseDate);
+    while (currentDate <= endDate) {
+      if (currentDate >= startDate && !instances.some(d => isSameDay(d, currentDate))) {
+        instances.push(new Date(currentDate));
+      }
+      currentDate = new Date(currentDate.getTime() + (service.serviceInterval * 24 * 60 * 60 * 1000));
+    }
+    
+    return instances.sort((a, b) => a.getTime() - b.getTime());
+  };
+
+  // Get services for a specific date (including recurring instances)
+  const getServicesForDate = (date: Date) => {
+    const servicesForDate: ServiceWithDetails[] = [];
+    
+    filteredServices.forEach(service => {
+      // For calendar view, we need to show recurring instances within a reasonable range
+      const viewStart = view === 'month' 
+        ? startOfMonth(startOfWeek(startOfMonth(currentDate), { weekStartsOn: 1 }))
+        : view === 'week' 
+        ? startOfWeek(currentDate, { weekStartsOn: 1 })
+        : currentDate;
+      
+      const viewEnd = view === 'month' 
+        ? endOfMonth(endOfWeek(endOfMonth(currentDate), { weekStartsOn: 1 }))
+        : view === 'week' 
+        ? endOfWeek(currentDate, { weekStartsOn: 1 })
+        : currentDate;
+
+      const instances = generateRecurringInstances(service, viewStart, viewEnd);
+      
+      if (instances.some(instanceDate => isSameDay(instanceDate, date))) {
+        servicesForDate.push(service);
+      }
     });
+    
+    return servicesForDate;
   };
 
   // Navigation functions
