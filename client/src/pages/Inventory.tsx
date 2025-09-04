@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -28,6 +28,8 @@ export default function Inventory() {
   const [isCreateConsumableOpen, setIsCreateConsumableOpen] = useState(false);
   const [editingEquipment, setEditingEquipment] = useState<Equipment | null>(null);
   const [editingConsumable, setEditingConsumable] = useState<Consumable | null>(null);
+  const [isCreateTemplateOpen, setIsCreateTemplateOpen] = useState(false);
+  const [editingTemplate, setEditingTemplate] = useState<any | null>(null);
   const { toast } = useToast();
 
   // Equipment queries
@@ -75,6 +77,13 @@ export default function Inventory() {
     qrCode: z.string().optional(),
   });
 
+  // Template form schema
+  const templateFormSchema = z.object({
+    name: z.string().min(1, "Template name is required"),
+    description: z.string().optional(),
+    consumableIds: z.array(z.number()).min(1, "At least one consumable must be selected"),
+  });
+
   // Equipment form
   const equipmentForm = useForm<z.infer<typeof equipmentFormSchema>>({
     resolver: zodResolver(equipmentFormSchema),
@@ -92,6 +101,36 @@ export default function Inventory() {
 
   // Watch template selection for auto-population
   const selectedTemplate = equipmentForm.watch('templateId');
+
+  // Auto-populate consumables when template is selected
+  useEffect(() => {
+    if (selectedTemplate && selectedTemplate !== 'custom') {
+      const fetchTemplateConsumables = async () => {
+        try {
+          const response = await apiRequest('GET', `/api/equipment-templates/${selectedTemplate}/consumables`);
+          const consumableIds = response.map((tc: any) => tc.consumable.id);
+          equipmentForm.setValue('consumableIds', consumableIds);
+        } catch (error) {
+          console.error('Failed to fetch template consumables:', error);
+        }
+      };
+      
+      fetchTemplateConsumables();
+    } else if (selectedTemplate === 'custom') {
+      // Clear consumables when custom is selected
+      equipmentForm.setValue('consumableIds', []);
+    }
+  }, [selectedTemplate]);
+
+  // Template form
+  const templateForm = useForm<z.infer<typeof templateFormSchema>>({
+    resolver: zodResolver(templateFormSchema),
+    defaultValues: {
+      name: "",
+      description: "",
+      consumableIds: [],
+    },
+  });
 
   // Consumable form
   const consumableForm = useForm<z.infer<typeof consumableFormSchema>>({
@@ -274,6 +313,113 @@ export default function Inventory() {
       });
     },
   });
+
+  // Template mutations
+  const createTemplateMutation = useMutation({
+    mutationFn: async (data: z.infer<typeof templateFormSchema>) => {
+      const formattedData = {
+        name: data.name,
+        description: data.description || null,
+        consumableIds: data.consumableIds,
+      };
+      return await apiRequest("POST", "/api/equipment-templates", formattedData);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/equipment-templates"] });
+      toast({
+        title: "Success",
+        description: "Template created successfully",
+      });
+      templateForm.reset();
+      setIsCreateTemplateOpen(false);
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const updateTemplateMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: number; data: z.infer<typeof templateFormSchema> }) => {
+      const formattedData = {
+        name: data.name,
+        description: data.description || null,
+        consumableIds: data.consumableIds,
+      };
+      return await apiRequest("PUT", `/api/equipment-templates/${id}`, formattedData);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/equipment-templates"] });
+      toast({
+        title: "Success",
+        description: "Template updated successfully",
+      });
+      templateForm.reset();
+      setEditingTemplate(null);
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteTemplateMutation = useMutation({
+    mutationFn: async (templateId: number) => {
+      await apiRequest("DELETE", `/api/equipment-templates/${templateId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/equipment-templates"] });
+      toast({
+        title: "Success",
+        description: "Template deleted successfully",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleEditTemplate = (template: any) => {
+    setEditingTemplate(template);
+    
+    // Fetch template with consumables to populate form correctly
+    const fetchTemplateWithConsumables = async () => {
+      try {
+        const response = await apiRequest('GET', `/api/equipment-templates/${template.id}/consumables`);
+        const consumableIds = response.map((tc: any) => tc.consumable.id);
+        
+        templateForm.reset({
+          name: template.name,
+          description: template.description || "",
+          consumableIds: consumableIds,
+        });
+      } catch (error) {
+        templateForm.reset({
+          name: template.name,
+          description: template.description || "",
+          consumableIds: [],
+        });
+      }
+    };
+    
+    fetchTemplateWithConsumables();
+  };
+
+  const handleDeleteTemplate = (template: any) => {
+    if (confirm(`Are you sure you want to delete the template "${template.name}"?`)) {
+      deleteTemplateMutation.mutate(template.id);
+    }
+  };
 
   const handleEditEquipment = (equipmentItem: Equipment) => {
     setEditingEquipment(equipmentItem);
@@ -484,9 +630,10 @@ export default function Inventory() {
         {/* Inventory Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <div className="flex items-center justify-between mb-6">
-            <TabsList className="grid w-fit grid-cols-2">
+            <TabsList className="grid w-fit grid-cols-3">
               <TabsTrigger value="equipment">Equipment</TabsTrigger>
               <TabsTrigger value="consumables">Consumables</TabsTrigger>
+              <TabsTrigger value="templates">Templates</TabsTrigger>
             </TabsList>
             
             <div className="flex space-x-2">
@@ -860,6 +1007,116 @@ export default function Inventory() {
                             data-testid="button-save-consumable"
                           >
                             {createConsumableMutation.isPending ? "Creating..." : "Create Consumable"}
+                          </Button>
+                        </div>
+                      </form>
+                    </Form>
+                  </DialogContent>
+                </Dialog>
+              )}
+
+              {activeTab === "templates" && (
+                <Dialog open={isCreateTemplateOpen} onOpenChange={setIsCreateTemplateOpen}>
+                  <DialogTrigger asChild>
+                    <Button data-testid="button-add-template">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Template
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                    <DialogHeader>
+                      <DialogTitle>Add New Equipment Template</DialogTitle>
+                    </DialogHeader>
+                    <Form {...templateForm}>
+                      <form onSubmit={templateForm.handleSubmit((data) => createTemplateMutation.mutate(data))} className="space-y-6">
+                        <FormField
+                          control={templateForm.control}
+                          name="name"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Template Name *</FormLabel>
+                              <FormControl>
+                                <Input placeholder="e.g., Hygiene Station Standard" {...field} data-testid="input-template-name" />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={templateForm.control}
+                          name="description"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Description</FormLabel>
+                              <FormControl>
+                                <Input placeholder="Brief description of this template" {...field} data-testid="input-template-description" />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        {/* Consumables Multi-Select */}
+                        <FormField
+                          control={templateForm.control}
+                          name="consumableIds"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Template Consumables *</FormLabel>
+                              <div className="border rounded-lg p-4 max-h-48 overflow-y-auto">
+                                {consumables.length === 0 ? (
+                                  <p className="text-muted-foreground text-sm">No consumables available</p>
+                                ) : (
+                                  <div className="space-y-2">
+                                    {consumables.map((consumable) => (
+                                      <label key={consumable.id} className="flex items-center space-x-2 cursor-pointer hover:bg-muted/50 p-2 rounded">
+                                        <input
+                                          type="checkbox"
+                                          checked={field.value?.includes(consumable.id) || false}
+                                          onChange={(e) => {
+                                            const currentIds = field.value || [];
+                                            if (e.target.checked) {
+                                              field.onChange([...currentIds, consumable.id]);
+                                            } else {
+                                              field.onChange(currentIds.filter(id => id !== consumable.id));
+                                            }
+                                          }}
+                                          className="rounded border-gray-300"
+                                          data-testid={`checkbox-template-consumable-${consumable.id}`}
+                                        />
+                                        <div className="flex-1">
+                                          <p className="font-medium text-sm">{consumable.name}</p>
+                                          <p className="text-xs text-muted-foreground">{consumable.stockCode}</p>
+                                        </div>
+                                      </label>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                              <FormDescription>
+                                Select the consumables that are typically needed for this equipment type.
+                              </FormDescription>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <div className="flex justify-end space-x-2 pt-4">
+                          <Button 
+                            type="button" 
+                            variant="outline" 
+                            onClick={() => setIsCreateTemplateOpen(false)}
+                            data-testid="button-cancel-template"
+                          >
+                            Cancel
+                          </Button>
+                          <Button 
+                            type="submit" 
+                            disabled={createTemplateMutation.isPending}
+                            data-testid="button-save-template"
+                          >
+                            {createTemplateMutation.isPending ? "Creating..." : "Create Template"}
                           </Button>
                         </div>
                       </form>
@@ -1414,6 +1671,171 @@ export default function Inventory() {
                         <div className="text-xs text-muted-foreground">
                           Added: {formatDate(consumableItem.createdAt)}
                         </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </TabsContent>
+
+          {/* Templates Tab */}
+          <TabsContent value="templates">
+            {equipmentTemplates.length === 0 ? (
+              <Card>
+                <CardContent className="flex flex-col items-center justify-center py-12">
+                  <div className="text-muted-foreground text-center">
+                    <Package className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                    <h3 className="text-lg font-medium mb-2">No templates found</h3>
+                    <p className="mb-4">
+                      Create templates to quickly set up equipment with standard consumables
+                    </p>
+                    <Button onClick={() => setIsCreateTemplateOpen(true)} data-testid="button-add-first-template">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Template
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {equipmentTemplates.map((template) => (
+                  <Card key={template.id} className="hover:shadow-md transition-shadow" data-testid={`card-template-${template.id}`}>
+                    <CardHeader className="pb-3">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <CardTitle className="text-lg mb-2">{template.name}</CardTitle>
+                          {template.description && (
+                            <p className="text-sm text-muted-foreground mb-2">{template.description}</p>
+                          )}
+                        </div>
+                        <div className="flex space-x-1">
+                          <Dialog open={editingTemplate?.id === template.id} onOpenChange={(open) => !open && setEditingTemplate(null)}>
+                            <DialogTrigger asChild>
+                              <Button 
+                                variant="ghost" 
+                                size="sm"
+                                onClick={() => handleEditTemplate(template)}
+                                data-testid={`button-edit-template-${template.id}`}
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                            </DialogTrigger>
+                            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                              <DialogHeader>
+                                <DialogTitle>Edit Template</DialogTitle>
+                              </DialogHeader>
+                              <Form {...templateForm}>
+                                <form onSubmit={templateForm.handleSubmit((data) => updateTemplateMutation.mutate({ id: template.id, data }))} className="space-y-6">
+                                  <FormField
+                                    control={templateForm.control}
+                                    name="name"
+                                    render={({ field }) => (
+                                      <FormItem>
+                                        <FormLabel>Template Name *</FormLabel>
+                                        <FormControl>
+                                          <Input placeholder="e.g., Hygiene Station Standard" {...field} data-testid="input-edit-template-name" />
+                                        </FormControl>
+                                        <FormMessage />
+                                      </FormItem>
+                                    )}
+                                  />
+
+                                  <FormField
+                                    control={templateForm.control}
+                                    name="description"
+                                    render={({ field }) => (
+                                      <FormItem>
+                                        <FormLabel>Description</FormLabel>
+                                        <FormControl>
+                                          <Input placeholder="Brief description of this template" {...field} data-testid="input-edit-template-description" />
+                                        </FormControl>
+                                        <FormMessage />
+                                      </FormItem>
+                                    )}
+                                  />
+
+                                  {/* Consumables Multi-Select */}
+                                  <FormField
+                                    control={templateForm.control}
+                                    name="consumableIds"
+                                    render={({ field }) => (
+                                      <FormItem>
+                                        <FormLabel>Template Consumables *</FormLabel>
+                                        <div className="border rounded-lg p-4 max-h-48 overflow-y-auto">
+                                          {consumables.length === 0 ? (
+                                            <p className="text-muted-foreground text-sm">No consumables available</p>
+                                          ) : (
+                                            <div className="space-y-2">
+                                              {consumables.map((consumable) => (
+                                                <label key={consumable.id} className="flex items-center space-x-2 cursor-pointer hover:bg-muted/50 p-2 rounded">
+                                                  <input
+                                                    type="checkbox"
+                                                    checked={field.value?.includes(consumable.id) || false}
+                                                    onChange={(e) => {
+                                                      const currentIds = field.value || [];
+                                                      if (e.target.checked) {
+                                                        field.onChange([...currentIds, consumable.id]);
+                                                      } else {
+                                                        field.onChange(currentIds.filter(id => id !== consumable.id));
+                                                      }
+                                                    }}
+                                                    className="rounded border-gray-300"
+                                                    data-testid={`checkbox-edit-template-consumable-${consumable.id}`}
+                                                  />
+                                                  <div className="flex-1">
+                                                    <p className="font-medium text-sm">{consumable.name}</p>
+                                                    <p className="text-xs text-muted-foreground">{consumable.stockCode}</p>
+                                                  </div>
+                                                </label>
+                                              ))}
+                                            </div>
+                                          )}
+                                        </div>
+                                        <FormDescription>
+                                          Select the consumables that are typically needed for this equipment type.
+                                        </FormDescription>
+                                        <FormMessage />
+                                      </FormItem>
+                                    )}
+                                  />
+
+                                  <div className="flex justify-end space-x-2 pt-4">
+                                    <Button 
+                                      type="button" 
+                                      variant="outline" 
+                                      onClick={() => setEditingTemplate(null)}
+                                      data-testid="button-cancel-edit-template"
+                                    >
+                                      Cancel
+                                    </Button>
+                                    <Button 
+                                      type="submit" 
+                                      disabled={updateTemplateMutation.isPending}
+                                      data-testid="button-save-edit-template"
+                                    >
+                                      {updateTemplateMutation.isPending ? "Updating..." : "Update Template"}
+                                    </Button>
+                                  </div>
+                                </form>
+                              </Form>
+                            </DialogContent>
+                          </Dialog>
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            onClick={() => handleDeleteTemplate(template)}
+                            disabled={deleteTemplateMutation.isPending}
+                            data-testid={`button-delete-template-${template.id}`}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-sm text-muted-foreground">
+                        <span className="font-medium">Created:</span> {formatDate(template.createdAt)}
                       </div>
                     </CardContent>
                   </Card>
