@@ -8,7 +8,9 @@ import {
   insertConsumableSchema, 
   insertServiceSchema, 
   insertTeamMemberSchema, 
-  insertServiceTeamSchema 
+  insertServiceTeamSchema,
+  insertEquipmentTemplateSchema,
+  insertTemplateConsumableSchema
 } from "@shared/schema";
 import { z } from "zod";
 
@@ -157,10 +159,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get('/api/equipment/:id/consumables', isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const equipment = await storage.getEquipmentWithConsumables(id);
+      res.json(equipment?.equipmentConsumables || []);
+    } catch (error) {
+      console.error("Error fetching equipment consumables:", error);
+      res.status(500).json({ message: "Failed to fetch equipment consumables" });
+    }
+  });
+
   app.post('/api/equipment', isAuthenticated, async (req, res) => {
     try {
-      const equipmentData = insertEquipmentSchema.parse(req.body);
-      const equipment = await storage.createEquipment(equipmentData);
+      const { consumableIds, ...equipmentData } = req.body;
+      const parsedEquipmentData = insertEquipmentSchema.parse(equipmentData);
+      
+      let equipment;
+      if (consumableIds && consumableIds.length > 0) {
+        equipment = await storage.createEquipmentWithConsumables(parsedEquipmentData, consumableIds);
+      } else {
+        equipment = await storage.createEquipment(parsedEquipmentData);
+      }
       
       // Audit log
       await storage.createAuditLog({
@@ -168,7 +188,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         action: 'create',
         entityType: 'equipment',
         entityId: equipment.id,
-        metadata: { equipmentName: equipment.name, stockCode: equipment.stockCode }
+        metadata: { equipmentName: equipment.name, stockCode: equipment.stockCode, consumableIds: consumableIds || [] }
       });
       
       res.status(201).json(equipment);
@@ -184,8 +204,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put('/api/equipment/:id', isAuthenticated, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      const equipmentData = insertEquipmentSchema.partial().parse(req.body);
-      const equipment = await storage.updateEquipment(id, equipmentData);
+      const { consumableIds, ...equipmentData } = req.body;
+      const parsedEquipmentData = insertEquipmentSchema.partial().parse(equipmentData);
+      
+      const equipment = await storage.updateEquipment(id, parsedEquipmentData);
+      
+      // Update consumables if provided
+      if (consumableIds !== undefined) {
+        await storage.updateEquipmentConsumables(id, consumableIds);
+      }
       
       // Audit log
       await storage.createAuditLog({
@@ -193,7 +220,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         action: 'update',
         entityType: 'equipment',
         entityId: equipment.id,
-        metadata: { equipmentName: equipment.name, stockCode: equipment.stockCode }
+        metadata: { equipmentName: equipment.name, stockCode: equipment.stockCode, consumableIds: consumableIds || [] }
       });
       
       res.json(equipment);
@@ -224,6 +251,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting equipment:", error);
       res.status(500).json({ message: "Failed to delete equipment" });
+    }
+  });
+
+  // Equipment Templates routes
+  app.get('/api/equipment-templates', isAuthenticated, async (req, res) => {
+    try {
+      const templates = await storage.getEquipmentTemplates();
+      res.json(templates);
+    } catch (error) {
+      console.error("Error fetching equipment templates:", error);
+      res.status(500).json({ message: "Failed to fetch equipment templates" });
+    }
+  });
+
+  app.get('/api/equipment-templates/:id', isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const template = await storage.getEquipmentTemplateWithConsumables(id);
+      if (!template) {
+        return res.status(404).json({ message: "Equipment template not found" });
+      }
+      res.json(template);
+    } catch (error) {
+      console.error("Error fetching equipment template:", error);
+      res.status(500).json({ message: "Failed to fetch equipment template" });
+    }
+  });
+
+  app.post('/api/equipment-templates', isAuthenticated, async (req, res) => {
+    try {
+      const { consumableIds, ...templateData } = req.body;
+      const parsedTemplateData = insertEquipmentTemplateSchema.parse({
+        ...templateData,
+        createdBy: req.user?.claims?.sub
+      });
+      
+      const template = await storage.createEquipmentTemplate(parsedTemplateData, consumableIds || []);
+      
+      // Audit log
+      await storage.createAuditLog({
+        userId: req.user?.claims?.sub,
+        action: 'create',
+        entityType: 'equipment_template',
+        entityId: template.id,
+        metadata: { templateName: template.name, consumableIds }
+      });
+      
+      res.status(201).json(template);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Validation error", errors: error.errors });
+      }
+      console.error("Error creating equipment template:", error);
+      res.status(500).json({ message: "Failed to create equipment template" });
     }
   });
 

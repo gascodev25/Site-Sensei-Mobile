@@ -9,6 +9,9 @@ import {
   teamAssignments,
   serviceStockIssued,
   auditLog,
+  equipmentTemplates,
+  templateConsumables,
+  equipmentConsumables,
   type User,
   type UpsertUser,
   type Client,
@@ -25,6 +28,10 @@ import {
   type ServiceTeam,
   type InsertServiceTeam,
   type AuditLogEntry,
+  type EquipmentTemplate,
+  type InsertEquipmentTemplate,
+  type EquipmentTemplateWithConsumables,
+  type EquipmentWithConsumables,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, or, sql, desc, asc, ilike, lt, gte, lte } from "drizzle-orm";
@@ -53,9 +60,19 @@ export interface IStorage {
   // Equipment operations
   getEquipment(): Promise<Equipment[]>;
   getEquipmentByStatus(status: string): Promise<Equipment[]>;
+  getEquipmentWithConsumables(id: number): Promise<EquipmentWithConsumables | undefined>;
   createEquipment(equipment: InsertEquipment): Promise<Equipment>;
   updateEquipment(id: number, equipment: Partial<InsertEquipment>): Promise<Equipment>;
   deleteEquipment(id: number): Promise<void>;
+  createEquipmentWithConsumables(equipment: InsertEquipment, consumableIds: number[]): Promise<Equipment>;
+  updateEquipmentConsumables(equipmentId: number, consumableIds: number[]): Promise<void>;
+
+  // Equipment Template operations
+  getEquipmentTemplates(): Promise<EquipmentTemplate[]>;
+  getEquipmentTemplateWithConsumables(id: number): Promise<EquipmentTemplateWithConsumables | undefined>;
+  createEquipmentTemplate(template: InsertEquipmentTemplate, consumableIds: number[]): Promise<EquipmentTemplate>;
+  updateEquipmentTemplate(id: number, template: Partial<InsertEquipmentTemplate>): Promise<EquipmentTemplate>;
+  deleteEquipmentTemplate(id: number): Promise<void>;
   
   // Consumables operations
   getConsumables(): Promise<Consumable[]>;
@@ -306,7 +323,118 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteEquipment(id: number): Promise<void> {
+    // First delete equipment-consumables relationships
+    await db.delete(equipmentConsumables).where(eq(equipmentConsumables.equipmentId, id));
+    // Then delete the equipment
     await db.delete(equipment).where(eq(equipment.id, id));
+  }
+
+  async getEquipmentWithConsumables(id: number): Promise<EquipmentWithConsumables | undefined> {
+    const [equipmentResult] = await db.select().from(equipment).where(eq(equipment.id, id));
+    if (!equipmentResult) return undefined;
+
+    const consumablesList = await db
+      .select({
+        equipmentConsumable: equipmentConsumables,
+        consumable: consumables,
+      })
+      .from(equipmentConsumables)
+      .innerJoin(consumables, eq(equipmentConsumables.consumableId, consumables.id))
+      .where(eq(equipmentConsumables.equipmentId, id));
+
+    return {
+      ...equipmentResult,
+      equipmentConsumables: consumablesList.map(row => ({
+        ...row.equipmentConsumable,
+        consumable: row.consumable,
+      })),
+    };
+  }
+
+  async createEquipmentWithConsumables(equipmentData: InsertEquipment, consumableIds: number[]): Promise<Equipment> {
+    const [newEquipment] = await db.insert(equipment).values(equipmentData).returning();
+    
+    if (consumableIds.length > 0) {
+      const equipmentConsumableData = consumableIds.map(consumableId => ({
+        equipmentId: newEquipment.id,
+        consumableId,
+      }));
+      await db.insert(equipmentConsumables).values(equipmentConsumableData);
+    }
+    
+    return newEquipment;
+  }
+
+  async updateEquipmentConsumables(equipmentId: number, consumableIds: number[]): Promise<void> {
+    // Delete existing relationships
+    await db.delete(equipmentConsumables).where(eq(equipmentConsumables.equipmentId, equipmentId));
+    
+    // Insert new relationships
+    if (consumableIds.length > 0) {
+      const equipmentConsumableData = consumableIds.map(consumableId => ({
+        equipmentId,
+        consumableId,
+      }));
+      await db.insert(equipmentConsumables).values(equipmentConsumableData);
+    }
+  }
+
+  // Equipment Template operations
+  async getEquipmentTemplates(): Promise<EquipmentTemplate[]> {
+    return await db.select().from(equipmentTemplates).orderBy(asc(equipmentTemplates.name));
+  }
+
+  async getEquipmentTemplateWithConsumables(id: number): Promise<EquipmentTemplateWithConsumables | undefined> {
+    const [template] = await db.select().from(equipmentTemplates).where(eq(equipmentTemplates.id, id));
+    if (!template) return undefined;
+
+    const consumablesList = await db
+      .select({
+        templateConsumable: templateConsumables,
+        consumable: consumables,
+      })
+      .from(templateConsumables)
+      .innerJoin(consumables, eq(templateConsumables.consumableId, consumables.id))
+      .where(eq(templateConsumables.templateId, id));
+
+    return {
+      ...template,
+      templateConsumables: consumablesList.map(row => ({
+        ...row.templateConsumable,
+        consumable: row.consumable,
+      })),
+    };
+  }
+
+  async createEquipmentTemplate(templateData: InsertEquipmentTemplate, consumableIds: number[]): Promise<EquipmentTemplate> {
+    const [newTemplate] = await db.insert(equipmentTemplates).values(templateData).returning();
+    
+    if (consumableIds.length > 0) {
+      const templateConsumableData = consumableIds.map(consumableId => ({
+        templateId: newTemplate.id,
+        consumableId,
+        recommendedQuantity: 1, // Default quantity
+      }));
+      await db.insert(templateConsumables).values(templateConsumableData);
+    }
+    
+    return newTemplate;
+  }
+
+  async updateEquipmentTemplate(id: number, templateData: Partial<InsertEquipmentTemplate>): Promise<EquipmentTemplate> {
+    const [updatedTemplate] = await db
+      .update(equipmentTemplates)
+      .set(templateData)
+      .where(eq(equipmentTemplates.id, id))
+      .returning();
+    return updatedTemplate;
+  }
+
+  async deleteEquipmentTemplate(id: number): Promise<void> {
+    // First delete template-consumables relationships
+    await db.delete(templateConsumables).where(eq(templateConsumables.templateId, id));
+    // Then delete the template
+    await db.delete(equipmentTemplates).where(eq(equipmentTemplates.id, id));
   }
 
   // Consumables operations

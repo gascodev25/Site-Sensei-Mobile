@@ -39,6 +39,11 @@ export default function Inventory() {
     queryKey: ["/api/consumables"],
   });
 
+  const { data: equipmentTemplates = [] } = useQuery<any[]>({
+    queryKey: ["/api/equipment-templates"],
+    enabled: isCreateEquipmentOpen || editingEquipment !== null,
+  });
+
   const { data: lowStockConsumables = [] } = useQuery<Consumable[]>({
     queryKey: ["/api/consumables", { lowStock: "true" }],
   });
@@ -55,6 +60,8 @@ export default function Inventory() {
     status: z.string().default("in_warehouse"),
     barcode: z.string().optional(),
     qrCode: z.string().optional(),
+    templateId: z.string().optional(),
+    consumableIds: z.array(z.number()).optional(),
   });
 
   // Consumable form schema
@@ -78,8 +85,13 @@ export default function Inventory() {
       status: "in_warehouse",
       barcode: "",
       qrCode: "",
+      templateId: "",
+      consumableIds: [],
     },
   });
+
+  // Watch template selection for auto-population
+  const selectedTemplate = equipmentForm.watch('templateId');
 
   // Consumable form
   const consumableForm = useForm<z.infer<typeof consumableFormSchema>>({
@@ -98,7 +110,7 @@ export default function Inventory() {
   // Equipment mutations
   const createEquipmentMutation = useMutation({
     mutationFn: async (data: z.infer<typeof equipmentFormSchema>) => {
-      const formattedData: InsertEquipment = {
+      const formattedData = {
         name: data.name,
         stockCode: data.stockCode,
         price: data.price || null,
@@ -107,6 +119,7 @@ export default function Inventory() {
         status: data.status,
         barcode: data.barcode || null,
         qrCode: data.qrCode || null,
+        consumableIds: data.consumableIds || [],
       };
       return await apiRequest("POST", "/api/equipment", formattedData);
     },
@@ -130,13 +143,14 @@ export default function Inventory() {
 
   const updateEquipmentMutation = useMutation({
     mutationFn: async ({ id, data }: { id: number; data: z.infer<typeof equipmentFormSchema> }) => {
-      const formattedData: Partial<InsertEquipment> = {
+      const formattedData = {
         name: data.name,
         stockCode: data.stockCode,
         price: data.price || null,
         status: data.status,
         barcode: data.barcode || null,
         qrCode: data.qrCode || null,
+        consumableIds: data.consumableIds || [],
       };
       return await apiRequest("PUT", `/api/equipment/${id}`, formattedData);
     },
@@ -263,14 +277,39 @@ export default function Inventory() {
 
   const handleEditEquipment = (equipmentItem: Equipment) => {
     setEditingEquipment(equipmentItem);
-    equipmentForm.reset({
-      name: equipmentItem.name,
-      stockCode: equipmentItem.stockCode,
-      price: equipmentItem.price || "",
-      status: equipmentItem.status || "in_warehouse",
-      barcode: equipmentItem.barcode || "",
-      qrCode: equipmentItem.qrCode || "",
-    });
+    
+    // First get equipment with consumables to populate form correctly
+    const fetchEquipmentWithConsumables = async () => {
+      try {
+        const response = await apiRequest('GET', `/api/equipment/${equipmentItem.id}/consumables`);
+        const consumableIds = response.map((ec: any) => ec.consumable.id);
+        
+        equipmentForm.reset({
+          name: equipmentItem.name,
+          stockCode: equipmentItem.stockCode,
+          price: equipmentItem.price || "",
+          status: equipmentItem.status || "in_warehouse",
+          barcode: equipmentItem.barcode || "",
+          qrCode: equipmentItem.qrCode || "",
+          templateId: "custom",
+          consumableIds: consumableIds,
+        });
+      } catch (error) {
+        // Fallback to basic equipment data
+        equipmentForm.reset({
+          name: equipmentItem.name,
+          stockCode: equipmentItem.stockCode,
+          price: equipmentItem.price || "",
+          status: equipmentItem.status || "in_warehouse",
+          barcode: equipmentItem.barcode || "",
+          qrCode: equipmentItem.qrCode || "",
+          templateId: "custom",
+          consumableIds: [],
+        });
+      }
+    };
+    
+    fetchEquipmentWithConsumables();
   };
 
   const handleDeleteEquipment = (equipmentItem: Equipment) => {
@@ -571,6 +610,83 @@ export default function Inventory() {
                             )}
                           />
                         </div>
+
+                        {/* Template Selection */}
+                        <FormField
+                          control={equipmentForm.control}
+                          name="templateId"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Equipment Template</FormLabel>
+                              <Select onValueChange={field.onChange} value={field.value} data-testid="select-equipment-template">
+                                <FormControl>
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Choose a template or select custom" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  <SelectItem value="custom">Custom (No Template)</SelectItem>
+                                  {equipmentTemplates.map((template: any) => (
+                                    <SelectItem key={template.id} value={template.id.toString()}>
+                                      {template.name}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <FormDescription>
+                                {selectedTemplate && selectedTemplate !== 'custom' 
+                                  ? 'Template will auto-select common consumables. You can modify them below.'
+                                  : 'Select consumables manually below.'}
+                              </FormDescription>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        {/* Consumables Multi-Select */}
+                        <FormField
+                          control={equipmentForm.control}
+                          name="consumableIds"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Required Consumables</FormLabel>
+                              <div className="border rounded-lg p-4 max-h-48 overflow-y-auto">
+                                {consumables.length === 0 ? (
+                                  <p className="text-muted-foreground text-sm">No consumables available</p>
+                                ) : (
+                                  <div className="space-y-2">
+                                    {consumables.map((consumable) => (
+                                      <label key={consumable.id} className="flex items-center space-x-2 cursor-pointer hover:bg-muted/50 p-2 rounded">
+                                        <input
+                                          type="checkbox"
+                                          checked={field.value?.includes(consumable.id) || false}
+                                          onChange={(e) => {
+                                            const currentIds = field.value || [];
+                                            if (e.target.checked) {
+                                              field.onChange([...currentIds, consumable.id]);
+                                            } else {
+                                              field.onChange(currentIds.filter(id => id !== consumable.id));
+                                            }
+                                          }}
+                                          className="rounded border-gray-300"
+                                          data-testid={`checkbox-consumable-${consumable.id}`}
+                                        />
+                                        <div className="flex-1">
+                                          <p className="font-medium text-sm">{consumable.name}</p>
+                                          <p className="text-xs text-muted-foreground">{consumable.stockCode}</p>
+                                        </div>
+                                      </label>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                              <FormDescription>
+                                Select the consumables required for servicing this equipment.
+                              </FormDescription>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
 
                         <div className="flex justify-end space-x-2 pt-4">
                           <Button 
@@ -915,6 +1031,83 @@ export default function Inventory() {
                                       )}
                                     />
                                   </div>
+
+                                  {/* Template Selection */}
+                                  <FormField
+                                    control={equipmentForm.control}
+                                    name="templateId"
+                                    render={({ field }) => (
+                                      <FormItem>
+                                        <FormLabel>Equipment Template</FormLabel>
+                                        <Select onValueChange={field.onChange} value={field.value} data-testid="select-edit-equipment-template">
+                                          <FormControl>
+                                            <SelectTrigger>
+                                              <SelectValue placeholder="Choose a template or select custom" />
+                                            </SelectTrigger>
+                                          </FormControl>
+                                          <SelectContent>
+                                            <SelectItem value="custom">Custom (No Template)</SelectItem>
+                                            {equipmentTemplates.map((template: any) => (
+                                              <SelectItem key={template.id} value={template.id.toString()}>
+                                                {template.name}
+                                              </SelectItem>
+                                            ))}
+                                          </SelectContent>
+                                        </Select>
+                                        <FormDescription>
+                                          {selectedTemplate && selectedTemplate !== 'custom' 
+                                            ? 'Template will auto-select common consumables. You can modify them below.'
+                                            : 'Select consumables manually below.'}
+                                        </FormDescription>
+                                        <FormMessage />
+                                      </FormItem>
+                                    )}
+                                  />
+
+                                  {/* Consumables Multi-Select */}
+                                  <FormField
+                                    control={equipmentForm.control}
+                                    name="consumableIds"
+                                    render={({ field }) => (
+                                      <FormItem>
+                                        <FormLabel>Required Consumables</FormLabel>
+                                        <div className="border rounded-lg p-4 max-h-48 overflow-y-auto">
+                                          {consumables.length === 0 ? (
+                                            <p className="text-muted-foreground text-sm">No consumables available</p>
+                                          ) : (
+                                            <div className="space-y-2">
+                                              {consumables.map((consumable) => (
+                                                <label key={consumable.id} className="flex items-center space-x-2 cursor-pointer hover:bg-muted/50 p-2 rounded">
+                                                  <input
+                                                    type="checkbox"
+                                                    checked={field.value?.includes(consumable.id) || false}
+                                                    onChange={(e) => {
+                                                      const currentIds = field.value || [];
+                                                      if (e.target.checked) {
+                                                        field.onChange([...currentIds, consumable.id]);
+                                                      } else {
+                                                        field.onChange(currentIds.filter(id => id !== consumable.id));
+                                                      }
+                                                    }}
+                                                    className="rounded border-gray-300"
+                                                    data-testid={`checkbox-edit-consumable-${consumable.id}`}
+                                                  />
+                                                  <div className="flex-1">
+                                                    <p className="font-medium text-sm">{consumable.name}</p>
+                                                    <p className="text-xs text-muted-foreground">{consumable.stockCode}</p>
+                                                  </div>
+                                                </label>
+                                              ))}
+                                            </div>
+                                          )}
+                                        </div>
+                                        <FormDescription>
+                                          Select the consumables required for servicing this equipment.
+                                        </FormDescription>
+                                        <FormMessage />
+                                      </FormItem>
+                                    )}
+                                  />
 
                                   <div className="flex justify-end space-x-2 pt-4">
                                     <Button 

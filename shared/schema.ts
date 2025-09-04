@@ -87,6 +87,22 @@ export const equipmentConsumables = pgTable("equipment_consumables", {
   consumableId: integer("consumable_id").references(() => consumables.id).notNull(),
 });
 
+// Equipment Templates
+export const equipmentTemplates = pgTable("equipment_templates", {
+  id: serial("id").primaryKey(),
+  name: varchar("name", { length: 100 }).notNull(),
+  description: varchar("description", { length: 500 }),
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Template Consumables (many-to-many)
+export const templateConsumables = pgTable("template_consumables", {
+  templateId: integer("template_id").references(() => equipmentTemplates.id).notNull(),
+  consumableId: integer("consumable_id").references(() => consumables.id).notNull(),
+  recommendedQuantity: integer("recommended_quantity").default(1),
+});
+
 // Team Members
 export const teamMembers = pgTable("team_members", {
   id: serial("id").primaryKey(),
@@ -185,6 +201,22 @@ export const equipmentRelations = relations(equipment, ({ one, many }) => ({
 export const consumablesRelations = relations(consumables, ({ many }) => ({
   equipmentConsumables: many(equipmentConsumables),
   serviceStockIssued: many(serviceStockIssued),
+  templateConsumables: many(templateConsumables),
+}));
+
+export const equipmentTemplatesRelations = relations(equipmentTemplates, ({ many }) => ({
+  templateConsumables: many(templateConsumables),
+}));
+
+export const templateConsumablesRelations = relations(templateConsumables, ({ one }) => ({
+  template: one(equipmentTemplates, {
+    fields: [templateConsumables.templateId],
+    references: [equipmentTemplates.id],
+  }),
+  consumable: one(consumables, {
+    fields: [templateConsumables.consumableId],
+    references: [consumables.id],
+  }),
 }));
 
 export const servicesRelations = relations(services, ({ one, many }) => ({
@@ -246,6 +278,13 @@ export const insertServiceTeamSchema = createInsertSchema(serviceTeams).omit({
   createdAt: true,
 });
 
+export const insertEquipmentTemplateSchema = createInsertSchema(equipmentTemplates).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertTemplateConsumableSchema = createInsertSchema(templateConsumables);
+
 // Types
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
@@ -260,6 +299,20 @@ export type InsertService = z.infer<typeof insertServiceSchema>;
 export type ServiceWithDetails = Service & {
   client?: Client;
   team?: ServiceTeam;
+};
+
+// Equipment Templates Types
+export type EquipmentTemplate = typeof equipmentTemplates.$inferSelect;
+export type InsertEquipmentTemplate = z.infer<typeof insertEquipmentTemplateSchema>;
+export type TemplateConsumable = typeof templateConsumables.$inferSelect;
+export type InsertTemplateConsumable = z.infer<typeof insertTemplateConsumableSchema>;
+
+export type EquipmentTemplateWithConsumables = EquipmentTemplate & {
+  templateConsumables?: (TemplateConsumable & { consumable: Consumable })[];
+};
+
+export type EquipmentWithConsumables = Equipment & {
+  equipmentConsumables?: (typeof equipmentConsumables.$inferSelect & { consumable: Consumable })[];
 };
 export type TeamMember = typeof teamMembers.$inferSelect;
 export type InsertTeamMember = z.infer<typeof insertTeamMemberSchema>;
