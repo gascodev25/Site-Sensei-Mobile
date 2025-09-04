@@ -189,6 +189,7 @@ export default function Inventory() {
         status: data.status,
         barcode: data.barcode || null,
         qrCode: data.qrCode || null,
+        templateId: data.templateId && data.templateId !== "custom" ? parseInt(data.templateId) : null,
         consumableIds: data.consumableIds || [],
       };
       return await apiRequest("PUT", `/api/equipment/${id}`, formattedData);
@@ -437,7 +438,7 @@ export default function Inventory() {
           status: equipmentItem.status || "in_warehouse",
           barcode: equipmentItem.barcode || "",
           qrCode: equipmentItem.qrCode || "",
-          templateId: "custom",
+          templateId: equipmentItem.templateId ? equipmentItem.templateId.toString() : "custom",
           consumableIds: consumableIds,
         });
       } catch (error) {
@@ -449,7 +450,7 @@ export default function Inventory() {
           status: equipmentItem.status || "in_warehouse",
           barcode: equipmentItem.barcode || "",
           qrCode: equipmentItem.qrCode || "",
-          templateId: "custom",
+          templateId: equipmentItem.templateId ? equipmentItem.templateId.toString() : "custom",
           consumableIds: [],
         });
       }
@@ -1147,9 +1148,7 @@ export default function Inventory() {
               </Card>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filteredEquipment.map((equipmentItem) => {
-                  console.log('Equipment item:', JSON.stringify(equipmentItem, null, 2)); // Debug log
-                  return (
+                {filteredEquipment.map((equipmentItem) => (
                   <Card key={equipmentItem.id} className="hover:shadow-md transition-shadow" data-testid={`card-equipment-${equipmentItem.id}`}>
                     <CardHeader className="pb-3">
                       <div className="flex items-start justify-between">
@@ -1441,8 +1440,7 @@ export default function Inventory() {
                       </div>
                     </CardContent>
                   </Card>
-                  );
-                })}
+                ))}
               </div>
             )}
           </TabsContent>
