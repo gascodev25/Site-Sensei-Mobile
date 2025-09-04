@@ -62,6 +62,7 @@ export const equipment = pgTable("equipment", {
   price: decimal("price", { precision: 10, scale: 2 }),
   dateInstalled: timestamp("date_installed"),
   installedAtClientId: integer("installed_at_client_id").references(() => clients.id),
+  templateId: integer("template_id").references(() => equipmentTemplates.id),
   status: varchar("status", { length: 20 }).default("in_warehouse"), // 'in_warehouse', 'in_field', 'issued'
   barcode: varchar("barcode", { length: 50 }).unique(),
   qrCode: varchar("qr_code", { length: 50 }).unique(),
