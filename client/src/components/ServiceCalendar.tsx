@@ -42,27 +42,40 @@ export default function ServiceCalendar({ services, onServiceClick, onServiceMov
     return colors[status as keyof typeof colors] || 'bg-gray-100 border-gray-400 text-gray-800';
   };
 
-  // Generate recurring service instances based on service intervals
+  // Generate recurring service instances based on recurrencePattern
   const generateRecurringInstances = (service: ServiceWithDetails, startDate: Date, endDate: Date): Date[] => {
-    if (!service.installationDate || !service.serviceInterval) {
-      return service.installationDate ? [typeof service.installationDate === 'string' 
-        ? parseISO(service.installationDate)
-        : service.installationDate] : [];
+    if (!service.installationDate) {
+      return [];
     }
 
-    const instances: Date[] = [];
     const baseDate = typeof service.installationDate === 'string' 
       ? parseISO(service.installationDate)
       : service.installationDate;
+
+    // Check if service has recurrence pattern
+    const recurrencePattern = service.recurrencePattern as { interval?: string; end_date?: string } | null;
     
-    let currentDate = new Date(baseDate);
+    if (!recurrencePattern || !recurrencePattern.interval) {
+      // Single occurrence service
+      return [baseDate];
+    }
+
+    // Parse interval (e.g., "7d", "30d", "60d")
+    const intervalMatch = recurrencePattern.interval.match(/^(\d+)d$/);
+    if (!intervalMatch) {
+      return [baseDate]; // If interval format is not recognized, show single occurrence
+    }
+
+    const intervalDays = parseInt(intervalMatch[1]);
+    const instances: Date[] = [];
     
     // Generate instances from base date backward to startDate
+    let currentDate = new Date(baseDate);
     while (currentDate >= startDate) {
       if (currentDate <= endDate) {
         instances.push(new Date(currentDate));
       }
-      currentDate = new Date(currentDate.getTime() - (service.serviceInterval * 24 * 60 * 60 * 1000));
+      currentDate = new Date(currentDate.getTime() - (intervalDays * 24 * 60 * 60 * 1000));
     }
     
     // Reset to base date and generate instances forward to endDate
@@ -71,7 +84,12 @@ export default function ServiceCalendar({ services, onServiceClick, onServiceMov
       if (currentDate >= startDate && !instances.some(d => isSameDay(d, currentDate))) {
         instances.push(new Date(currentDate));
       }
-      currentDate = new Date(currentDate.getTime() + (service.serviceInterval * 24 * 60 * 60 * 1000));
+      currentDate = new Date(currentDate.getTime() + (intervalDays * 24 * 60 * 60 * 1000));
+      
+      // Optional: respect end_date if specified in recurrence pattern
+      if (recurrencePattern.end_date && currentDate > parseISO(recurrencePattern.end_date)) {
+        break;
+      }
     }
     
     return instances.sort((a, b) => a.getTime() - b.getTime());
