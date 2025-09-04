@@ -228,6 +228,12 @@ export const insertConsumableSchema = createInsertSchema(consumables).omit({
 export const insertServiceSchema = createInsertSchema(services).omit({
   id: true,
   createdAt: true,
+  completedAt: true,
+  lastInvoiceSync: true,
+  checkInTime: true,
+  checkOutTime: true,
+}).extend({
+  installationDate: z.coerce.date().optional().nullable(),
 });
 
 export const insertTeamMemberSchema = createInsertSchema(teamMembers).omit({

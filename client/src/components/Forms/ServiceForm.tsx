@@ -76,8 +76,8 @@ export default function ServiceForm({ service, onSuccess, onCancel }: ServiceFor
       // Format the data properly
       const formattedData = {
         ...data,
-        installationDate: data.installationDate ? new Date(data.installationDate).toISOString() : null,
-        recurrencePattern: data.recurrencePattern ? JSON.stringify(data.recurrencePattern) : null,
+        installationDate: data.installationDate ? data.installationDate : null,
+        recurrencePattern: data.recurrencePattern || null,
       };
 
       if (isEditing) {
