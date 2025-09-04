@@ -212,17 +212,12 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createService(service: InsertService): Promise<Service> {
-    console.log("Creating service with data:", JSON.stringify(service, null, 2));
     const { equipmentItems, consumableItems, ...serviceData } = service;
-    
-    console.log("Equipment items:", equipmentItems);
-    console.log("Consumable items:", consumableItems);
     
     const [newService] = await db.insert(services).values(serviceData).returning();
     
     // Create service stock associations
     if (equipmentItems && equipmentItems.length > 0) {
-      console.log("Creating equipment stock assignments:", equipmentItems);
       const equipmentStockData = equipmentItems.map(item => ({
         serviceId: newService.id,
         equipmentId: item.id,
@@ -233,7 +228,6 @@ export class DatabaseStorage implements IStorage {
     }
     
     if (consumableItems && consumableItems.length > 0) {
-      console.log("Creating consumable stock assignments:", consumableItems);
       const consumableStockData = consumableItems.map(item => ({
         serviceId: newService.id,
         consumableId: item.id,
@@ -299,8 +293,6 @@ export class DatabaseStorage implements IStorage {
       .from(serviceStockIssued)
       .where(eq(serviceStockIssued.serviceId, serviceId));
 
-    console.log("Raw stock assignments:", stockAssignments);
-
     const equipmentItems = stockAssignments
       .filter(item => item.equipmentId !== null)
       .map(item => ({ id: item.equipmentId!, quantity: item.quantity }));
@@ -309,10 +301,7 @@ export class DatabaseStorage implements IStorage {
       .filter(item => item.consumableId !== null)
       .map(item => ({ id: item.consumableId!, quantity: item.quantity }));
 
-    const result = { equipmentItems, consumableItems };
-    console.log("Transformed stock result:", result);
-
-    return result;
+    return { equipmentItems, consumableItems };
   }
 
   async searchServices(query: string): Promise<ServiceWithDetails[]> {
