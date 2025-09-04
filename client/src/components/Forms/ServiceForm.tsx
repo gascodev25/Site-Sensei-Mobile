@@ -3,12 +3,13 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { insertServiceSchema, type Service, type InsertService, type Client, type ServiceTeam } from "@shared/schema";
+import { insertServiceSchema, type Service, type InsertService, type Client, type ServiceTeam, type Equipment, type Consumable } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { CalendarIcon, Repeat } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { CalendarIcon, Repeat, Package, Wrench } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { format } from "date-fns";
@@ -53,6 +54,14 @@ export default function ServiceForm({ service, onSuccess, onCancel }: ServiceFor
     queryKey: ["/api/service-teams"],
   });
 
+  const { data: equipment = [] } = useQuery<Equipment[]>({
+    queryKey: ["/api/equipment"],
+  });
+
+  const { data: consumables = [] } = useQuery<Consumable[]>({
+    queryKey: ["/api/consumables"],
+  });
+
   const form = useForm<InsertService>({
     resolver: zodResolver(insertServiceSchema),
     defaultValues: {
@@ -65,6 +74,8 @@ export default function ServiceForm({ service, onSuccess, onCancel }: ServiceFor
       estimatedDuration: service?.estimatedDuration || 60,
       contractLengthMonths: service?.contractLengthMonths || undefined,
       recurrencePattern: service?.recurrencePattern || null,
+      equipmentItems: [],
+      consumableItems: [],
     },
   });
 
@@ -373,6 +384,140 @@ export default function ServiceForm({ service, onSuccess, onCancel }: ServiceFor
             </div>
           </div>
         )}
+
+        {/* Equipment Selection */}
+        <div className="space-y-4 border-t border-border pt-4">
+          <div className="flex items-center space-x-2">
+            <Wrench className="h-5 w-5 text-muted-foreground" />
+            <h3 className="text-lg font-medium">Required Equipment</h3>
+          </div>
+          <p className="text-sm text-muted-foreground">Select equipment needed for this service</p>
+          
+          <FormField
+            control={form.control}
+            name="equipmentItems"
+            render={({ field }) => (
+              <FormItem>
+                <FormControl>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {equipment.map((item) => {
+                      const isSelected = field.value?.some(eq => eq.id === item.id) || false;
+                      const selectedItem = field.value?.find(eq => eq.id === item.id);
+                      
+                      return (
+                        <div key={item.id} className="flex items-center space-x-3 p-3 border rounded-lg">
+                          <Checkbox
+                            checked={isSelected}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                field.onChange([...(field.value || []), { id: item.id, quantity: 1 }]);
+                              } else {
+                                field.onChange(field.value?.filter(eq => eq.id !== item.id) || []);
+                              }
+                            }}
+                            data-testid={`checkbox-equipment-${item.id}`}
+                          />
+                          <div className="flex-1">
+                            <p className="font-medium">{item.name}</p>
+                            <p className="text-sm text-muted-foreground">{item.stockCode}</p>
+                          </div>
+                          {isSelected && (
+                            <div className="flex items-center space-x-2">
+                              <span className="text-sm">Qty:</span>
+                              <Input
+                                type="number"
+                                min="1"
+                                value={selectedItem?.quantity || 1}
+                                onChange={(e) => {
+                                  const newQty = parseInt(e.target.value) || 1;
+                                  field.onChange(
+                                    field.value?.map(eq => 
+                                      eq.id === item.id ? { ...eq, quantity: newQty } : eq
+                                    ) || []
+                                  );
+                                }}
+                                className="w-20"
+                                data-testid={`input-equipment-quantity-${item.id}`}
+                              />
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+
+        {/* Consumables Selection */}
+        <div className="space-y-4 border-t border-border pt-4">
+          <div className="flex items-center space-x-2">
+            <Package className="h-5 w-5 text-muted-foreground" />
+            <h3 className="text-lg font-medium">Required Consumables</h3>
+          </div>
+          <p className="text-sm text-muted-foreground">Select consumables needed for this service</p>
+          
+          <FormField
+            control={form.control}
+            name="consumableItems"
+            render={({ field }) => (
+              <FormItem>
+                <FormControl>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {consumables.map((item) => {
+                      const isSelected = field.value?.some(con => con.id === item.id) || false;
+                      const selectedItem = field.value?.find(con => con.id === item.id);
+                      
+                      return (
+                        <div key={item.id} className="flex items-center space-x-3 p-3 border rounded-lg">
+                          <Checkbox
+                            checked={isSelected}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                field.onChange([...(field.value || []), { id: item.id, quantity: 1 }]);
+                              } else {
+                                field.onChange(field.value?.filter(con => con.id !== item.id) || []);
+                              }
+                            }}
+                            data-testid={`checkbox-consumable-${item.id}`}
+                          />
+                          <div className="flex-1">
+                            <p className="font-medium">{item.name}</p>
+                            <p className="text-sm text-muted-foreground">{item.stockCode}</p>
+                          </div>
+                          {isSelected && (
+                            <div className="flex items-center space-x-2">
+                              <span className="text-sm">Qty:</span>
+                              <Input
+                                type="number"
+                                min="1"
+                                value={selectedItem?.quantity || 1}
+                                onChange={(e) => {
+                                  const newQty = parseInt(e.target.value) || 1;
+                                  field.onChange(
+                                    field.value?.map(con => 
+                                      con.id === item.id ? { ...con, quantity: newQty } : con
+                                    ) || []
+                                  );
+                                }}
+                                className="w-20"
+                                data-testid={`input-consumable-quantity-${item.id}`}
+                              />
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
 
         <div className="flex justify-end space-x-4">
           <Button

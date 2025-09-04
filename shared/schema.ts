@@ -267,6 +267,14 @@ export const insertServiceSchema = createInsertSchema(services).omit({
   checkOutTime: true,
 }).extend({
   installationDate: z.coerce.date().optional().nullable(),
+  equipmentItems: z.array(z.object({
+    id: z.number(),
+    quantity: z.number().min(1)
+  })).optional(),
+  consumableItems: z.array(z.object({
+    id: z.number(),
+    quantity: z.number().min(1)
+  })).optional(),
 });
 
 export const insertTeamMemberSchema = createInsertSchema(teamMembers).omit({

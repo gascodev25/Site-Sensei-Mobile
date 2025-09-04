@@ -212,7 +212,31 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createService(service: InsertService): Promise<Service> {
-    const [newService] = await db.insert(services).values(service).returning();
+    const { equipmentItems, consumableItems, ...serviceData } = service;
+    
+    const [newService] = await db.insert(services).values(serviceData).returning();
+    
+    // Create service stock associations
+    if (equipmentItems && equipmentItems.length > 0) {
+      const equipmentStockData = equipmentItems.map(item => ({
+        serviceId: newService.id,
+        equipmentId: item.id,
+        quantity: item.quantity,
+        returned: false,
+      }));
+      await db.insert(serviceStockIssued).values(equipmentStockData);
+    }
+    
+    if (consumableItems && consumableItems.length > 0) {
+      const consumableStockData = consumableItems.map(item => ({
+        serviceId: newService.id,
+        consumableId: item.id,
+        quantity: item.quantity,
+        returned: false,
+      }));
+      await db.insert(serviceStockIssued).values(consumableStockData);
+    }
+    
     return newService;
   }
 
