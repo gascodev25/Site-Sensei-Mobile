@@ -18,22 +18,7 @@ export default function Clients() {
   const { toast } = useToast();
 
   const { data: clients = [], isLoading } = useQuery<Client[]>({
-    queryKey: ["/api/clients", searchQuery],
-    queryFn: async () => {
-      const url = searchQuery 
-        ? `/api/clients?search=${encodeURIComponent(searchQuery)}`
-        : '/api/clients';
-      
-      const response = await fetch(url, {
-        credentials: 'include'
-      });
-      
-      if (!response.ok) {
-        throw new Error(`${response.status}: ${response.statusText}`);
-      }
-      
-      return response.json();
-    },
+    queryKey: ["/api/clients"],
   });
 
   const deleteClientMutation = useMutation({
@@ -61,6 +46,14 @@ export default function Clients() {
       deleteClientMutation.mutate(client.id);
     }
   };
+
+  const filteredClients = clients.filter(client =>
+    client.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    client.addressText.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (client.city && client.city.toLowerCase().includes(searchQuery.toLowerCase())) ||
+    (client.contactPerson && client.contactPerson.toLowerCase().includes(searchQuery.toLowerCase())) ||
+    (client.phone && client.phone.toLowerCase().includes(searchQuery.toLowerCase()))
+  );
 
   if (isLoading) {
     return (
@@ -120,7 +113,7 @@ export default function Clients() {
         </div>
 
         {/* Clients Grid */}
-        {clients.length === 0 ? (
+        {filteredClients.length === 0 ? (
           <Card>
             <CardContent className="flex flex-col items-center justify-center py-12">
               <div className="text-muted-foreground text-center">
@@ -137,7 +130,7 @@ export default function Clients() {
           </Card>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {clients.map((client: Client) => (
+            {filteredClients.map((client: Client) => (
               <Card key={client.id} className="hover:shadow-md transition-shadow" data-testid={`card-client-${client.id}`}>
                 <CardHeader>
                   <div className="flex items-start justify-between">
