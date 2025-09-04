@@ -69,19 +69,11 @@ export default function ServiceCalendar({ services, onServiceClick, onServiceMov
     const intervalDays = parseInt(intervalMatch[1]);
     const instances: Date[] = [];
     
-    // Generate instances from base date backward to startDate
+    // Generate instances ONLY forward from the installation date
     let currentDate = new Date(baseDate);
-    while (currentDate >= startDate) {
-      if (currentDate <= endDate) {
-        instances.push(new Date(currentDate));
-      }
-      currentDate = new Date(currentDate.getTime() - (intervalDays * 24 * 60 * 60 * 1000));
-    }
-    
-    // Reset to base date and generate instances forward to endDate
-    currentDate = new Date(baseDate);
     while (currentDate <= endDate) {
-      if (currentDate >= startDate && !instances.some(d => isSameDay(d, currentDate))) {
+      // Only add if the date is within our view range and on or after the installation date
+      if (currentDate >= startDate && currentDate >= baseDate) {
         instances.push(new Date(currentDate));
       }
       currentDate = new Date(currentDate.getTime() + (intervalDays * 24 * 60 * 60 * 1000));
