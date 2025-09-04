@@ -268,6 +268,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.put('/api/consumables/:id', isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const consumableData = insertConsumableSchema.partial().parse(req.body);
+      const consumable = await storage.updateConsumable(id, consumableData);
+      
+      // Audit log
+      await storage.createAuditLog({
+        userId: req.user?.claims?.sub,
+        action: 'update',
+        entityType: 'consumable',
+        entityId: consumable.id,
+        metadata: { consumableName: consumable.name, stockCode: consumable.stockCode }
+      });
+      
+      res.json(consumable);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Validation error", errors: error.errors });
+      }
+      console.error("Error updating consumable:", error);
+      res.status(500).json({ message: "Failed to update consumable" });
+    }
+  });
+
+  app.delete('/api/consumables/:id', isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      await storage.deleteConsumable(id);
+      
+      // Audit log
+      await storage.createAuditLog({
+        userId: req.user?.claims?.sub,
+        action: 'delete',
+        entityType: 'consumable',
+        entityId: id,
+        metadata: {}
+      });
+      
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting consumable:", error);
+      res.status(500).json({ message: "Failed to delete consumable" });
+    }
+  });
+
   // Services routes
   app.get('/api/services', isAuthenticated, async (req, res) => {
     try {

@@ -210,6 +210,37 @@ export default function Inventory() {
     },
   });
 
+  const updateConsumableMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: number; data: z.infer<typeof consumableFormSchema> }) => {
+      const formattedData: Partial<InsertConsumable> = {
+        name: data.name,
+        stockCode: data.stockCode,
+        price: data.price || null,
+        minStockLevel: data.minStockLevel ? parseInt(data.minStockLevel) : 0,
+        currentStock: data.currentStock ? parseInt(data.currentStock) : 0,
+        barcode: data.barcode || null,
+        qrCode: data.qrCode || null,
+      };
+      return await apiRequest("PUT", `/api/consumables/${id}`, formattedData);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/consumables"] });
+      toast({
+        title: "Success",
+        description: "Consumable updated successfully",
+      });
+      consumableForm.reset();
+      setEditingConsumable(null);
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const deleteConsumableMutation = useMutation({
     mutationFn: async (consumableId: number) => {
       await apiRequest("DELETE", `/api/consumables/${consumableId}`);
@@ -246,6 +277,19 @@ export default function Inventory() {
     if (confirm(`Are you sure you want to delete ${equipmentItem.name}?`)) {
       deleteEquipmentMutation.mutate(equipmentItem.id);
     }
+  };
+
+  const handleEditConsumable = (consumableItem: Consumable) => {
+    setEditingConsumable(consumableItem);
+    consumableForm.reset({
+      name: consumableItem.name,
+      stockCode: consumableItem.stockCode,
+      price: consumableItem.price || "",
+      minStockLevel: consumableItem.minStockLevel?.toString() || "0",
+      currentStock: consumableItem.currentStock?.toString() || "0",
+      barcode: consumableItem.barcode || "",
+      qrCode: consumableItem.qrCode || "",
+    });
   };
 
   const handleDeleteConsumable = (consumableItem: Consumable) => {
@@ -982,24 +1026,162 @@ export default function Inventory() {
                           </div>
                         </div>
                         <div className="flex space-x-1">
-                          <Dialog>
+                          <Dialog open={editingConsumable?.id === consumableItem.id} onOpenChange={(open) => !open && setEditingConsumable(null)}>
                             <DialogTrigger asChild>
                               <Button 
                                 variant="ghost" 
                                 size="sm"
-                                onClick={() => setEditingConsumable(consumableItem)}
+                                onClick={() => handleEditConsumable(consumableItem)}
                                 data-testid={`button-edit-consumable-${consumableItem.id}`}
                               >
                                 <Edit className="h-4 w-4" />
                               </Button>
                             </DialogTrigger>
-                            <DialogContent className="max-w-2xl">
+                            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
                               <DialogHeader>
                                 <DialogTitle>Edit Consumable</DialogTitle>
                               </DialogHeader>
-                              <div className="p-4 text-center text-muted-foreground">
-                                Consumable editing form coming soon...
-                              </div>
+                              <Form {...consumableForm}>
+                                <form onSubmit={consumableForm.handleSubmit((data) => updateConsumableMutation.mutate({ id: consumableItem.id, data }))} className="space-y-6">
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <FormField
+                                      control={consumableForm.control}
+                                      name="name"
+                                      render={({ field }) => (
+                                        <FormItem>
+                                          <FormLabel>Consumable Name *</FormLabel>
+                                          <FormControl>
+                                            <Input placeholder="Enter consumable name" {...field} data-testid="input-edit-consumable-name" />
+                                          </FormControl>
+                                          <FormMessage />
+                                        </FormItem>
+                                      )}
+                                    />
+                                    
+                                    <FormField
+                                      control={consumableForm.control}
+                                      name="stockCode"
+                                      render={({ field }) => (
+                                        <FormItem>
+                                          <FormLabel>Stock Code *</FormLabel>
+                                          <FormControl>
+                                            <Input placeholder="Enter stock code" {...field} data-testid="input-edit-consumable-stock-code" />
+                                          </FormControl>
+                                          <FormMessage />
+                                        </FormItem>
+                                      )}
+                                    />
+                                  </div>
+
+                                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    <FormField
+                                      control={consumableForm.control}
+                                      name="price"
+                                      render={({ field }) => (
+                                        <FormItem>
+                                          <FormLabel>Price (R)</FormLabel>
+                                          <FormControl>
+                                            <Input 
+                                              type="number" 
+                                              step="0.01" 
+                                              placeholder="0.00" 
+                                              {...field} 
+                                              data-testid="input-edit-consumable-price" 
+                                            />
+                                          </FormControl>
+                                          <FormMessage />
+                                        </FormItem>
+                                      )}
+                                    />
+                                    
+                                    <FormField
+                                      control={consumableForm.control}
+                                      name="currentStock"
+                                      render={({ field }) => (
+                                        <FormItem>
+                                          <FormLabel>Current Stock</FormLabel>
+                                          <FormControl>
+                                            <Input 
+                                              type="number" 
+                                              placeholder="0" 
+                                              {...field} 
+                                              data-testid="input-edit-consumable-current-stock" 
+                                            />
+                                          </FormControl>
+                                          <FormMessage />
+                                        </FormItem>
+                                      )}
+                                    />
+
+                                    <FormField
+                                      control={consumableForm.control}
+                                      name="minStockLevel"
+                                      render={({ field }) => (
+                                        <FormItem>
+                                          <FormLabel>Min Stock Level</FormLabel>
+                                          <FormControl>
+                                            <Input 
+                                              type="number" 
+                                              placeholder="0" 
+                                              {...field} 
+                                              data-testid="input-edit-consumable-min-stock" 
+                                            />
+                                          </FormControl>
+                                          <FormMessage />
+                                        </FormItem>
+                                      )}
+                                    />
+                                  </div>
+
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <FormField
+                                      control={consumableForm.control}
+                                      name="barcode"
+                                      render={({ field }) => (
+                                        <FormItem>
+                                          <FormLabel>Barcode</FormLabel>
+                                          <FormControl>
+                                            <Input placeholder="Enter barcode" {...field} data-testid="input-edit-consumable-barcode" />
+                                          </FormControl>
+                                          <FormMessage />
+                                        </FormItem>
+                                      )}
+                                    />
+                                    
+                                    <FormField
+                                      control={consumableForm.control}
+                                      name="qrCode"
+                                      render={({ field }) => (
+                                        <FormItem>
+                                          <FormLabel>QR Code</FormLabel>
+                                          <FormControl>
+                                            <Input placeholder="Enter QR code" {...field} data-testid="input-edit-consumable-qr-code" />
+                                          </FormControl>
+                                          <FormMessage />
+                                        </FormItem>
+                                      )}
+                                    />
+                                  </div>
+
+                                  <div className="flex justify-end space-x-2 pt-4">
+                                    <Button 
+                                      type="button" 
+                                      variant="outline" 
+                                      onClick={() => setEditingConsumable(null)}
+                                      data-testid="button-cancel-edit-consumable"
+                                    >
+                                      Cancel
+                                    </Button>
+                                    <Button 
+                                      type="submit" 
+                                      disabled={updateConsumableMutation.isPending}
+                                      data-testid="button-save-edit-consumable"
+                                    >
+                                      {updateConsumableMutation.isPending ? "Updating..." : "Update Consumable"}
+                                    </Button>
+                                  </div>
+                                </form>
+                              </Form>
                             </DialogContent>
                           </Dialog>
                           <Button 
