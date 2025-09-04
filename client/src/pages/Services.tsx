@@ -3,6 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import Header from "@/components/Layout/Header";
+import ServiceForm from "@/components/Forms/ServiceForm";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -106,13 +107,20 @@ export default function Services() {
                 Schedule Service
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-2xl">
+            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Schedule New Service</DialogTitle>
               </DialogHeader>
-              <div className="p-4 text-center text-muted-foreground">
-                Service scheduling form coming soon...
-              </div>
+              <ServiceForm
+                onSuccess={() => {
+                  setIsCreateOpen(false);
+                  setEditingService(null);
+                }}
+                onCancel={() => {
+                  setIsCreateOpen(false);
+                  setEditingService(null);
+                }}
+              />
             </DialogContent>
           </Dialog>
         </div>

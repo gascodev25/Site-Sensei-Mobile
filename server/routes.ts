@@ -597,6 +597,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Service Stock Assignment routes
+  app.post('/api/service-stock', isAuthenticated, async (req, res) => {
+    try {
+      const { serviceId, equipmentId, consumableId, quantity } = req.body;
+      
+      const payload: any = {
+        serviceId,
+        quantity: quantity || 1,
+      };
+      
+      if (equipmentId) {
+        payload.equipmentId = equipmentId;
+      }
+      
+      if (consumableId) {
+        payload.consumableId = consumableId;
+      }
+      
+      const assignment = await storage.createServiceStockAssignment(payload);
+      
+      // Audit log
+      await storage.createAuditLog({
+        userId: req.user?.claims?.sub,
+        action: 'create',
+        entityType: 'service_stock',
+        entityId: assignment.id,
+        metadata: { serviceId, equipmentId, consumableId, quantity }
+      });
+      
+      res.status(201).json(assignment);
+    } catch (error) {
+      console.error("Error creating service stock assignment:", error);
+      res.status(500).json({ message: "Failed to create service stock assignment" });
+    }
+  });
+
+  app.get('/api/services/:id/stock', isAuthenticated, async (req, res) => {
+    try {
+      const serviceId = parseInt(req.params.id);
+      const assignments = await storage.getServiceStockAssignments(serviceId);
+      res.json(assignments);
+    } catch (error) {
+      console.error("Error fetching service stock assignments:", error);
+      res.status(500).json({ message: "Failed to fetch service stock assignments" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

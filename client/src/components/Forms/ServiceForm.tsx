@@ -3,13 +3,11 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { insertServiceSchema, type Service, type InsertService } from "@shared/schema";
+import { insertServiceSchema, type Service, type InsertService, type Client, type ServiceTeam } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
-import { Checkbox } from "@/components/ui/checkbox";
 import { CalendarIcon, Repeat } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
@@ -47,11 +45,11 @@ export default function ServiceForm({ service, onSuccess, onCancel }: ServiceFor
   const { toast } = useToast();
   const isEditing = !!service;
 
-  const { data: clients = [] } = useQuery({
+  const { data: clients = [] } = useQuery<Client[]>({
     queryKey: ["/api/clients"],
   });
 
-  const { data: teams = [] } = useQuery({
+  const { data: teams = [] } = useQuery<ServiceTeam[]>({
     queryKey: ["/api/service-teams"],
   });
 
@@ -141,7 +139,7 @@ export default function ServiceForm({ service, onSuccess, onCancel }: ServiceFor
                       <SelectValue placeholder="Select client" />
                     </SelectTrigger>
                     <SelectContent>
-                      {clients.map((client: any) => (
+                      {clients.map((client) => (
                         <SelectItem key={client.id} value={client.id.toString()}>
                           {client.name}
                         </SelectItem>
@@ -250,7 +248,7 @@ export default function ServiceForm({ service, onSuccess, onCancel }: ServiceFor
                       <SelectValue placeholder="Select team" />
                     </SelectTrigger>
                     <SelectContent>
-                      {teams.map((team: any) => (
+                      {teams.map((team) => (
                         <SelectItem key={team.id} value={team.id.toString()}>
                           {team.name}
                         </SelectItem>

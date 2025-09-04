@@ -7,6 +7,7 @@ import {
   teamMembers,
   serviceTeams,
   teamAssignments,
+  serviceStockIssued,
   auditLog,
   type User,
   type UpsertUser,
@@ -95,6 +96,10 @@ export interface IStorage {
     completionRate: number;
     monthlyRevenue: number;
   }>;
+  
+  // Service stock assignment methods
+  createServiceStockAssignment(assignment: any): Promise<any>;
+  getServiceStockAssignments(serviceId: number): Promise<any[]>;
   
   // Audit logging
   createAuditLog(entry: Omit<AuditLogEntry, 'id' | 'timestamp'>): Promise<void>;
@@ -451,6 +456,16 @@ export class DatabaseStorage implements IStorage {
       completionRate,
       monthlyRevenue: 24760, // TODO: Calculate from completed services
     };
+  }
+
+  // Service stock assignment methods
+  async createServiceStockAssignment(assignmentData: any): Promise<any> {
+    const [assignment] = await db.insert(serviceStockIssued).values(assignmentData).returning();
+    return assignment;
+  }
+
+  async getServiceStockAssignments(serviceId: number): Promise<any[]> {
+    return await db.select().from(serviceStockIssued).where(eq(serviceStockIssued.serviceId, serviceId));
   }
 
   // Audit logging
