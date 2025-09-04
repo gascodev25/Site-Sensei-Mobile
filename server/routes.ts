@@ -308,6 +308,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.put('/api/equipment-templates/:id', isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { consumableIds, ...templateData } = req.body;
+      const parsedTemplateData = insertEquipmentTemplateSchema.partial().parse(templateData);
+      
+      const template = await storage.updateEquipmentTemplate(id, parsedTemplateData, consumableIds || []);
+      
+      // Audit log
+      await storage.createAuditLog({
+        userId: req.user?.claims?.sub,
+        action: 'update',
+        entityType: 'equipment_template',
+        entityId: template.id,
+        metadata: { templateName: template.name, consumableIds }
+      });
+      
+      res.json(template);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Validation error", errors: error.errors });
+      }
+      console.error("Error updating equipment template:", error);
+      res.status(500).json({ message: "Failed to update equipment template" });
+    }
+  });
+
+  app.delete('/api/equipment-templates/:id', isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      await storage.deleteEquipmentTemplate(id);
+      
+      // Audit log
+      await storage.createAuditLog({
+        userId: req.user?.claims?.sub,
+        action: 'delete',
+        entityType: 'equipment_template',
+        entityId: id,
+        metadata: {}
+      });
+      
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting equipment template:", error);
+      res.status(500).json({ message: "Failed to delete equipment template" });
+    }
+  });
+
   // Consumables routes
   app.get('/api/consumables', isAuthenticated, async (req, res) => {
     try {

@@ -71,7 +71,7 @@ export interface IStorage {
   getEquipmentTemplates(): Promise<EquipmentTemplate[]>;
   getEquipmentTemplateWithConsumables(id: number): Promise<EquipmentTemplateWithConsumables | undefined>;
   createEquipmentTemplate(template: InsertEquipmentTemplate, consumableIds: number[]): Promise<EquipmentTemplate>;
-  updateEquipmentTemplate(id: number, template: Partial<InsertEquipmentTemplate>): Promise<EquipmentTemplate>;
+  updateEquipmentTemplate(id: number, template: Partial<InsertEquipmentTemplate>, consumableIds: number[]): Promise<EquipmentTemplate>;
   deleteEquipmentTemplate(id: number): Promise<void>;
   
   // Consumables operations
@@ -421,12 +421,26 @@ export class DatabaseStorage implements IStorage {
     return newTemplate;
   }
 
-  async updateEquipmentTemplate(id: number, templateData: Partial<InsertEquipmentTemplate>): Promise<EquipmentTemplate> {
+  async updateEquipmentTemplate(id: number, templateData: Partial<InsertEquipmentTemplate>, consumableIds: number[]): Promise<EquipmentTemplate> {
     const [updatedTemplate] = await db
       .update(equipmentTemplates)
       .set(templateData)
       .where(eq(equipmentTemplates.id, id))
       .returning();
+    
+    // Delete existing template-consumable associations
+    await db.delete(templateConsumables).where(eq(templateConsumables.templateId, id));
+    
+    // Create new associations if consumableIds provided
+    if (consumableIds.length > 0) {
+      const templateConsumableData = consumableIds.map(consumableId => ({
+        templateId: id,
+        consumableId,
+        recommendedQuantity: 1, // Default quantity
+      }));
+      await db.insert(templateConsumables).values(templateConsumableData);
+    }
+    
     return updatedTemplate;
   }
 
