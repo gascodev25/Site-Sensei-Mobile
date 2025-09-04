@@ -299,6 +299,8 @@ export class DatabaseStorage implements IStorage {
       .from(serviceStockIssued)
       .where(eq(serviceStockIssued.serviceId, serviceId));
 
+    console.log("Raw stock assignments:", stockAssignments);
+
     const equipmentItems = stockAssignments
       .filter(item => item.equipmentId !== null)
       .map(item => ({ id: item.equipmentId!, quantity: item.quantity }));
@@ -307,7 +309,10 @@ export class DatabaseStorage implements IStorage {
       .filter(item => item.consumableId !== null)
       .map(item => ({ id: item.consumableId!, quantity: item.quantity }));
 
-    return { equipmentItems, consumableItems };
+    const result = { equipmentItems, consumableItems };
+    console.log("Transformed stock result:", result);
+
+    return result;
   }
 
   async searchServices(query: string): Promise<ServiceWithDetails[]> {
