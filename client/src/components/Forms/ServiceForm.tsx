@@ -93,14 +93,22 @@ export default function ServiceForm({ service, onSuccess, onCancel, onDelete }: 
   // Update form with loaded equipment and consumables when editing
   useEffect(() => {
     if (serviceWithStock && isEditing) {
-      // Set equipment items
+      // Set equipment items (only id and quantity for form validation)
       if (serviceWithStock.equipmentItems) {
-        form.setValue("equipmentItems", serviceWithStock.equipmentItems);
+        const equipmentFormData = serviceWithStock.equipmentItems.map((item: any) => ({
+          id: item.id,
+          quantity: item.quantity
+        }));
+        form.setValue("equipmentItems", equipmentFormData);
       }
       
-      // Set consumable items  
+      // Set consumable items (only id and quantity for form validation)
       if (serviceWithStock.consumableItems) {
-        form.setValue("consumableItems", serviceWithStock.consumableItems);
+        const consumableFormData = serviceWithStock.consumableItems.map((item: any) => ({
+          id: item.id,
+          quantity: item.quantity
+        }));
+        form.setValue("consumableItems", consumableFormData);
       }
     }
   }, [serviceWithStock, isEditing, form]);
