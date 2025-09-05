@@ -388,6 +388,7 @@ export default function Services() {
                   setEditingService(null);
                   setIsCreateOpen(false);
                 }}
+                onDelete={() => handleDelete(editingService)}
               />
             )}
           </DialogContent>

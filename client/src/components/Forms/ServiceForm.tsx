@@ -19,6 +19,7 @@ interface ServiceFormProps {
   service?: Service;
   onSuccess: () => void;
   onCancel: () => void;
+  onDelete?: () => void;
 }
 
 const serviceTypes = [
@@ -42,7 +43,7 @@ const recurrenceIntervals = [
   { value: "once", label: "Once-off" },
 ];
 
-export default function ServiceForm({ service, onSuccess, onCancel }: ServiceFormProps) {
+export default function ServiceForm({ service, onSuccess, onCancel, onDelete }: ServiceFormProps) {
   const { toast } = useToast();
   const isEditing = !!service;
 
@@ -529,6 +530,17 @@ export default function ServiceForm({ service, onSuccess, onCancel }: ServiceFor
           >
             Cancel
           </Button>
+          {isEditing && onDelete && (
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={onDelete}
+              disabled={createServiceMutation.isPending}
+              data-testid="button-delete"
+            >
+              Delete
+            </Button>
+          )}
           <Button
             type="submit"
             disabled={createServiceMutation.isPending}
