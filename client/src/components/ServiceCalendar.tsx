@@ -32,8 +32,8 @@ export default function ServiceCalendar({ services, onServiceClick, onServiceMov
     return services.filter(s => s.team?.name === selectedTeam);
   }, [services, selectedTeam]);
 
-  // Get color based on service status
-  const getServiceColor = (status: string) => {
+  // Get color based on service status (for badge only)
+  const getStatusColor = (status: string) => {
     const colors = {
       'scheduled': 'bg-amber-100 border-amber-400 text-amber-800',
       'completed': 'bg-green-100 border-green-400 text-green-800',
@@ -41,6 +41,21 @@ export default function ServiceCalendar({ services, onServiceClick, onServiceMov
       'in_progress': 'bg-blue-100 border-blue-400 text-blue-800'
     };
     return colors[status as keyof typeof colors] || 'bg-gray-100 border-gray-400 text-gray-800';
+  };
+
+  // Get team background color for service containers
+  const getTeamBackgroundColor = (teamName?: string, status?: string) => {
+    if (!teamName) {
+      // Fallback to status color if no team
+      return getStatusColor(status || 'scheduled');
+    }
+    
+    const teamColors = {
+      "Hygiene": "bg-blue-50 border-blue-200 text-blue-900",
+      "Deep Clean": "bg-green-50 border-green-200 text-green-900", 
+      "Pest Control": "bg-orange-50 border-orange-200 text-orange-900",
+    };
+    return teamColors[teamName as keyof typeof teamColors] || getStatusColor(status || 'scheduled');
   };
 
   // Generate recurring service instances based on recurrencePattern
@@ -171,7 +186,7 @@ export default function ServiceCalendar({ services, onServiceClick, onServiceMov
       onDragStart={() => handleDragStart(service, forDate || new Date())}
       onClick={() => onServiceClick?.(service)}
       className={`
-        ${getServiceColor(service.status || 'scheduled')}
+        ${getTeamBackgroundColor(service.team?.name, service.status)}
         border rounded p-2 cursor-pointer hover:shadow-sm transition-shadow text-xs
         ${size === 'large' ? 'mb-2' : 'mb-1'}
       `}
@@ -180,25 +195,25 @@ export default function ServiceCalendar({ services, onServiceClick, onServiceMov
       <div className="font-medium truncate">{service.client?.name || 'Unknown'}</div>
       {size === 'large' && (
         <>
-          <div className="flex items-center text-xs mt-1 text-muted-foreground">
+          <div className="flex items-center text-xs mt-1 opacity-75">
             <MapPin className="h-3 w-3 mr-1" />
             <span className="truncate">{service.client?.city || 'Location not set'}</span>
           </div>
           {service.team && (
-            <div className="flex items-center text-xs mt-1 text-muted-foreground">
+            <div className="flex items-center text-xs mt-1 opacity-75">
               <User className="h-3 w-3 mr-1" />
               <span className="truncate">{service.team.name}</span>
             </div>
           )}
           {service.estimatedDuration && (
-            <div className="flex items-center text-xs mt-1 text-muted-foreground">
+            <div className="flex items-center text-xs mt-1 opacity-75">
               <Clock className="h-3 w-3 mr-1" />
               <span>{service.estimatedDuration}min</span>
             </div>
           )}
         </>
       )}
-      <Badge className={`mt-1 text-xs ${getServiceColor(service.status || 'scheduled')}`}>
+      <Badge className={`mt-1 text-xs ${getStatusColor(service.status || 'scheduled')}`}>
         {(service.status || 'scheduled').replace('_', ' ').toUpperCase()}
       </Badge>
     </div>
