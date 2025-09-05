@@ -250,6 +250,10 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteService(id: number): Promise<void> {
+    // First delete related stock issued records
+    await db.delete(serviceStockIssued).where(eq(serviceStockIssued.serviceId, id));
+    
+    // Then delete the service
     await db.delete(services).where(eq(services.id, id));
   }
 
