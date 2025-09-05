@@ -663,32 +663,21 @@ export class DatabaseStorage implements IStorage {
       .where(eq(serviceStockIssued.serviceId, id));
 
     // Get template consumables for each assigned equipment
-    const equipmentIds = equipmentAssignments.map(item => item.equipment.id);
+    const templateIds = equipmentAssignments
+      .map(item => item.equipment.templateId)
+      .filter(templateId => templateId !== null);
     let templateConsumablesList: any[] = [];
     
-    if (equipmentIds.length > 0) {
-      // Find templates that match the assigned equipment
-      const matchingTemplates = await db
-        .select()
-        .from(equipmentTemplates)
-        .where(inArray(equipmentTemplates.equipmentId, equipmentIds));
-
-      if (matchingTemplates.length > 0) {
-        const templateIds = matchingTemplates.map(t => t.id);
-        
-        // Get consumables linked to those templates
-        templateConsumablesList = await db
-          .select({
-            templateConsumable: templateConsumables,
-            consumable: consumables,
-            equipment: equipment,
-          })
-          .from(templateConsumables)
-          .innerJoin(consumables, eq(templateConsumables.consumableId, consumables.id))
-          .innerJoin(equipmentTemplates, eq(templateConsumables.templateId, equipmentTemplates.id))
-          .innerJoin(equipment, eq(equipmentTemplates.equipmentId, equipment.id))
-          .where(inArray(templateConsumables.templateId, templateIds));
-      }
+    if (templateIds.length > 0) {
+      // Get consumables linked to those templates
+      templateConsumablesList = await db
+        .select({
+          templateConsumable: templateConsumables,
+          consumable: consumables,
+        })
+        .from(templateConsumables)
+        .innerJoin(consumables, eq(templateConsumables.consumableId, consumables.id))
+        .where(inArray(templateConsumables.templateId, templateIds));
     }
 
     // Combine directly assigned consumables with template consumables
@@ -703,7 +692,7 @@ export class DatabaseStorage implements IStorage {
       if (!alreadyAssigned) {
         allConsumables.push({
           stockItem: { 
-            quantity: templateItem.templateConsumable.quantity,
+            quantity: templateItem.templateConsumable.recommendedQuantity || 1,
             serviceId: id,
             consumableId: templateItem.consumable.id,
             equipmentId: null,
