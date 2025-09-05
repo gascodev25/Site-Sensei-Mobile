@@ -50,10 +50,12 @@ export default function Services() {
 
   const updateServiceMutation = useMutation({
     mutationFn: async ({ serviceId, data }: { serviceId: number; data: Partial<ServiceWithDetails> }) => {
-      await apiRequest("PATCH", `/api/services/${serviceId}`, data);
+      await apiRequest("PUT", `/api/services/${serviceId}`, data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/services"] });
+      queryClient.refetchQueries({ queryKey: ["/api/services"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/metrics"] });
       toast({
         title: "Success",
         description: "Service rescheduled successfully",
