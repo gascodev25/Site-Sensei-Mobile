@@ -30,8 +30,10 @@ export default function Services() {
       await apiRequest("DELETE", `/api/services/${serviceId}`);
     },
     onSuccess: () => {
+      // Force refetch all service-related queries
       queryClient.invalidateQueries({ queryKey: ["/api/services"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard/metrics"] });
+      queryClient.refetchQueries({ queryKey: ["/api/services"] });
       toast({
         title: "Success",
         description: "Service deleted successfully",
