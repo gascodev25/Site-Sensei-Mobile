@@ -65,7 +65,7 @@ export default function ServiceForm({ service, onSuccess, onCancel, onDelete }: 
   });
 
   // Fetch service with stock items when editing
-  const { data: serviceWithStock } = useQuery({
+  const { data: serviceWithStock } = useQuery<any>({
     queryKey: ["/api/services", service?.id],
     enabled: isEditing && !!service?.id,
   });
@@ -121,6 +121,7 @@ export default function ServiceForm({ service, onSuccess, onCancel, onDelete }: 
       }
     },
     onSuccess: () => {
+      console.log("Service mutation successful, invalidating queries and calling onSuccess");
       queryClient.invalidateQueries({ queryKey: ["/api/services"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard/metrics"] });
       toast({
@@ -139,6 +140,8 @@ export default function ServiceForm({ service, onSuccess, onCancel, onDelete }: 
   });
 
   const onSubmit = (data: InsertService) => {
+    console.log("Form submitted with data:", data);
+    console.log("Form errors:", form.formState.errors);
     createServiceMutation.mutate(data);
   };
 
