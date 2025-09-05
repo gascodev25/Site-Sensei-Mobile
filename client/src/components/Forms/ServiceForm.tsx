@@ -106,8 +106,9 @@ export default function ServiceForm({ service, onSuccess, onCancel, onDelete }: 
       if (serviceWithStock.consumableItems) {
         const consumableFormData = serviceWithStock.consumableItems.map((item: any) => ({
           id: item.id,
-          quantity: item.quantity
+          quantity: Math.max(1, item.quantity || 1) // Ensure minimum quantity of 1
         }));
+        console.log("Setting consumable form data:", consumableFormData);
         form.setValue("consumableItems", consumableFormData);
       }
     }
@@ -157,6 +158,9 @@ export default function ServiceForm({ service, onSuccess, onCancel, onDelete }: 
   // Add debugging for form state
   console.log("Form state - isValid:", form.formState.isValid);
   console.log("Form state - errors:", form.formState.errors);
+  console.log("serviceWithStock:", serviceWithStock);
+  console.log("equipmentItems form value:", form.getValues("equipmentItems"));
+  console.log("consumableItems form value:", form.getValues("consumableItems"));
 
   const handleConvertToServiceContract = () => {
     if (watchType === "installation") {
