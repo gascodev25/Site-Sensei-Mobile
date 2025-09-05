@@ -33,6 +33,17 @@ export default function Services() {
   });
   const { toast } = useToast();
 
+  // Get team background color
+  const getTeamBackgroundColor = (teamName?: string) => {
+    if (!teamName) return "";
+    const teamColors = {
+      "Hygiene": "bg-blue-50 border-blue-200",
+      "Deep Clean": "bg-green-50 border-green-200", 
+      "Pest Control": "bg-orange-50 border-orange-200",
+    };
+    return teamColors[teamName as keyof typeof teamColors] || "";
+  };
+
   const { data: services = [], isLoading } = useQuery<ServiceWithDetails[]>({
     queryKey: ["/api/services"],
   });
@@ -395,7 +406,7 @@ export default function Services() {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {filteredServices.map((service: ServiceWithDetails) => (
-                  <Card key={service.id} className="hover:shadow-md transition-shadow" data-testid={`card-service-${service.id}`}>
+                  <Card key={service.id} className={`hover:shadow-md transition-shadow ${getTeamBackgroundColor(service.team?.name)}`} data-testid={`card-service-${service.id}`}>
                     <CardHeader className="pb-3">
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
