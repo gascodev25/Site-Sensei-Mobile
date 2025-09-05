@@ -142,8 +142,13 @@ export default function ServiceForm({ service, onSuccess, onCancel, onDelete }: 
   const onSubmit = (data: InsertService) => {
     console.log("Form submitted with data:", data);
     console.log("Form errors:", form.formState.errors);
+    console.log("Form is valid:", form.formState.isValid);
     createServiceMutation.mutate(data);
   };
+
+  // Add debugging for form state
+  console.log("Form state - isValid:", form.formState.isValid);
+  console.log("Form state - errors:", form.formState.errors);
 
   const handleConvertToServiceContract = () => {
     if (watchType === "installation") {
