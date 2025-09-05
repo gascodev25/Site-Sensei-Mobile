@@ -34,7 +34,7 @@ import {
   type EquipmentWithConsumables,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, or, sql, desc, asc, ilike, lt, gte, lte } from "drizzle-orm";
+import { eq, and, or, sql, desc, asc, ilike, lt, gte, lte, inArray } from "drizzle-orm";
 
 export interface IStorage {
   // User operations (required for Replit Auth)
@@ -662,6 +662,58 @@ export class DatabaseStorage implements IStorage {
       .innerJoin(consumables, eq(serviceStockIssued.consumableId, consumables.id))
       .where(eq(serviceStockIssued.serviceId, id));
 
+    // Get template consumables for each assigned equipment
+    const equipmentIds = equipmentAssignments.map(item => item.equipment.id);
+    let templateConsumablesList: any[] = [];
+    
+    if (equipmentIds.length > 0) {
+      // Find templates that match the assigned equipment
+      const matchingTemplates = await db
+        .select()
+        .from(equipmentTemplates)
+        .where(inArray(equipmentTemplates.equipmentId, equipmentIds));
+
+      if (matchingTemplates.length > 0) {
+        const templateIds = matchingTemplates.map(t => t.id);
+        
+        // Get consumables linked to those templates
+        templateConsumablesList = await db
+          .select({
+            templateConsumable: templateConsumables,
+            consumable: consumables,
+            equipment: equipment,
+          })
+          .from(templateConsumables)
+          .innerJoin(consumables, eq(templateConsumables.consumableId, consumables.id))
+          .innerJoin(equipmentTemplates, eq(templateConsumables.templateId, equipmentTemplates.id))
+          .innerJoin(equipment, eq(equipmentTemplates.equipmentId, equipment.id))
+          .where(inArray(templateConsumables.templateId, templateIds));
+      }
+    }
+
+    // Combine directly assigned consumables with template consumables
+    const allConsumables = [...consumableAssignments];
+    
+    // Add template consumables that aren't already directly assigned
+    templateConsumablesList.forEach(templateItem => {
+      const alreadyAssigned = consumableAssignments.some(
+        assigned => assigned.consumable.id === templateItem.consumable.id
+      );
+      
+      if (!alreadyAssigned) {
+        allConsumables.push({
+          stockItem: { 
+            quantity: templateItem.templateConsumable.quantity,
+            serviceId: id,
+            consumableId: templateItem.consumable.id,
+            equipmentId: null,
+            returned: false
+          },
+          consumable: templateItem.consumable,
+        });
+      }
+    });
+
     return {
       ...service,
       equipmentItems: equipmentAssignments.map(row => ({
@@ -669,7 +721,7 @@ export class DatabaseStorage implements IStorage {
         quantity: row.stockItem.quantity,
         equipment: row.equipment,
       })),
-      consumableItems: consumableAssignments.map(row => ({
+      consumableItems: allConsumables.map(row => ({
         id: row.consumable.id,
         quantity: row.stockItem.quantity,
         consumable: row.consumable,
