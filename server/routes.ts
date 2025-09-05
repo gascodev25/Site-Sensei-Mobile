@@ -477,6 +477,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get('/api/services/:id', isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const service = await storage.getServiceWithStockItems(id);
+      if (!service) {
+        return res.status(404).json({ message: "Service not found" });
+      }
+      res.json(service);
+    } catch (error) {
+      console.error("Error fetching service:", error);
+      res.status(500).json({ message: "Failed to fetch service" });
+    }
+  });
+
   app.get('/api/services/ready-for-invoicing', isAuthenticated, async (req, res) => {
     try {
       const services = await storage.getServicesReadyForInvoicing();

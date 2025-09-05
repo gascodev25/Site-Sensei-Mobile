@@ -14,6 +14,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
+import { useEffect } from "react";
 
 interface ServiceFormProps {
   service?: Service;
@@ -63,6 +64,12 @@ export default function ServiceForm({ service, onSuccess, onCancel, onDelete }: 
     queryKey: ["/api/consumables"],
   });
 
+  // Fetch service with stock items when editing
+  const { data: serviceWithStock } = useQuery({
+    queryKey: ["/api/services", service?.id],
+    enabled: isEditing && !!service?.id,
+  });
+
   const form = useForm<InsertService>({
     resolver: zodResolver(insertServiceSchema),
     defaultValues: {
@@ -82,6 +89,21 @@ export default function ServiceForm({ service, onSuccess, onCancel, onDelete }: 
 
   const watchType = form.watch("type");
   const watchInstallationDate = form.watch("installationDate");
+
+  // Update form with loaded equipment and consumables when editing
+  useEffect(() => {
+    if (serviceWithStock && isEditing) {
+      // Set equipment items
+      if (serviceWithStock.equipmentItems) {
+        form.setValue("equipmentItems", serviceWithStock.equipmentItems);
+      }
+      
+      // Set consumable items  
+      if (serviceWithStock.consumableItems) {
+        form.setValue("consumableItems", serviceWithStock.consumableItems);
+      }
+    }
+  }, [serviceWithStock, isEditing, form]);
 
   const createServiceMutation = useMutation({
     mutationFn: async (data: InsertService) => {

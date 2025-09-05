@@ -638,6 +638,45 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(serviceStockIssued).where(eq(serviceStockIssued.serviceId, serviceId));
   }
 
+  async getServiceWithStockItems(id: number): Promise<any | undefined> {
+    const [service] = await db.select().from(services).where(eq(services.id, id));
+    if (!service) return undefined;
+
+    // Get equipment assigned to this service
+    const equipmentAssignments = await db
+      .select({
+        stockItem: serviceStockIssued,
+        equipment: equipment,
+      })
+      .from(serviceStockIssued)
+      .innerJoin(equipment, eq(serviceStockIssued.equipmentId, equipment.id))
+      .where(eq(serviceStockIssued.serviceId, id));
+
+    // Get consumables assigned to this service
+    const consumableAssignments = await db
+      .select({
+        stockItem: serviceStockIssued,
+        consumable: consumables,
+      })
+      .from(serviceStockIssued)
+      .innerJoin(consumables, eq(serviceStockIssued.consumableId, consumables.id))
+      .where(eq(serviceStockIssued.serviceId, id));
+
+    return {
+      ...service,
+      equipmentItems: equipmentAssignments.map(row => ({
+        id: row.equipment.id,
+        quantity: row.stockItem.quantity,
+        equipment: row.equipment,
+      })),
+      consumableItems: consumableAssignments.map(row => ({
+        id: row.consumable.id,
+        quantity: row.stockItem.quantity,
+        consumable: row.consumable,
+      })),
+    };
+  }
+
   // Audit logging
   async createAuditLog(entry: Omit<AuditLogEntry, 'id' | 'timestamp'>): Promise<void> {
     await db.insert(auditLog).values(entry);
