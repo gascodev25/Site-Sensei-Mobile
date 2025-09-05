@@ -135,6 +135,7 @@ export const services = pgTable("services", {
   teamId: integer("team_id").references(() => serviceTeams.id),
   status: varchar("status", { length: 20 }).default("scheduled"), // 'scheduled', 'completed', 'missed'
   recurrencePattern: jsonb("recurrence_pattern"), // { interval: '30d', end_date: '2026-01-01' }
+  excludedDates: jsonb("excluded_dates").$type<string[]>().default([]), // Array of ISO date strings to skip
   contractLengthMonths: integer("contract_length_months"),
   createdAt: timestamp("created_at").defaultNow(),
   completedAt: timestamp("completed_at"),
@@ -267,6 +268,7 @@ export const insertServiceSchema = createInsertSchema(services).omit({
   checkOutTime: true,
 }).extend({
   installationDate: z.coerce.date().optional().nullable(),
+  excludedDates: z.array(z.string()).optional(), // Array of ISO date strings
   equipmentItems: z.array(z.object({
     id: z.number(),
     quantity: z.number().min(1)

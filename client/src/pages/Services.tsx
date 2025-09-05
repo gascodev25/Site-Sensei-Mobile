@@ -141,9 +141,9 @@ export default function Services() {
     }
   };
 
-  const handleMoveThisOnly = () => {
-    const { service, newDate } = recurringMoveDialog;
-    if (!service || !newDate) return;
+  const handleMoveThisOnly = async () => {
+    const { service, originalDate, newDate } = recurringMoveDialog;
+    if (!service || !newDate || !originalDate) return;
 
     // Create a new individual service for this specific date
     const individualServiceData = {
@@ -159,7 +159,24 @@ export default function Services() {
       contractLengthMonths: null,
     };
 
-    createIndividualServiceMutation.mutate(individualServiceData);
+    // Add the original date to the recurring service's excluded dates
+    const currentExcludedDates = (service.excludedDates as string[]) || [];
+    const originalDateString = originalDate.toISOString().split('T')[0]; // YYYY-MM-DD format
+    const updatedExcludedDates = [...currentExcludedDates, originalDateString];
+
+    try {
+      // Create individual service and update original service to exclude the moved date
+      await Promise.all([
+        createIndividualServiceMutation.mutateAsync(individualServiceData),
+        updateServiceMutation.mutateAsync({
+          serviceId: service.id,
+          data: { excludedDates: updatedExcludedDates }
+        })
+      ]);
+    } catch (error) {
+      console.error('Error in handleMoveThisOnly:', error);
+    }
+    
     setRecurringMoveDialog({ open: false, service: null, originalDate: null, newDate: null });
   };
 
