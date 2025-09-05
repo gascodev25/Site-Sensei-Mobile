@@ -10,7 +10,7 @@ import type { ServiceWithDetails } from "@shared/schema";
 interface ServiceCalendarProps {
   services: ServiceWithDetails[];
   onServiceClick?: (service: ServiceWithDetails) => void;
-  onServiceMove?: (serviceId: number, newDate: Date) => void;
+  onServiceMove?: (serviceId: number, newDate: Date, originalDate?: Date) => void;
 }
 
 export default function ServiceCalendar({ services, onServiceClick, onServiceMove }: ServiceCalendarProps) {
@@ -18,6 +18,7 @@ export default function ServiceCalendar({ services, onServiceClick, onServiceMov
   const [view, setView] = useState<'month' | 'week' | 'day'>('month');
   const [selectedTeam, setSelectedTeam] = useState<string>('all');
   const [draggedService, setDraggedService] = useState<ServiceWithDetails | null>(null);
+  const [draggedFromDate, setDraggedFromDate] = useState<Date | null>(null);
 
   // Get unique teams for filtering
   const teams = useMemo(() => {
@@ -137,14 +138,16 @@ export default function ServiceCalendar({ services, onServiceClick, onServiceMov
   };
 
   // Drag and drop handlers
-  const handleDragStart = (service: ServiceWithDetails) => {
+  const handleDragStart = (service: ServiceWithDetails, fromDate: Date) => {
     setDraggedService(service);
+    setDraggedFromDate(fromDate);
   };
 
   const handleDrop = (date: Date) => {
     if (draggedService && onServiceMove) {
-      onServiceMove(draggedService.id, date);
+      onServiceMove(draggedService.id, date, draggedFromDate || undefined);
       setDraggedService(null);
+      setDraggedFromDate(null);
     }
   };
 
@@ -153,11 +156,11 @@ export default function ServiceCalendar({ services, onServiceClick, onServiceMov
   };
 
   // Render service item
-  const renderServiceItem = (service: ServiceWithDetails, size: 'small' | 'large' = 'small') => (
+  const renderServiceItem = (service: ServiceWithDetails, size: 'small' | 'large' = 'small', forDate?: Date) => (
     <div
       key={service.id}
       draggable
-      onDragStart={() => handleDragStart(service)}
+      onDragStart={() => handleDragStart(service, forDate || new Date())}
       onClick={() => onServiceClick?.(service)}
       className={`
         ${getServiceColor(service.status || 'scheduled')}
@@ -235,7 +238,7 @@ export default function ServiceCalendar({ services, onServiceClick, onServiceMov
                 {format(day, 'd')}
               </div>
               <div className="space-y-1">
-                {dayServices.slice(0, 3).map(service => renderServiceItem(service, 'small'))}
+                {dayServices.slice(0, 3).map(service => renderServiceItem(service, 'small', day))}
                 {dayServices.length > 3 && (
                   <div className="text-xs text-muted-foreground">
                     +{dayServices.length - 3} more
@@ -279,7 +282,7 @@ export default function ServiceCalendar({ services, onServiceClick, onServiceMov
                 data-testid={`calendar-week-day-${format(day, 'yyyy-MM-dd')}`}
               >
                 <div className="space-y-2">
-                  {dayServices.map(service => renderServiceItem(service, 'large'))}
+                  {dayServices.map(service => renderServiceItem(service, 'large', day))}
                 </div>
               </CardContent>
             </Card>
@@ -313,7 +316,7 @@ export default function ServiceCalendar({ services, onServiceClick, onServiceMov
               {dayServices.map(service => (
                 <Card key={service.id} className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => onServiceClick?.(service)}>
                   <CardContent className="p-4">
-                    {renderServiceItem(service, 'large')}
+                    {renderServiceItem(service, 'large', currentDate)}
                   </CardContent>
                 </Card>
               ))}

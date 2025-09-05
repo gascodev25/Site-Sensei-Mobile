@@ -13,12 +13,24 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Plus, Search, Edit, Trash2, Calendar, Clock, User, MapPin, List } from "lucide-react";
 import type { ServiceWithDetails } from "@shared/schema";
 import ServiceCalendar from "@/components/ServiceCalendar";
+import RecurringServiceMoveDialog from "@/components/Dialogs/RecurringServiceMoveDialog";
 
 export default function Services() {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState("list");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingService, setEditingService] = useState<ServiceWithDetails | null>(null);
+  const [recurringMoveDialog, setRecurringMoveDialog] = useState<{
+    open: boolean;
+    service: ServiceWithDetails | null;
+    originalDate: Date | null;
+    newDate: Date | null;
+  }>({
+    open: false,
+    service: null,
+    originalDate: null,
+    newDate: null,
+  });
   const { toast } = useToast();
 
   const { data: services = [], isLoading } = useQuery<ServiceWithDetails[]>({
@@ -70,6 +82,28 @@ export default function Services() {
     },
   });
 
+  const createIndividualServiceMutation = useMutation({
+    mutationFn: async (serviceData: Partial<ServiceWithDetails>) => {
+      return await apiRequest("POST", "/api/services", serviceData);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/services"] });
+      queryClient.refetchQueries({ queryKey: ["/api/services"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/metrics"] });
+      toast({
+        title: "Success",
+        description: "Individual service created successfully",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleDelete = (service: ServiceWithDetails) => {
     if (confirm(`Are you sure you want to delete this service for ${service.client?.name}?`)) {
       deleteServiceMutation.mutate(service.id);
@@ -80,11 +114,65 @@ export default function Services() {
     setEditingService(service);
   };
 
-  const handleServiceMove = (serviceId: number, newDate: Date) => {
-    updateServiceMutation.mutate({ 
-      serviceId, 
-      data: { installationDate: newDate.toISOString() }
+  const handleServiceMove = (serviceId: number, newDate: Date, draggedFromDate?: Date) => {
+    const service = services.find(s => s.id === serviceId);
+    if (!service) return;
+
+    // Check if this is a recurring service
+    const isRecurring = service.recurrencePattern && 
+      service.recurrencePattern !== null && 
+      typeof service.recurrencePattern === 'object' &&
+      (service.recurrencePattern as any).interval;
+
+    if (isRecurring && draggedFromDate) {
+      // Show dialog for recurring service
+      setRecurringMoveDialog({
+        open: true,
+        service,
+        originalDate: draggedFromDate,
+        newDate,
+      });
+    } else {
+      // Handle non-recurring service or direct move
+      updateServiceMutation.mutate({ 
+        serviceId, 
+        data: { installationDate: newDate }
+      });
+    }
+  };
+
+  const handleMoveThisOnly = () => {
+    const { service, newDate } = recurringMoveDialog;
+    if (!service || !newDate) return;
+
+    // Create a new individual service for this specific date
+    const individualServiceData = {
+      clientId: service.clientId,
+      type: service.type,
+      installationDate: newDate,
+      teamId: service.teamId,
+      status: service.status,
+      servicePriority: service.servicePriority,
+      estimatedDuration: service.estimatedDuration,
+      // Remove recurrence pattern - this is a one-time service
+      recurrencePattern: null,
+      contractLengthMonths: null,
+    };
+
+    createIndividualServiceMutation.mutate(individualServiceData);
+    setRecurringMoveDialog({ open: false, service: null, originalDate: null, newDate: null });
+  };
+
+  const handleMoveAllFuture = () => {
+    const { service, newDate } = recurringMoveDialog;
+    if (!service || !newDate) return;
+
+    // Update the base service's installation date
+    updateServiceMutation.mutate({
+      serviceId: service.id,
+      data: { installationDate: newDate }
     });
+    setRecurringMoveDialog({ open: false, service: null, originalDate: null, newDate: null });
   };
 
   // Client-side filtering like Clients and Inventory pages
@@ -395,6 +483,19 @@ export default function Services() {
             )}
           </DialogContent>
         </Dialog>
+
+        {/* Recurring Service Move Dialog */}
+        <RecurringServiceMoveDialog
+          open={recurringMoveDialog.open}
+          onOpenChange={(open) => 
+            !open && setRecurringMoveDialog({ open: false, service: null, originalDate: null, newDate: null })
+          }
+          service={recurringMoveDialog.service}
+          originalDate={recurringMoveDialog.originalDate}
+          newDate={recurringMoveDialog.newDate}
+          onMoveThisOnly={handleMoveThisOnly}
+          onMoveAllFuture={handleMoveAllFuture}
+        />
       </div>
     </div>
   );
