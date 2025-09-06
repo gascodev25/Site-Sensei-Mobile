@@ -561,9 +561,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid service ID" });
       }
       
-      // Validate request body
-      const validatedData = serviceCompletionSchema.parse(req.body);
-      const { equipmentItems, consumableItems, convertToContract } = validatedData;
+      // Validate request body using safeParse
+      const validationResult = serviceCompletionSchema.safeParse(req.body);
+      if (!validationResult.success) {
+        return res.status(400).json({ 
+          message: "Validation error", 
+          errors: validationResult.error.errors 
+        });
+      }
+      
+      const { equipmentItems, consumableItems, convertToContract } = validationResult.data;
+      
+      // Validate equipment IDs exist in database
+      if (equipmentItems && equipmentItems.length > 0) {
+        const equipmentIds = equipmentItems.map(item => item.id);
+        const existingEquipment = await storage.getEquipment();
+        const existingEquipmentIds = existingEquipment.map(eq => eq.id);
+        
+        const invalidEquipmentIds = equipmentIds.filter(id => !existingEquipmentIds.includes(id));
+        if (invalidEquipmentIds.length > 0) {
+          return res.status(400).json({ 
+            message: `Invalid equipment IDs: ${invalidEquipmentIds.join(', ')}. These equipment items do not exist.`
+          });
+        }
+      }
+      
+      // Validate consumable IDs exist in database
+      if (consumableItems && consumableItems.length > 0) {
+        const consumableIds = consumableItems.map(item => item.id);
+        const existingConsumables = await storage.getConsumables();
+        const existingConsumableIds = existingConsumables.map(c => c.id);
+        
+        const invalidConsumableIds = consumableIds.filter(id => !existingConsumableIds.includes(id));
+        if (invalidConsumableIds.length > 0) {
+          return res.status(400).json({ 
+            message: `Invalid consumable IDs: ${invalidConsumableIds.join(', ')}. These consumable items do not exist.`
+          });
+        }
+      }
       
       // Get the existing service
       const existingService = await storage.getService(id);
