@@ -1024,6 +1024,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         } catch (error: any) {
           errorCount++;
+          console.error(`Bulk upload client error for row ${index + 1}:`, error);
+          console.error('Row data:', JSON.stringify(row, null, 2));
+          console.error('Transformed data:', JSON.stringify(clientData, null, 2));
           errors.push({ row: index + 1, error: error.message });
         }
       }
