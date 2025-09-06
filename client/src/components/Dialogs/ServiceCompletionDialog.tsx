@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
@@ -49,11 +49,22 @@ export default function ServiceCompletionDialog({
 
   const form = useForm<CompletionFormData>({
     defaultValues: {
-      equipmentItems: service?.equipmentItems || [],
-      consumableItems: service?.consumableItems || [],
-      convertToContract: service?.type === 'installation',
+      equipmentItems: [],
+      consumableItems: [],
+      convertToContract: false,
     },
   });
+
+  // Reset form when service changes
+  useEffect(() => {
+    if (service) {
+      form.reset({
+        equipmentItems: service.equipmentItems || [],
+        consumableItems: service.consumableItems || [],
+        convertToContract: service.type === 'installation',
+      });
+    }
+  }, [service, form]);
 
   const completeServiceMutation = useMutation({
     mutationFn: async (data: CompletionFormData) => {
