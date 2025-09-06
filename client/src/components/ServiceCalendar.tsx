@@ -183,6 +183,55 @@ export default function ServiceCalendar({ services, onServiceClick, onServiceMov
     e.preventDefault();
   };
 
+  // Get status badge using same logic as list view
+  const getStatusBadge = (service: ServiceWithDetails, forDate?: Date) => {
+    const currentDateStr = forDate?.toISOString().split('T')[0] || new Date().toISOString().split('T')[0];
+    const status = service.status || 'scheduled';
+    const statusColors = {
+      scheduled: "bg-blue-100 text-blue-800 border-blue-300",
+      completed: "bg-green-100 text-green-800 border-green-300", 
+      missed: "bg-red-100 text-red-800 border-red-300",
+      in_progress: "bg-yellow-100 text-yellow-800 border-yellow-300"
+    };
+    
+    // For non-recurring services, use the main status
+    if (service.type !== 'service_contract') {
+      return (
+        <Badge className={`text-xs ${statusColors[status as keyof typeof statusColors] || "bg-gray-100 text-gray-800 border-gray-300"}`}>
+          {status.replace('_', ' ').toUpperCase()}
+        </Badge>
+      );
+    }
+    
+    // For service contracts (recurring), check if this specific date is completed
+    const isCompletedOnThisDate = service.completedDates && 
+      (service.completedDates as string[]).includes(currentDateStr);
+      
+    if (isCompletedOnThisDate) {
+      return (
+        <Badge className="text-xs bg-green-100 text-green-800 border-green-300">
+          COMPLETED
+        </Badge>
+      );
+    }
+    
+    // Show completion count for recurring services
+    const completedDates = service.completedDates as string[] || [];
+    if (completedDates.length > 0) {
+      return (
+        <Badge className="text-xs bg-green-100 text-green-800 border-green-300">
+          {completedDates.length} COMPLETED
+        </Badge>
+      );
+    }
+    
+    return (
+      <Badge className={`text-xs ${statusColors[status as keyof typeof statusColors] || "bg-gray-100 text-gray-800 border-gray-300"}`}>
+        {status.replace('_', ' ').toUpperCase()}
+      </Badge>
+    );
+  };
+
   // Render service item
   const renderServiceItem = (service: ServiceWithDetails, size: 'small' | 'large' = 'small', forDate?: Date) => {
     const currentDateStr = forDate?.toISOString().split('T')[0] || new Date().toISOString().split('T')[0];
@@ -247,9 +296,7 @@ export default function ServiceCalendar({ services, onServiceClick, onServiceMov
             )}
           </>
         )}
-        <Badge className={`mt-1 text-xs ${getStatusColor(effectiveStatus)}`}>
-          {effectiveStatus.replace('_', ' ').toUpperCase()}
-        </Badge>
+        {getStatusBadge(service, forDate)}
       </div>
     );
   };
