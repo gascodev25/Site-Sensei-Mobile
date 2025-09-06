@@ -128,10 +128,17 @@ export default function Services() {
     mutationFn: async ({ serviceId, data }: { serviceId: number; data: any }) => {
       return await apiRequest("POST", `/api/services/${serviceId}/complete`, data);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/services"] });
-      queryClient.refetchQueries({ queryKey: ["/api/services"] });
+    onSuccess: async () => {
+      // Force clear all service-related cache entries
+      queryClient.removeQueries({ queryKey: ["/api/services"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard/metrics"] });
+      
+      // Small delay to ensure server has processed the update
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // Refetch the services data
+      await queryClient.refetchQueries({ queryKey: ["/api/services"] });
+      
       setCompletionDialog({ open: false, service: null });
       setEditingService(null);
       toast({
@@ -277,13 +284,23 @@ export default function Services() {
       in_progress: "bg-blue-100 border-blue-400 text-blue-800"
     };
     
-    // For service contracts, show completion count if any occurrences are completed
-    if (service.type === 'service_contract' && service.completedDates && (service.completedDates as string[]).length > 0) {
-      return (
-        <Badge className="bg-green-100 border-green-400 text-green-800">
-          {(service.completedDates as string[]).length} COMPLETED
-        </Badge>
-      );
+    // For service contracts, prioritize the actual status if completed
+    if (service.type === 'service_contract') {
+      if (status === 'completed') {
+        return (
+          <Badge className="bg-green-100 border-green-400 text-green-800">
+            COMPLETED
+          </Badge>
+        );
+      }
+      // Show completion count if any occurrences are completed but service isn't marked as completed
+      if (service.completedDates && (service.completedDates as string[]).length > 0) {
+        return (
+          <Badge className="bg-green-100 border-green-400 text-green-800">
+            {(service.completedDates as string[]).length} COMPLETED
+          </Badge>
+        );
+      }
     }
     
     return (
