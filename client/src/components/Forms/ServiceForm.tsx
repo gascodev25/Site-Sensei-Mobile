@@ -389,7 +389,13 @@ export default function ServiceForm({ service, initialDate, onSuccess, onCancel,
                     <FormLabel>Recurrence</FormLabel>
                     <FormControl>
                       <Select 
-                        value={(field.value && typeof field.value === 'object' && 'interval' in field.value) ? (field.value as any).interval || "" : ""}
+                        value={
+                          field.value === null || field.value === undefined 
+                            ? "once" 
+                            : (field.value && typeof field.value === 'object' && 'interval' in field.value) 
+                              ? (field.value as any).interval || "once" 
+                              : "once"
+                        }
                         onValueChange={(value) => {
                           if (value === "once") {
                             field.onChange(null);
