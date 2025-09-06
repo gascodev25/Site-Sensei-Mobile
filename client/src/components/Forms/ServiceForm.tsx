@@ -103,7 +103,7 @@ export default function ServiceForm({ service, initialDate, onSuccess, onCancel,
         }));
         form.setValue("equipmentItems", equipmentFormData);
       }
-      
+
       // Set consumable items (only id and quantity for form validation)
       if (serviceWithStock.consumableItems) {
         const consumableFormData = serviceWithStock.consumableItems.map((item: any) => ({
@@ -358,7 +358,7 @@ export default function ServiceForm({ service, initialDate, onSuccess, onCancel,
         {watchType === "service_contract" && (
           <div className="space-y-4 border-t border-border pt-4">
             <h3 className="text-lg font-medium">Service Contract Details</h3>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField
                 control={form.control}
@@ -428,7 +428,7 @@ export default function ServiceForm({ service, initialDate, onSuccess, onCancel,
             <h3 className="text-lg font-medium">Required Equipment</h3>
           </div>
           <p className="text-sm text-muted-foreground">Select equipment needed for this service</p>
-          
+
           <FormField
             control={form.control}
             name="equipmentItems"
@@ -438,8 +438,8 @@ export default function ServiceForm({ service, initialDate, onSuccess, onCancel,
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     {equipment.map((item) => {
                       const isSelected = field.value?.some(eq => eq.id === item.id) || false;
-                      const selectedItem = field.value?.find(eq => eq.id === item.id);
-                      
+                      const selectedItem = field.value?.some(eq => eq.id === item.id);
+
                       return (
                         <div key={item.id} className="flex items-center space-x-3 p-3 border rounded-lg">
                           <Checkbox
@@ -495,7 +495,7 @@ export default function ServiceForm({ service, initialDate, onSuccess, onCancel,
             <h3 className="text-lg font-medium">Required Consumables</h3>
           </div>
           <p className="text-sm text-muted-foreground">Select consumables needed for this service</p>
-          
+
           <FormField
             control={form.control}
             name="consumableItems"
@@ -505,8 +505,8 @@ export default function ServiceForm({ service, initialDate, onSuccess, onCancel,
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     {consumables.map((item) => {
                       const isSelected = field.value?.some(con => con.id === item.id) || false;
-                      const selectedItem = field.value?.find(con => con.id === item.id);
-                      
+                      const selectedItem = field.value?.some(con => con.id === item.id);
+
                       return (
                         <div key={item.id} className="flex items-center space-x-3 p-3 border rounded-lg">
                           <Checkbox
@@ -576,10 +576,9 @@ export default function ServiceForm({ service, initialDate, onSuccess, onCancel,
               Delete
             </Button>
           )}
-          {isEditing && onComplete && service?.status !== 'completed' && (
+          {isEditing && onComplete && service?.type === 'service_contract' && service.status !== 'completed' && (
             <Button
               type="button"
-              variant="default"
               onClick={onComplete}
               disabled={createServiceMutation.isPending}
               className="bg-green-600 hover:bg-green-700 text-white"
