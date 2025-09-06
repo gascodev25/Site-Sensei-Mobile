@@ -13,6 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Plus, Search, Edit, Trash2, Calendar, Clock, User, MapPin, List } from "lucide-react";
 import type { ServiceWithDetails } from "@shared/schema";
 import ServiceCalendar from "@/components/ServiceCalendar";
+import { cn } from "@/lib/utils";
 import RecurringServiceMoveDialog from "@/components/Dialogs/RecurringServiceMoveDialog";
 import ServiceCompletionDialog from "@/components/Dialogs/ServiceCompletionDialog";
 
