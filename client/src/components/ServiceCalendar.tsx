@@ -11,9 +11,10 @@ interface ServiceCalendarProps {
   services: ServiceWithDetails[];
   onServiceClick?: (service: ServiceWithDetails) => void;
   onServiceMove?: (serviceId: number, newDate: Date, originalDate?: Date) => void;
+  onDateClick?: (date: Date) => void;
 }
 
-export default function ServiceCalendar({ services, onServiceClick, onServiceMove }: ServiceCalendarProps) {
+export default function ServiceCalendar({ services, onServiceClick, onServiceMove, onDateClick }: ServiceCalendarProps) {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [view, setView] = useState<'month' | 'week' | 'day'>('month');
   const [selectedTeam, setSelectedTeam] = useState<string>('all');
@@ -198,7 +199,10 @@ export default function ServiceCalendar({ services, onServiceClick, onServiceMov
         key={service.id}
         draggable
         onDragStart={() => handleDragStart(service, forDate || new Date())}
-        onClick={() => onServiceClick?.(service)}
+        onClick={(e) => {
+          e.stopPropagation();
+          onServiceClick?.(service);
+        }}
         className={`
           ${getTeamBackgroundColor(service.team?.name, effectiveStatus)}
           border rounded p-2 cursor-pointer hover:shadow-sm transition-shadow text-xs
@@ -261,7 +265,7 @@ export default function ServiceCalendar({ services, onServiceClick, onServiceMov
             <div
               key={day.toISOString()}
               className={`
-                min-h-[100px] p-1 border border-border rounded
+                min-h-[100px] p-1 border border-border rounded cursor-pointer hover:bg-muted/20 transition-colors
                 ${!isCurrentMonth ? 'bg-muted/50 text-muted-foreground' : 'bg-background'}
                 ${isToday ? 'ring-2 ring-primary' : ''}
               `}
@@ -270,6 +274,7 @@ export default function ServiceCalendar({ services, onServiceClick, onServiceMov
                 handleDrop(day);
               }}
               onDragOver={handleDragOver}
+              onClick={() => onDateClick?.(day)}
               data-testid={`calendar-day-${format(day, 'yyyy-MM-dd')}`}
             >
               <div className={`text-sm font-medium mb-1 ${isToday ? 'text-primary' : ''}`}>
@@ -311,12 +316,13 @@ export default function ServiceCalendar({ services, onServiceClick, onServiceMov
                 </CardTitle>
               </CardHeader>
               <CardContent 
-                className="p-3 min-h-[300px]"
+                className="p-3 min-h-[300px] cursor-pointer hover:bg-muted/20 transition-colors"
                 onDrop={(e) => {
                   e.preventDefault();
                   handleDrop(day);
                 }}
                 onDragOver={handleDragOver}
+                onClick={() => onDateClick?.(day)}
                 data-testid={`calendar-week-day-${format(day, 'yyyy-MM-dd')}`}
               >
                 <div className="space-y-2">
@@ -343,7 +349,7 @@ export default function ServiceCalendar({ services, onServiceClick, onServiceMov
             <div className="text-lg">{format(currentDate, 'EEEE, MMMM yyyy')}</div>
           </CardTitle>
         </CardHeader>
-        <CardContent className="p-6">
+        <CardContent className="p-6 cursor-pointer hover:bg-muted/20 transition-colors" onClick={() => onDateClick?.(currentDate)}>
           {dayServices.length === 0 ? (
             <div className="text-center text-muted-foreground py-12">
               <Calendar className="h-12 w-12 mx-auto mb-4" />
@@ -352,7 +358,10 @@ export default function ServiceCalendar({ services, onServiceClick, onServiceMov
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {dayServices.map(service => (
-                <Card key={service.id} className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => onServiceClick?.(service)}>
+                <Card key={service.id} className="cursor-pointer hover:shadow-md transition-shadow" onClick={(e) => {
+                  e.stopPropagation();
+                  onServiceClick?.(service);
+                }}>
                   <CardContent className="p-4">
                     {renderServiceItem(service, 'large', currentDate)}
                   </CardContent>

@@ -21,6 +21,7 @@ export default function Services() {
   const [activeTab, setActiveTab] = useState("list");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingService, setEditingService] = useState<ServiceWithDetails | null>(null);
+  const [preSelectedDate, setPreSelectedDate] = useState<Date | null>(null);
   const [recurringMoveDialog, setRecurringMoveDialog] = useState<{
     open: boolean;
     service: ServiceWithDetails | null;
@@ -197,6 +198,11 @@ export default function Services() {
     }
   };
 
+  const handleDateClick = (date: Date) => {
+    setPreSelectedDate(date);
+    setIsCreateOpen(true);
+  };
+
   const handleMoveThisOnly = async () => {
     const { service, originalDate, newDate } = recurringMoveDialog;
     if (!service || !newDate || !originalDate) return;
@@ -324,7 +330,12 @@ export default function Services() {
         {/* Page Header */}
         <div className="flex items-center justify-between mb-8">
           <h1 className="text-3xl font-bold text-foreground">Services Management</h1>
-          <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+          <Dialog open={isCreateOpen} onOpenChange={(open) => {
+            setIsCreateOpen(open);
+            if (!open) {
+              setPreSelectedDate(null);
+            }
+          }}>
             <DialogTrigger asChild>
               <Button data-testid="button-add-service">
                 <Plus className="h-4 w-4 mr-2" />
@@ -336,13 +347,16 @@ export default function Services() {
                 <DialogTitle>Schedule New Service</DialogTitle>
               </DialogHeader>
               <ServiceForm
+                initialDate={preSelectedDate}
                 onSuccess={() => {
                   setIsCreateOpen(false);
                   setEditingService(null);
+                  setPreSelectedDate(null);
                 }}
                 onCancel={() => {
                   setIsCreateOpen(false);
                   setEditingService(null);
+                  setPreSelectedDate(null);
                 }}
               />
             </DialogContent>
@@ -540,6 +554,7 @@ export default function Services() {
               services={services}
               onServiceClick={handleServiceClick}
               onServiceMove={handleServiceMove}
+              onDateClick={handleDateClick}
             />
           </TabsContent>
         </Tabs>

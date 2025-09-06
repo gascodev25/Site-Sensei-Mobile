@@ -18,6 +18,7 @@ import { useEffect } from "react";
 
 interface ServiceFormProps {
   service?: Service;
+  initialDate?: Date | null;
   onSuccess: () => void;
   onCancel: () => void;
   onDelete?: () => void;
@@ -45,7 +46,7 @@ const recurrenceIntervals = [
   { value: "once", label: "Once-off" },
 ];
 
-export default function ServiceForm({ service, onSuccess, onCancel, onDelete, onComplete }: ServiceFormProps) {
+export default function ServiceForm({ service, initialDate, onSuccess, onCancel, onDelete, onComplete }: ServiceFormProps) {
   const { toast } = useToast();
   const isEditing = !!service;
 
@@ -76,7 +77,7 @@ export default function ServiceForm({ service, onSuccess, onCancel, onDelete, on
     defaultValues: {
       clientId: service?.clientId || 0,
       type: service?.type || "installation",
-      installationDate: service?.installationDate ? new Date(service.installationDate) : undefined,
+      installationDate: service?.installationDate ? new Date(service.installationDate) : initialDate || undefined,
       teamId: service?.teamId || 0,
       status: service?.status || "scheduled",
       servicePriority: service?.servicePriority || "Routine",
@@ -176,7 +177,7 @@ export default function ServiceForm({ service, onSuccess, onCancel, onDelete, on
                 <FormLabel>Client *</FormLabel>
                 <FormControl>
                   <Select 
-                    value={field.value?.toString()} 
+                    value={field.value?.toString() ?? undefined} 
                     onValueChange={(value) => field.onChange(parseInt(value))}
                   >
                     <SelectTrigger data-testid="select-client">
@@ -204,7 +205,7 @@ export default function ServiceForm({ service, onSuccess, onCancel, onDelete, on
                 <FormLabel>Service Type *</FormLabel>
                 <FormControl>
                   <div className="flex items-center space-x-2">
-                    <Select value={field.value} onValueChange={field.onChange}>
+                    <Select value={field.value ?? undefined} onValueChange={field.onChange}>
                       <SelectTrigger data-testid="select-service-type">
                         <SelectValue placeholder="Select service type" />
                       </SelectTrigger>
@@ -263,7 +264,7 @@ export default function ServiceForm({ service, onSuccess, onCancel, onDelete, on
                   <PopoverContent className="w-auto p-0" align="start">
                     <Calendar
                       mode="single"
-                      selected={field.value}
+                      selected={field.value ?? undefined}
                       onSelect={field.onChange}
                       disabled={(date) =>
                         date < new Date() || date < new Date("1900-01-01")
@@ -285,8 +286,8 @@ export default function ServiceForm({ service, onSuccess, onCancel, onDelete, on
                 <FormLabel>Service Team</FormLabel>
                 <FormControl>
                   <Select 
-                    value={field.value?.toString()} 
-                    onValueChange={(value) => field.onChange(value ? parseInt(value) : null)}
+                    value={field.value?.toString() ?? undefined} 
+                    onValueChange={(value) => field.onChange(value ? parseInt(value) : undefined)}
                   >
                     <SelectTrigger data-testid="select-team">
                       <SelectValue placeholder="Select team" />
@@ -314,7 +315,7 @@ export default function ServiceForm({ service, onSuccess, onCancel, onDelete, on
               <FormItem>
                 <FormLabel>Priority</FormLabel>
                 <FormControl>
-                  <Select value={field.value} onValueChange={field.onChange}>
+                  <Select value={field.value ?? undefined} onValueChange={field.onChange}>
                     <SelectTrigger data-testid="select-priority">
                       <SelectValue placeholder="Select priority" />
                     </SelectTrigger>
@@ -343,7 +344,8 @@ export default function ServiceForm({ service, onSuccess, onCancel, onDelete, on
                     type="number"
                     placeholder="60"
                     {...field}
-                    onChange={(e) => field.onChange(parseInt(e.target.value))}
+                    value={field.value ?? 60}
+                    onChange={(e) => field.onChange(parseInt(e.target.value) || 60)}
                     data-testid="input-duration"
                   />
                 </FormControl>
@@ -369,6 +371,7 @@ export default function ServiceForm({ service, onSuccess, onCancel, onDelete, on
                         type="number"
                         placeholder="12"
                         {...field}
+                        value={field.value ?? ''}
                         onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : undefined)}
                         data-testid="input-contract-length"
                       />
@@ -386,7 +389,7 @@ export default function ServiceForm({ service, onSuccess, onCancel, onDelete, on
                     <FormLabel>Recurrence</FormLabel>
                     <FormControl>
                       <Select 
-                        value={field.value?.interval || ""}
+                        value={(field.value && typeof field.value === 'object' && 'interval' in field.value) ? (field.value as any).interval || "" : ""}
                         onValueChange={(value) => {
                           if (value === "once") {
                             field.onChange(null);
