@@ -162,10 +162,14 @@ export default function Services() {
       // For installations, show completion dialog to update equipment/consumables
       setCompletionDialog({ open: true, service });
     } else {
-      // For regular services, just mark as completed
+      // For service contracts and other types, complete directly with current equipment/consumables
       completeServiceMutation.mutate({
         serviceId: service.id,
-        data: { status: 'completed' }
+        data: {
+          completionDate: new Date().toISOString().split('T')[0],
+          equipmentItems: service.equipmentItems || [],
+          consumableItems: service.consumableItems || []
+        }
       });
     }
   };
