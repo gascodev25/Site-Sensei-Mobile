@@ -269,7 +269,24 @@ export default function Services() {
   });
 
   const getStatusBadge = (service: ServiceWithDetails) => {
-    const status = service.status || 'scheduled';
+    let status = service.status || 'scheduled';
+    
+    // For recurring services, check if today's date is in completedDates
+    const isRecurring = service.recurrencePattern && 
+                       typeof service.recurrencePattern === 'object' && 
+                       service.recurrencePattern !== null &&
+                       'interval' in service.recurrencePattern;
+    
+    if (isRecurring && service.completedDates && Array.isArray(service.completedDates)) {
+      const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
+      const serviceDate = service.installationDate ? new Date(service.installationDate).toISOString().split('T')[0] : null;
+      
+      // Check if the service date or today is in completed dates
+      if (service.completedDates.includes(today) || (serviceDate && service.completedDates.includes(serviceDate))) {
+        status = 'completed';
+      }
+    }
+    
     const statusColors = {
       scheduled: "bg-amber-100 border-amber-400 text-amber-800",
       completed: "bg-green-100 border-green-400 text-green-800", 
