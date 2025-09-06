@@ -261,19 +261,18 @@ export default function Services() {
   });
 
   const getStatusBadge = (service: ServiceWithDetails) => {
-    let status = service.status || 'scheduled';
-    
-    // For service contracts, check if today's date is in completedDates
-    if (service.completedDates && Array.isArray(service.completedDates)) {
-      const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
-      const serviceDate = service.installationDate ? new Date(service.installationDate).toISOString().split('T')[0] : null;
-      
-      // Check if the service date or today is in completed dates
-      if (service.completedDates.includes(today) || (serviceDate && service.completedDates.includes(serviceDate))) {
-        status = 'completed';
-      }
+    // Check if this is a recurring service with completedDates
+    if (service.completedDates && Array.isArray(service.completedDates) && service.completedDates.length > 0) {
+      // For recurring services, show completed if there are any completed dates
+      return (
+        <Badge className="bg-green-100 border-green-400 text-green-800">
+          COMPLETED
+        </Badge>
+      );
     }
     
+    // For non-recurring services, use the actual status
+    const status = service.status || 'scheduled';
     const statusColors = {
       scheduled: "bg-amber-100 border-amber-400 text-amber-800",
       completed: "bg-green-100 border-green-400 text-green-800", 
