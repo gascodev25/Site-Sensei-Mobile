@@ -202,7 +202,7 @@ export default function ServiceCalendar({ services, onServiceClick, onServiceMov
           p-2 mb-1 rounded text-xs cursor-pointer transition-all duration-200 
           ${getTeamBackgroundColor(service.team?.name, effectiveStatus)} 
           hover:shadow-md border-l-4 
-          ${(service.status === 'completed' || isCompletedOnThisDate) ? 'opacity-75 line-through' : ''}
+          ${isCompletedOnThisDate ? 'opacity-75 line-through' : ''}
         `;
 
     return (
