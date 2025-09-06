@@ -6,7 +6,7 @@ import Header from "@/components/Layout/Header";
 import ServiceForm from "@/components/Forms/ServiceForm";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-
+import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -128,28 +128,10 @@ export default function Services() {
     mutationFn: async ({ serviceId, data }: { serviceId: number; data: any }) => {
       return await apiRequest("POST", `/api/services/${serviceId}/complete`, data);
     },
-    onSuccess: async () => {
-      // Clear all related caches
-      queryClient.removeQueries({ queryKey: ["/api/services"] });
-      queryClient.removeQueries({ queryKey: ["/api/dashboard/metrics"] });
-      
-      // Small delay to ensure server has processed the update
-      await new Promise(resolve => setTimeout(resolve, 300));
-      
-      // Force fresh fetch of services data
-      await queryClient.fetchQuery({ 
-        queryKey: ["/api/services"],
-        staleTime: 0,
-        gcTime: 0
-      });
-      
-      // Force refetch dashboard metrics
-      await queryClient.fetchQuery({ 
-        queryKey: ["/api/dashboard/metrics"],
-        staleTime: 0,
-        gcTime: 0
-      });
-      
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/services"] });
+      queryClient.refetchQueries({ queryKey: ["/api/services"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/metrics"] });
       setCompletionDialog({ open: false, service: null });
       setEditingService(null);
       toast({
@@ -184,7 +166,7 @@ export default function Services() {
       // For regular services, just mark as completed
       completeServiceMutation.mutate({
         serviceId: service.id,
-        data: {}
+        data: { status: 'completed' }
       });
     }
   };
@@ -286,42 +268,29 @@ export default function Services() {
     );
   });
 
-  
-
-  // Get effective status for a service on a specific date (for recurring services)
-  const getEffectiveStatus = (service: ServiceWithDetails, checkDate?: Date) => {
-    const isRecurring = service.recurrencePattern && 
-      service.recurrencePattern !== null && 
-      typeof service.recurrencePattern === 'object' &&
-      (service.recurrencePattern as any).interval;
-
-    const isServiceContract = service.type === 'service_contract';
-
-    if (!isRecurring && !isServiceContract) {
-      return service.status;
-    }
-
-    // For recurring services or service contracts, check if the installation date (or provided date) is completed
-    const dateToCheck = checkDate || (service.installationDate ? new Date(service.installationDate) : new Date());
-    const dateString = dateToCheck.toISOString().split('T')[0]; // YYYY-MM-DD format
-    const completedDates = (service.completedDates as string[]) || [];
-    const isDateCompleted = completedDates.includes(dateString);
+  const getStatusBadge = (service: ServiceWithDetails) => {
+    const status = service.status || 'scheduled';
+    const statusColors = {
+      scheduled: "bg-amber-100 border-amber-400 text-amber-800",
+      completed: "bg-green-100 border-green-400 text-green-800", 
+      missed: "bg-red-100 border-red-400 text-red-800",
+      in_progress: "bg-blue-100 border-blue-400 text-blue-800"
+    };
     
-    if (isDateCompleted) {
-      return 'completed';
+    // For service contracts, show completion count if any occurrences are completed
+    if (service.type === 'service_contract' && service.completedDates && (service.completedDates as string[]).length > 0) {
+      return (
+        <Badge className="bg-green-100 border-green-400 text-green-800">
+          {(service.completedDates as string[]).length} COMPLETED
+        </Badge>
+      );
     }
     
-    // Check if the date is in the past to mark as missed
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const serviceDate = new Date(dateToCheck);
-    serviceDate.setHours(0, 0, 0, 0);
-    
-    if (serviceDate < today) {
-      return 'missed';
-    }
-    
-    return 'scheduled';
+    return (
+      <Badge className={statusColors[status as keyof typeof statusColors] || "bg-gray-100 border-gray-400 text-gray-800"}>
+        {status.replace('_', ' ').toUpperCase()}
+      </Badge>
+    );
   };
 
   const formatDate = (dateString: string | Date | null) => {
@@ -450,7 +419,7 @@ export default function Services() {
                     <div>
                       <p className="text-sm font-medium text-muted-foreground">Completed</p>
                       <p className="text-2xl font-bold text-green-600">
-                        {services.filter(s => getEffectiveStatus(s) === 'completed').length}
+                        {services.filter(s => s.status === 'completed').length}
                       </p>
                     </div>
                   </div>
@@ -464,7 +433,7 @@ export default function Services() {
                     <div>
                       <p className="text-sm font-medium text-muted-foreground">Scheduled</p>
                       <p className="text-2xl font-bold text-orange-600">
-                        {services.filter(s => getEffectiveStatus(s) === 'scheduled').length}
+                        {services.filter(s => s.status === 'scheduled').length}
                       </p>
                     </div>
                   </div>
@@ -478,7 +447,7 @@ export default function Services() {
                     <div>
                       <p className="text-sm font-medium text-muted-foreground">Missed</p>
                       <p className="text-2xl font-bold text-red-600">
-                        {services.filter(s => getEffectiveStatus(s) === 'missed').length}
+                        {services.filter(s => s.status === 'missed').length}
                       </p>
                     </div>
                   </div>
@@ -512,6 +481,7 @@ export default function Services() {
                         <div className="flex-1">
                           <div className="flex items-center space-x-2 mb-2">
                             <CardTitle className="text-lg">{service.client?.name || 'Unknown Client'}</CardTitle>
+                            {getStatusBadge(service)}
                           </div>
                           <div className="flex items-center text-sm text-muted-foreground mb-1">
                             <MapPin className="h-3 w-3 mr-1" />

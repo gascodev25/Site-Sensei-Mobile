@@ -629,28 +629,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.json(existingService);
       }
 
-      // Check if this is a recurring service (has recurrence pattern)
-      const isRecurring = existingService.recurrencePattern && 
-        existingService.recurrencePattern !== null && 
-        typeof existingService.recurrencePattern === 'object' &&
-        (existingService.recurrencePattern as any).interval;
-
-      // Prepare update data
+      // Prepare update data - handle recurring vs non-recurring services differently
       const updateData: any = {};
-      
-      // Add completion date to completedDates array
-      const currentCompletedDates = (existingService.completedDates as string[]) || [];
-      if (!currentCompletedDates.includes(completionDate)) {
-        updateData.completedDates = [...currentCompletedDates, completionDate];
-      }
+      const isRecurring = existingService.recurrencePattern && 
+                         typeof existingService.recurrencePattern === 'object' && 
+                         existingService.recurrencePattern !== null &&
+                         'interval' in existingService.recurrencePattern;
 
-      // Handle non-recurring services (mark as completed)
-      if (!isRecurring) {
+      if (isRecurring) {
+        // For recurring services: Add to completedDates but keep service status as scheduled
+        const currentCompletedDates = (existingService.completedDates as string[]) || [];
+        if (!currentCompletedDates.includes(completionDate)) {
+          updateData.completedDates = [...currentCompletedDates, completionDate];
+        }
+        // Don't change the main service status for recurring services
+      } else {
+        // For non-recurring services: Mark as completed normally
         updateData.status = 'completed';
         updateData.completedAt = new Date();
       }
 
-      // If it's an installation and conversion is requested, convert to recurring service contract
+      // If it's an installation and conversion is requested
       if (existingService.type === 'installation' && convertToContract) {
         updateData.type = 'service_contract';
         updateData.contractLengthMonths = contractLengthMonths || 12;
@@ -670,13 +669,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
             ? new Date(existingService.installationDate).toISOString().split('T')[0]
             : completionDate;
           
+          const currentCompletedDates = (existingService.completedDates as string[]) || [];
           if (!currentCompletedDates.includes(installationDateString)) {
             updateData.completedDates = [...currentCompletedDates, installationDateString];
           }
-          
-          // Keep status as scheduled since it's now a recurring contract
-          updateData.status = 'scheduled';
-          updateData.completedAt = null;
         }
       }
 
@@ -689,9 +685,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Update the service
-      console.log(`Updating service ${id} with data:`, JSON.stringify(updateData, null, 2));
       const service = await storage.updateService(id, updateData);
-      console.log(`Service ${id} updated successfully. New status: ${service.status}, completedDates:`, service.completedDates);
       
       // Audit log
       await storage.createAuditLog({
