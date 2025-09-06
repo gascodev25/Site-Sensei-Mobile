@@ -561,6 +561,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid service ID" });
       }
       
+      // Permission check: Only ops_manager or team_member can mark services as complete
+      const user = await storage.getUser(req.user?.claims?.sub);
+      if (!user || !user.roles) {
+        return res.status(403).json({ message: "User not found or no roles assigned" });
+      }
+      
+      const hasRole = (role: string) => user.roles.split(",").includes(role);
+      const canMarkComplete = hasRole("ops_manager") || hasRole("team_member");
+      
+      if (!canMarkComplete) {
+        return res.status(403).json({ 
+          message: "Unauthorized: Only operations managers and team members can complete services" 
+        });
+      }
+      
       // Validate request body using safeParse
       const validationResult = serviceCompletionSchema.safeParse(req.body);
       if (!validationResult.success) {
