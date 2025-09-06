@@ -10,7 +10,9 @@ import {
   insertTeamMemberSchema, 
   insertServiceTeamSchema,
   insertEquipmentTemplateSchema,
-  insertTemplateConsumableSchema
+  insertTemplateConsumableSchema,
+  insertLocationSchema,
+  insertStockMovementSchema
 } from "@shared/schema";
 import { z } from "zod";
 
@@ -816,6 +818,229 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching service stock assignments:", error);
       res.status(500).json({ message: "Failed to fetch service stock assignments" });
+    }
+  });
+
+  // Warehouse Location routes
+  app.get('/api/locations', isAuthenticated, async (req, res) => {
+    try {
+      const locations = await storage.getLocations();
+      res.json(locations);
+    } catch (error) {
+      console.error("Error fetching locations:", error);
+      res.status(500).json({ message: "Failed to fetch locations" });
+    }
+  });
+
+  app.get('/api/locations/:id', isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const location = await storage.getLocation(id);
+      if (!location) {
+        return res.status(404).json({ message: "Location not found" });
+      }
+      res.json(location);
+    } catch (error) {
+      console.error("Error fetching location:", error);
+      res.status(500).json({ message: "Failed to fetch location" });
+    }
+  });
+
+  app.post('/api/locations', isAuthenticated, async (req, res) => {
+    try {
+      const locationData = insertLocationSchema.parse(req.body);
+      const location = await storage.createLocation(locationData);
+      
+      // Audit log
+      await storage.createAuditLog({
+        userId: req.user?.claims?.sub,
+        action: 'create',
+        entityType: 'location',
+        entityId: location.id,
+        metadata: { locationName: location.name, type: location.type }
+      });
+      
+      res.status(201).json(location);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Validation error", errors: error.errors });
+      }
+      console.error("Error creating location:", error);
+      res.status(500).json({ message: "Failed to create location" });
+    }
+  });
+
+  app.put('/api/locations/:id', isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const locationData = insertLocationSchema.partial().parse(req.body);
+      const location = await storage.updateLocation(id, locationData);
+      
+      // Audit log
+      await storage.createAuditLog({
+        userId: req.user?.claims?.sub,
+        action: 'update',
+        entityType: 'location',
+        entityId: location.id,
+        metadata: { locationName: location.name, type: location.type }
+      });
+      
+      res.json(location);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Validation error", errors: error.errors });
+      }
+      console.error("Error updating location:", error);
+      res.status(500).json({ message: "Failed to update location" });
+    }
+  });
+
+  app.delete('/api/locations/:id', isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      await storage.deleteLocation(id);
+      
+      // Audit log
+      await storage.createAuditLog({
+        userId: req.user?.claims?.sub,
+        action: 'delete',
+        entityType: 'location',
+        entityId: id,
+        metadata: {}
+      });
+      
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting location:", error);
+      res.status(500).json({ message: "Failed to delete location" });
+    }
+  });
+
+  // Stock Movement routes
+  app.post('/api/stock-movements', isAuthenticated, async (req, res) => {
+    try {
+      const movementData = insertStockMovementSchema.parse({
+        ...req.body,
+        movedBy: req.user?.claims?.sub
+      });
+      const movement = await storage.createStockMovement(movementData);
+      res.status(201).json(movement);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Validation error", errors: error.errors });
+      }
+      console.error("Error creating stock movement:", error);
+      res.status(500).json({ message: "Failed to create stock movement" });
+    }
+  });
+
+  app.get('/api/stock-movements', isAuthenticated, async (req, res) => {
+    try {
+      const movements = await storage.getStockMovements();
+      res.json(movements);
+    } catch (error) {
+      console.error("Error fetching stock movements:", error);
+      res.status(500).json({ message: "Failed to fetch stock movements" });
+    }
+  });
+
+  app.get('/api/stock-movements/item/:itemType/:itemId', isAuthenticated, async (req, res) => {
+    try {
+      const { itemType, itemId } = req.params;
+      const movements = await storage.getStockMovementsByItem(itemType, parseInt(itemId));
+      res.json(movements);
+    } catch (error) {
+      console.error("Error fetching stock movements by item:", error);
+      res.status(500).json({ message: "Failed to fetch stock movements" });
+    }
+  });
+
+  app.get('/api/stock-movements/location/:locationId', isAuthenticated, async (req, res) => {
+    try {
+      const locationId = parseInt(req.params.locationId);
+      const movements = await storage.getStockMovementsByLocation(locationId);
+      res.json(movements);
+    } catch (error) {
+      console.error("Error fetching stock movements by location:", error);
+      res.status(500).json({ message: "Failed to fetch stock movements" });
+    }
+  });
+
+  // Stock Balance queries
+  app.get('/api/stock/consumable/:consumableId/location/:locationId', isAuthenticated, async (req, res) => {
+    try {
+      const { consumableId, locationId } = req.params;
+      const quantity = await storage.getConsumableStockByLocation(parseInt(consumableId), parseInt(locationId));
+      res.json({ consumableId: parseInt(consumableId), locationId: parseInt(locationId), quantity });
+    } catch (error) {
+      console.error("Error fetching consumable stock by location:", error);
+      res.status(500).json({ message: "Failed to fetch stock balance" });
+    }
+  });
+
+  app.get('/api/stock/consumable/:consumableId/all-locations', isAuthenticated, async (req, res) => {
+    try {
+      const consumableId = parseInt(req.params.consumableId);
+      const stockByLocation = await storage.getAllConsumableStock(consumableId);
+      res.json(stockByLocation);
+    } catch (error) {
+      console.error("Error fetching consumable stock by all locations:", error);
+      res.status(500).json({ message: "Failed to fetch stock distribution" });
+    }
+  });
+
+  app.get('/api/stock/equipment/:equipmentId/location', isAuthenticated, async (req, res) => {
+    try {
+      const equipmentId = parseInt(req.params.equipmentId);
+      const location = await storage.getEquipmentLocation(equipmentId);
+      res.json(location);
+    } catch (error) {
+      console.error("Error fetching equipment location:", error);
+      res.status(500).json({ message: "Failed to fetch equipment location" });
+    }
+  });
+
+  // Stock Summary routes (warehouse vs field stock levels)
+  app.get('/api/stock/summary/warehouse-vs-field', isAuthenticated, async (req, res) => {
+    try {
+      const locations = await storage.getLocations();
+      const consumables = await storage.getConsumables();
+      
+      const stockSummary = {
+        warehouse: { consumables: [] as any[], equipment: [] as any[] },
+        field: { consumables: [] as any[], equipment: [] as any[] }
+      };
+      
+      // Get consumable stock by location type
+      for (const consumable of consumables) {
+        let warehouseTotal = 0;
+        let fieldTotal = 0;
+        
+        for (const location of locations) {
+          const quantity = await storage.getConsumableStockByLocation(consumable.id, location.id);
+          if (location.type === 'warehouse') {
+            warehouseTotal += quantity;
+          } else if (location.type === 'service_team') {
+            fieldTotal += quantity;
+          }
+        }
+        
+        if (warehouseTotal > 0 || fieldTotal > 0) {
+          stockSummary.warehouse.consumables.push({
+            ...consumable,
+            quantity: warehouseTotal
+          });
+          stockSummary.field.consumables.push({
+            ...consumable,
+            quantity: fieldTotal
+          });
+        }
+      }
+      
+      res.json(stockSummary);
+    } catch (error) {
+      console.error("Error fetching warehouse vs field stock summary:", error);
+      res.status(500).json({ message: "Failed to fetch stock summary" });
     }
   });
 
