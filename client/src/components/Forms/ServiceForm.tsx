@@ -9,7 +9,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { CalendarIcon, Repeat, Package, Wrench, Trash2 } from "lucide-react";
+import { CalendarIcon, Repeat, Package, Wrench } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { format } from "date-fns";
@@ -575,12 +575,11 @@ export default function ServiceForm({ service, initialDate, onSuccess, onCancel,
             <Button
               type="button"
               variant="destructive"
-              onClick={() => onDelete()}
+              onClick={onDelete}
               disabled={createServiceMutation.isPending}
               data-testid="button-delete"
             >
-              <Trash2 className="mr-2 h-4 w-4" />
-              Delete Service
+              Delete
             </Button>
           )}
           {isEditing && onComplete && (

@@ -3,20 +3,18 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { ChevronLeft, ChevronRight, Calendar, User, Clock, MapPin, Trash2, Edit } from "lucide-react";
+import { ChevronLeft, ChevronRight, Calendar, User, Clock, MapPin } from "lucide-react";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, parseISO, addWeeks, subWeeks, startOfWeek, endOfWeek } from "date-fns";
 import type { ServiceWithDetails } from "@shared/schema";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
 interface ServiceCalendarProps {
   services: ServiceWithDetails[];
-  onServiceClick: (service: ServiceWithDetails) => void;
-  onServiceMove: (serviceId: number, newDate: Date, draggedFromDate?: Date) => void;
-  onDateClick: (date: Date) => void;
-  onServiceDelete?: (service: ServiceWithDetails, specificDate?: Date) => void;
+  onServiceClick?: (service: ServiceWithDetails) => void;
+  onServiceMove?: (serviceId: number, newDate: Date, originalDate?: Date) => void;
+  onDateClick?: (date: Date) => void;
 }
 
-export default function ServiceCalendar({ services, onServiceClick, onServiceMove, onDateClick, onServiceDelete }: ServiceCalendarProps) {
+export default function ServiceCalendar({ services, onServiceClick, onServiceMove, onDateClick }: ServiceCalendarProps) {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [view, setView] = useState<'month' | 'week' | 'day'>('month');
   const [selectedTeam, setSelectedTeam] = useState<string>('all');
@@ -53,10 +51,10 @@ export default function ServiceCalendar({ services, onServiceClick, onServiceMov
       // Fallback to status color if no team
       return getStatusColor(status || 'scheduled');
     }
-
+    
     const teamColors = {
       "Hygiene": "bg-blue-50 border-blue-200 text-blue-900",
-      "Deep Clean": "bg-green-50 border-green-200 text-green-900",
+      "Deep Clean": "bg-green-50 border-green-200 text-green-900", 
       "Pest Control": "bg-orange-50 border-orange-200 text-orange-900",
     };
     return teamColors[teamName as keyof typeof teamColors] || getStatusColor(status || 'scheduled');
@@ -68,13 +66,13 @@ export default function ServiceCalendar({ services, onServiceClick, onServiceMov
       return [];
     }
 
-    const baseDate = typeof service.installationDate === 'string'
+    const baseDate = typeof service.installationDate === 'string' 
       ? parseISO(service.installationDate)
       : service.installationDate;
 
     // Check if service has recurrence pattern
     const recurrencePattern = service.recurrencePattern as { interval?: string; end_date?: string } | null;
-
+    
     if (!recurrencePattern || !recurrencePattern.interval) {
       // Single occurrence service
       return [baseDate];
@@ -88,58 +86,58 @@ export default function ServiceCalendar({ services, onServiceClick, onServiceMov
 
     const intervalDays = parseInt(intervalMatch[1]);
     const instances: Date[] = [];
-
+    
     // Get excluded dates (dates to skip)
     const excludedDates = (service.excludedDates as string[]) || [];
     const excludedDateStrings = new Set(excludedDates.map(date => date.split('T')[0])); // Normalize to YYYY-MM-DD
-
+    
     // Generate instances ONLY forward from the installation date
     let currentDate = new Date(baseDate);
     while (currentDate <= endDate) {
       const currentDateString = currentDate.toISOString().split('T')[0]; // YYYY-MM-DD format
-
+      
       // Only add if the date is within our view range, on or after the installation date, and NOT excluded
-      if (currentDate >= startDate &&
-          currentDate >= baseDate &&
+      if (currentDate >= startDate && 
+          currentDate >= baseDate && 
           !excludedDateStrings.has(currentDateString)) {
         instances.push(new Date(currentDate));
       }
       currentDate = new Date(currentDate.getTime() + (intervalDays * 24 * 60 * 60 * 1000));
-
+      
       // Optional: respect end_date if specified in recurrence pattern
       if (recurrencePattern.end_date && currentDate > parseISO(recurrencePattern.end_date)) {
         break;
       }
     }
-
+    
     return instances.sort((a, b) => a.getTime() - b.getTime());
   };
 
   // Get services for a specific date (including recurring instances)
   const getServicesForDate = (date: Date) => {
     const servicesForDate: ServiceWithDetails[] = [];
-
+    
     filteredServices.forEach(service => {
       // For calendar view, we need to show recurring instances within a reasonable range
-      const viewStart = view === 'month'
+      const viewStart = view === 'month' 
         ? startOfMonth(startOfWeek(startOfMonth(currentDate), { weekStartsOn: 1 }))
-        : view === 'week'
+        : view === 'week' 
         ? startOfWeek(currentDate, { weekStartsOn: 1 })
         : currentDate;
-
-      const viewEnd = view === 'month'
+      
+      const viewEnd = view === 'month' 
         ? endOfMonth(endOfWeek(endOfMonth(currentDate), { weekStartsOn: 1 }))
-        : view === 'week'
+        : view === 'week' 
         ? endOfWeek(currentDate, { weekStartsOn: 1 })
         : currentDate;
 
       const instances = generateRecurringInstances(service, viewStart, viewEnd);
-
+      
       if (instances.some(instanceDate => isSameDay(instanceDate, date))) {
         servicesForDate.push(service);
       }
     });
-
+    
     return servicesForDate;
   };
 
@@ -173,7 +171,7 @@ export default function ServiceCalendar({ services, onServiceClick, onServiceMov
 
   const handleDrop = (date: Date) => {
     if (draggedService && onServiceMove) {
-      onServiceMove(draggedService.id, date, draggedFromDate || new Date()); // Pass the whole service object
+      onServiceMove(draggedService.id, date, draggedFromDate || undefined);
       setDraggedService(null);
       setDraggedFromDate(null);
       // Reset dragging state after a small delay to prevent click events
@@ -185,106 +183,66 @@ export default function ServiceCalendar({ services, onServiceClick, onServiceMov
     e.preventDefault();
   };
 
-  // Helper to get service status, considering recurring service completion
-  const getServiceStatus = (service: ServiceWithDetails, date?: Date) => {
-    if (!date) return service.status || 'scheduled';
-
-    const dateString = date.toISOString().split('T')[0];
+  // Render service item
+  const renderServiceItem = (service: ServiceWithDetails, size: 'small' | 'large' = 'small', forDate?: Date) => {
+    // Check if this specific occurrence is completed
+    const dateString = forDate?.toISOString().split('T')[0] || new Date().toISOString().split('T')[0];
     const completedDates = (service.completedDates as string[]) || [];
     const isThisOccurrenceCompleted = completedDates.includes(dateString);
-
+    
+    // Determine status: check completedDates for service contracts, otherwise use service status
     const isServiceContract = service.type === 'service_contract';
-    const hasRecurrence = service.recurrencePattern && typeof service.recurrencePattern === 'object' && 'interval' in service.recurrencePattern;
-
-    if ((isServiceContract || hasRecurrence) && isThisOccurrenceCompleted) {
-      return 'completed';
-    }
-    return service.status || 'scheduled';
-  };
-
-  // Render service item
-  const renderServiceItem = (service: ServiceWithDetails, size: 'small' | 'large' = 'small', date?: Date) => {
-    const effectiveStatus = getServiceStatus(service, date);
-
+    const hasRecurrence = service.recurrencePattern && 'interval' in (service.recurrencePattern as any);
+    
+    const effectiveStatus = (isServiceContract || hasRecurrence)
+      ? (isThisOccurrenceCompleted ? 'completed' : 'scheduled')
+      : service.status || 'scheduled';
+    
     return (
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <div
-            key={service.id}
-            draggable
-            onDragStart={() => handleDragStart(service, date || new Date())}
-            onDragEnd={() => {
-              // Reset dragging state if drag is cancelled or completed without drop
-              setTimeout(() => setIsDragging(false), 0);
-            }}
-            onClick={(e) => {
-              e.stopPropagation();
-              if (isDragging) return; // Prevent click if dragging
-              onServiceClick?.(service);
-            }}
-            className={`
-              ${getTeamBackgroundColor(service.team?.name, effectiveStatus)}
-              border rounded p-2 cursor-pointer hover:shadow-sm transition-shadow text-xs
-              ${size === 'large' ? 'mb-2' : 'mb-1'}
-            `}
-            data-testid={`calendar-service-${service.id}`}
-          >
-            <div className="font-medium truncate">{service.client?.name || 'Unknown'}</div>
-            {size === 'large' && (
-              <>
-                <div className="flex items-center text-xs mt-1 opacity-75">
-                  <MapPin className="h-3 w-3 mr-1" />
-                  <span className="truncate">{service.client?.city || 'Location not set'}</span>
-                </div>
-                {service.team && (
-                  <div className="flex items-center text-xs mt-1 opacity-75">
-                    <User className="h-3 w-3 mr-1" />
-                    <span className="truncate">{service.team.name}</span>
-                  </div>
-                )}
-                {service.estimatedDuration && (
-                  <div className="flex items-center text-xs mt-1 opacity-75">
-                    <Clock className="h-3 w-3 mr-1" />
-                    <span>{service.estimatedDuration}min</span>
-                  </div>
-                )}
-              </>
+      <div
+        key={service.id}
+        draggable
+        onDragStart={() => handleDragStart(service, forDate || new Date())}
+        onDragEnd={() => {
+          // Reset dragging state if drag is cancelled or completed without drop
+          setTimeout(() => setIsDragging(false), 0);
+        }}
+        onClick={(e) => {
+          e.stopPropagation();
+          onServiceClick?.(service);
+        }}
+        className={`
+          ${getTeamBackgroundColor(service.team?.name, effectiveStatus)}
+          border rounded p-2 cursor-pointer hover:shadow-sm transition-shadow text-xs
+          ${size === 'large' ? 'mb-2' : 'mb-1'}
+        `}
+        data-testid={`calendar-service-${service.id}`}
+      >
+        <div className="font-medium truncate">{service.client?.name || 'Unknown'}</div>
+        {size === 'large' && (
+          <>
+            <div className="flex items-center text-xs mt-1 opacity-75">
+              <MapPin className="h-3 w-3 mr-1" />
+              <span className="truncate">{service.client?.city || 'Location not set'}</span>
+            </div>
+            {service.team && (
+              <div className="flex items-center text-xs mt-1 opacity-75">
+                <User className="h-3 w-3 mr-1" />
+                <span className="truncate">{service.team.name}</span>
+              </div>
             )}
-            <Badge className={`mt-1 text-xs ${getStatusColor(effectiveStatus)}`}>
-              {effectiveStatus.replace('_', ' ').toUpperCase()}
-            </Badge>
-          </div>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" className="w-48">
-          <DropdownMenuItem
-            onClick={() => onServiceClick(service)}
-            className="cursor-pointer"
-          >
-            <Edit className="h-3 w-3 mr-1" />
-            Edit Service
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            onClick={() => {
-              const isRecurring = service.recurrencePattern &&
-                                 typeof service.recurrencePattern === 'object' &&
-                                 service.recurrencePattern !== null &&
-                                 'interval' in service.recurrencePattern;
-
-              if (isRecurring && onServiceDelete) {
-                onServiceDelete(service, date);
-              } else if (onServiceDelete) {
-                onServiceDelete(service);
-              }
-            }}
-            className="cursor-pointer text-red-600"
-          >
-            <Trash2 className="h-3 w-3 mr-1" />
-            {service.recurrencePattern && typeof service.recurrencePattern === 'object' && 'interval' in service.recurrencePattern
-              ? 'Cancel This Date'
-              : 'Delete Service'}
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+            {service.estimatedDuration && (
+              <div className="flex items-center text-xs mt-1 opacity-75">
+                <Clock className="h-3 w-3 mr-1" />
+                <span>{service.estimatedDuration}min</span>
+              </div>
+            )}
+          </>
+        )}
+        <Badge className={`mt-1 text-xs ${getStatusColor(effectiveStatus)}`}>
+          {effectiveStatus.replace('_', ' ').toUpperCase()}
+        </Badge>
+      </div>
     );
   };
 
@@ -304,13 +262,13 @@ export default function ServiceCalendar({ services, onServiceClick, onServiceMov
             {day}
           </div>
         ))}
-
+        
         {/* Calendar days */}
         {days.map(day => {
           const dayServices = getServicesForDate(day);
           const isCurrentMonth = isSameMonth(day, currentDate);
           const isToday = isSameDay(day, new Date());
-
+          
           return (
             <div
               key={day.toISOString()}
@@ -359,7 +317,7 @@ export default function ServiceCalendar({ services, onServiceClick, onServiceMov
         {days.map(day => {
           const dayServices = getServicesForDate(day);
           const isToday = isSameDay(day, new Date());
-
+          
           return (
             <Card key={day.toISOString()} className={isToday ? 'ring-2 ring-primary' : ''}>
               <CardHeader className="p-3">
@@ -368,7 +326,7 @@ export default function ServiceCalendar({ services, onServiceClick, onServiceMov
                   <div className="text-sm font-normal">{format(day, 'EEE')}</div>
                 </CardTitle>
               </CardHeader>
-              <CardContent
+              <CardContent 
                 className="p-3 min-h-[300px] cursor-pointer hover:bg-muted/20 transition-colors"
                 onDrop={(e) => {
                   e.preventDefault();
