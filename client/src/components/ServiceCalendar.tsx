@@ -225,7 +225,7 @@ export default function ServiceCalendar({ services, onServiceClick, onServiceMov
           {service.type?.replace('_', ' ')} - {service.team?.name || 'No Team'}
         </div>
         <div className="text-xs font-medium mt-1">
-          Status: {isCompletedOnThisDate ? 'COMPLETED' : (service.status?.replace('_', ' ').toUpperCase() || 'SCHEDULED')}
+          Status: {effectiveStatus.replace('_', ' ').toUpperCase()}
         </div>
 
         {size === 'large' && (
