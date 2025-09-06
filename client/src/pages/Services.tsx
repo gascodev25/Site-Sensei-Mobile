@@ -277,15 +277,6 @@ export default function Services() {
       in_progress: "bg-blue-100 border-blue-400 text-blue-800"
     };
     
-    // For service contracts, show completion count if any occurrences are completed
-    if (service.type === 'service_contract' && service.completedDates && (service.completedDates as string[]).length > 0) {
-      return (
-        <Badge className="bg-green-100 border-green-400 text-green-800">
-          {(service.completedDates as string[]).length} COMPLETED
-        </Badge>
-      );
-    }
-    
     return (
       <Badge className={statusColors[status as keyof typeof statusColors] || "bg-gray-100 border-gray-400 text-gray-800"}>
         {status.replace('_', ' ').toUpperCase()}
