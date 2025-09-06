@@ -215,12 +215,8 @@ export default function ServiceCalendar({ services, onServiceClick, onServiceMov
       );
     }
 
-    // For recurring services that are not completed on this date, show as scheduled
-    return (
-      <Badge className="text-xs bg-blue-100 text-blue-800 border-blue-300">
-        SCHEDULED
-      </Badge>
-    );
+    // For recurring services that are not completed on this date, don't show a badge
+    return null;
   };
 
   // Render service item
