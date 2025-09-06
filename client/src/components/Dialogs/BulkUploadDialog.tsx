@@ -120,7 +120,7 @@ export default function BulkUploadDialog({
           errors.push({
             row: index + 1,
             field,
-            message: `${field.replace('_', ' ')} is required`
+            message: `${field.replace(/_/g, ' ')} is required`
           });
         }
       });
@@ -137,7 +137,7 @@ export default function BulkUploadDialog({
       }
 
       if (entityType === "equipment" || entityType === "consumables") {
-        if (row.price && isNaN(parseFloat(row.price))) {
+        if (row.price && row.price !== '' && isNaN(parseFloat(row.price))) {
           errors.push({
             row: index + 1,
             field: 'price',
@@ -147,14 +147,14 @@ export default function BulkUploadDialog({
       }
 
       if (entityType === "consumables") {
-        if (row.current_stock && isNaN(parseInt(row.current_stock))) {
+        if (row.current_stock && row.current_stock !== '' && isNaN(parseInt(row.current_stock))) {
           errors.push({
             row: index + 1,
             field: 'current_stock',
             message: 'Current stock must be a valid number'
           });
         }
-        if (row.min_stock_level && isNaN(parseInt(row.min_stock_level))) {
+        if (row.min_stock_level && row.min_stock_level !== '' && isNaN(parseInt(row.min_stock_level))) {
           errors.push({
             row: index + 1,
             field: 'min_stock_level',
