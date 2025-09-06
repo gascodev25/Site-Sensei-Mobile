@@ -159,15 +159,23 @@ export default function Services() {
   };
 
   const handleServiceComplete = (service: ServiceWithDetails) => {
-    // For service contracts, show completion dialog to update equipment/consumables
-    setCompletionDialog({ open: true, service });
+    if (service.type === 'installation') {
+      // For installations, show completion dialog to update equipment/consumables
+      setCompletionDialog({ open: true, service });
+    } else {
+      // For regular services, just mark as completed
+      completeServiceMutation.mutate({
+        serviceId: service.id,
+        data: { status: 'completed' }
+      });
+    }
   };
 
   const handleServiceMove = (serviceId: number, newDate: Date, draggedFromDate?: Date) => {
     const service = services.find(s => s.id === serviceId);
     if (!service) return;
 
-    // Check if this is a recurring service (all services are now service contracts)
+    // Check if this is a recurring service
     const isRecurring = service.recurrencePattern && 
       service.recurrencePattern !== null && 
       typeof service.recurrencePattern === 'object' &&
@@ -182,7 +190,7 @@ export default function Services() {
         newDate,
       });
     } else {
-      // Handle direct move for one-time service contracts
+      // Handle non-recurring service or direct move
       updateServiceMutation.mutate({ 
         serviceId, 
         data: { installationDate: newDate }
@@ -261,29 +269,24 @@ export default function Services() {
   });
 
   const getStatusBadge = (service: ServiceWithDetails) => {
-    // Check actual service status first
-    const status = service.status || 'scheduled';
+    let status = service.status || 'scheduled';
     
-    // If service is marked as completed, show completed badge
-    if (status === 'completed') {
-      return (
-        <Badge className="bg-green-100 border-green-400 text-green-800">
-          COMPLETED
-        </Badge>
-      );
+    // For recurring services, check if today's date is in completedDates
+    const isRecurring = service.recurrencePattern && 
+                       typeof service.recurrencePattern === 'object' && 
+                       service.recurrencePattern !== null &&
+                       'interval' in service.recurrencePattern;
+    
+    if (isRecurring && service.completedDates && Array.isArray(service.completedDates)) {
+      const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
+      const serviceDate = service.installationDate ? new Date(service.installationDate).toISOString().split('T')[0] : null;
+      
+      // Check if the service date or today is in completed dates
+      if (service.completedDates.includes(today) || (serviceDate && service.completedDates.includes(serviceDate))) {
+        status = 'completed';
+      }
     }
     
-    // Check if this is a recurring service with completedDates
-    if (service.completedDates && Array.isArray(service.completedDates) && service.completedDates.length > 0) {
-      // For recurring services with completed dates, show partial completion
-      return (
-        <Badge className="bg-green-100 border-green-400 text-green-800">
-          COMPLETED
-        </Badge>
-      );
-    }
-    
-    // For other statuses
     const statusColors = {
       scheduled: "bg-amber-100 border-amber-400 text-amber-800",
       completed: "bg-green-100 border-green-400 text-green-800", 

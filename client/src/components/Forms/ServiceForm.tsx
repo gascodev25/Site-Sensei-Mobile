@@ -26,6 +26,7 @@ interface ServiceFormProps {
 }
 
 const serviceTypes = [
+  { value: "installation", label: "Installation" },
   { value: "service_contract", label: "Service Contract" },
 ];
 
@@ -75,14 +76,14 @@ export default function ServiceForm({ service, initialDate, onSuccess, onCancel,
     resolver: zodResolver(insertServiceSchema),
     defaultValues: {
       clientId: service?.clientId || 0,
-      type: service?.type || "service_contract",
+      type: service?.type || "installation",
       installationDate: service?.installationDate ? new Date(service.installationDate) : initialDate || undefined,
       teamId: service?.teamId || 0,
       status: service?.status || "scheduled",
       servicePriority: service?.servicePriority || "Routine",
       estimatedDuration: service?.estimatedDuration || 60,
-      contractLengthMonths: service?.contractLengthMonths || 12,
-      recurrencePattern: service?.recurrencePattern || { interval: "30d", end_date: null },
+      contractLengthMonths: service?.contractLengthMonths || undefined,
+      recurrencePattern: service?.recurrencePattern || null,
       equipmentItems: [],
       consumableItems: [],
     },
@@ -152,7 +153,17 @@ export default function ServiceForm({ service, initialDate, onSuccess, onCancel,
   };
 
 
-  
+  const handleConvertToServiceContract = () => {
+    if (watchType === "installation") {
+      form.setValue("type", "service_contract");
+      form.setValue("contractLengthMonths", 12);
+      form.setValue("recurrencePattern", { interval: "30d", end_date: null });
+    } else {
+      form.setValue("type", "installation");
+      form.setValue("contractLengthMonths", undefined);
+      form.setValue("recurrencePattern", null);
+    }
+  };
 
   return (
     <Form {...form}>
@@ -193,18 +204,29 @@ export default function ServiceForm({ service, initialDate, onSuccess, onCancel,
               <FormItem>
                 <FormLabel>Service Type *</FormLabel>
                 <FormControl>
-                  <Select value={field.value ?? undefined} onValueChange={field.onChange}>
-                    <SelectTrigger data-testid="select-service-type">
-                      <SelectValue placeholder="Select service type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {serviceTypes.map((type) => (
-                        <SelectItem key={type.value} value={type.value}>
-                          {type.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <div className="flex items-center space-x-2">
+                    <Select value={field.value ?? undefined} onValueChange={field.onChange}>
+                      <SelectTrigger data-testid="select-service-type">
+                        <SelectValue placeholder="Select service type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {serviceTypes.map((type) => (
+                          <SelectItem key={type.value} value={type.value}>
+                            {type.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button 
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleConvertToServiceContract}
+                      data-testid="button-convert-service"
+                    >
+                      <Repeat className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -333,69 +355,71 @@ export default function ServiceForm({ service, initialDate, onSuccess, onCancel,
           />
         </div>
 
-        <div className="space-y-4 border-t border-border pt-4">
-          <h3 className="text-lg font-medium">Service Contract Details</h3>
+        {watchType === "service_contract" && (
+          <div className="space-y-4 border-t border-border pt-4">
+            <h3 className="text-lg font-medium">Service Contract Details</h3>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <FormField
-              control={form.control}
-              name="contractLengthMonths"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Contract Length (months)</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="number"
-                      placeholder="12"
-                      {...field}
-                      value={field.value ?? ''}
-                      onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : undefined)}
-                      data-testid="input-contract-length"
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="contractLengthMonths"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Contract Length (months)</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        placeholder="12"
+                        {...field}
+                        value={field.value ?? ''}
+                        onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : undefined)}
+                        data-testid="input-contract-length"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-            <FormField
-              control={form.control}
-              name="recurrencePattern"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Recurrence</FormLabel>
-                  <FormControl>
-                    <Select 
-                      value={(field.value && typeof field.value === 'object' && 'interval' in field.value) ? (field.value as any).interval || "" : ""}
-                      onValueChange={(value) => {
-                        if (value === "once") {
-                          field.onChange(null);
-                        } else {
-                          field.onChange({ 
-                            interval: value, 
-                            end_date: null 
-                          });
-                        }
-                      }}
-                    >
-                      <SelectTrigger data-testid="select-recurrence">
-                        <SelectValue placeholder="Select recurrence" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {recurrenceIntervals.map((interval) => (
-                          <SelectItem key={interval.value} value={interval.value}>
-                            {interval.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+              <FormField
+                control={form.control}
+                name="recurrencePattern"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Recurrence</FormLabel>
+                    <FormControl>
+                      <Select 
+                        value={(field.value && typeof field.value === 'object' && 'interval' in field.value) ? (field.value as any).interval || "" : ""}
+                        onValueChange={(value) => {
+                          if (value === "once") {
+                            field.onChange(null);
+                          } else {
+                            field.onChange({ 
+                              interval: value, 
+                              end_date: null 
+                            });
+                          }
+                        }}
+                      >
+                        <SelectTrigger data-testid="select-recurrence">
+                          <SelectValue placeholder="Select recurrence" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {recurrenceIntervals.map((interval) => (
+                            <SelectItem key={interval.value} value={interval.value}>
+                              {interval.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Equipment Selection */}
         <div className="space-y-4 border-t border-border pt-4">
