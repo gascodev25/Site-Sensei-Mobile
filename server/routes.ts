@@ -649,32 +649,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         updateData.completedAt = new Date();
       }
 
-      // If it's an installation and conversion is requested
-      if (existingService.type === 'installation' && convertToContract) {
-        updateData.type = 'service_contract';
-        updateData.contractLengthMonths = contractLengthMonths || 12;
-        
-        // Set recurrence pattern based on service interval
-        if (serviceInterval) {
-          const endDate = new Date(existingService.installationDate || new Date());
-          endDate.setMonth(endDate.getMonth() + (contractLengthMonths || 12));
-          
-          updateData.recurrencePattern = {
-            interval: serviceInterval,
-            end_date: endDate.toISOString().split('T')[0]
-          };
-          
-          // Mark the installation date as completed in the new service contract
-          const installationDateString = existingService.installationDate 
-            ? new Date(existingService.installationDate).toISOString().split('T')[0]
-            : completionDate;
-          
-          const currentCompletedDates = (existingService.completedDates as string[]) || [];
-          if (!currentCompletedDates.includes(installationDateString)) {
-            updateData.completedDates = [...currentCompletedDates, installationDateString];
-          }
-        }
-      }
+      // All services are now service contracts - no conversion needed
 
       // Update equipment and consumable items if provided
       if (equipmentItems) {
@@ -694,11 +669,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         entityType: 'service',
         entityId: service.id,
         metadata: { 
-          convertedToContract: convertToContract,
           equipmentItems: equipmentItems?.length || 0,
           consumableItems: consumableItems?.length || 0,
-          serviceInterval: serviceInterval,
-          contractLengthMonths: contractLengthMonths
+          completionDate: completionDate
         }
       });
       

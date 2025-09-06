@@ -130,7 +130,7 @@ export const teamAssignments = pgTable("team_assignments", {
 export const services = pgTable("services", {
   id: serial("id").primaryKey(),
   clientId: integer("client_id").references(() => clients.id).notNull(),
-  type: varchar("type", { length: 20 }).default("installation"), // 'installation', 'service_contract'
+  type: varchar("type", { length: 20 }).default("service_contract"), // 'service_contract'
   installationDate: timestamp("installation_date"),
   teamId: integer("team_id").references(() => serviceTeams.id),
   status: varchar("status", { length: 20 }).default("scheduled"), // 'scheduled', 'completed', 'missed'
