@@ -642,6 +642,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const currentCompletedDates = (existingService.completedDates as string[]) || [];
         if (!currentCompletedDates.includes(completionDate)) {
           updateData.completedDates = [...currentCompletedDates, completionDate];
+        } else {
+          // If already completed for this date, just return the existing service
+          return res.json(existingService);
         }
         // Keep the main service status as scheduled for recurring services
         // Individual occurrences are tracked via completedDates array
@@ -686,8 +689,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         updateData.consumableItems = consumableItems;
       }
 
-      // Update the service
-      const service = await storage.updateService(id, updateData);
+      // Update the service only if there are changes to make
+      let service;
+      if (Object.keys(updateData).length > 0) {
+        service = await storage.updateService(id, updateData);
+      } else {
+        // No changes needed, return existing service
+        service = existingService;
+      }
       
       // Audit log
       await storage.createAuditLog({
