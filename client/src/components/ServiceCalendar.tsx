@@ -3,18 +3,26 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { ChevronLeft, ChevronRight, Calendar, User, Clock, MapPin } from "lucide-react";
+import { ChevronLeft, ChevronRight, Calendar, User, Clock, MapPin, Repeat } from "lucide-react";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, parseISO, addWeeks, subWeeks, startOfWeek, endOfWeek } from "date-fns";
 import type { ServiceWithDetails } from "@shared/schema";
+import { cn } from "@/lib/utils";
 
 interface ServiceCalendarProps {
   services: ServiceWithDetails[];
   onServiceClick?: (service: ServiceWithDetails) => void;
-  onServiceMove?: (serviceId: number, newDate: Date, originalDate?: Date) => void;
+  onServiceMove?: (serviceId: number, newDate: Date, draggedFromDate?: Date) => void;
   onDateClick?: (date: Date) => void;
+  onServiceComplete?: (service: ServiceWithDetails, completionDate?: Date) => void;
 }
 
-export default function ServiceCalendar({ services, onServiceClick, onServiceMove, onDateClick }: ServiceCalendarProps) {
+export default function ServiceCalendar({ 
+  services, 
+  onServiceClick, 
+  onServiceMove, 
+  onDateClick,
+  onServiceComplete
+}: ServiceCalendarProps) {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [view, setView] = useState<'month' | 'week' | 'day'>('month');
   const [selectedTeam, setSelectedTeam] = useState<string>('all');
@@ -215,50 +223,57 @@ export default function ServiceCalendar({ services, onServiceClick, onServiceMov
       effectiveStatus = service.status || 'scheduled';
     }
 
+    const handleServiceAction = (e: React.MouseEvent, action: 'click' | 'complete') => {
+      e.stopPropagation();
+      if (action === 'complete') {
+        onServiceComplete?.(service, forDate);
+      } else {
+        onServiceClick?.(service);
+      }
+    };
+
     return (
       <div
-        key={service.id}
-        draggable
-        onDragStart={() => handleDragStart(service, forDate || new Date())}
-        onDragEnd={() => {
-          // Reset dragging state if drag is cancelled or completed without drop
-          setTimeout(() => setIsDragging(false), 0);
-        }}
-        onClick={(e) => {
-          e.stopPropagation();
-          onServiceClick?.(service);
-        }}
-        className={`
-          ${getTeamBackgroundColor(service.team?.name, effectiveStatus)}
-          border rounded p-2 cursor-pointer hover:shadow-sm transition-shadow text-xs
-          ${size === 'large' ? 'mb-2' : 'mb-1'}
-        `}
+        key={`${service.id}-${dateString}`}
+        className={cn(
+          "p-2 mb-1 rounded text-xs cursor-pointer transition-all duration-200",
+          "hover:shadow-md",
+          "border border-border",
+          size === 'small' ? 'min-h-[60px]' : 'min-h-[80px]',
+          getTeamBackgroundColor(service.team?.name, effectiveStatus)
+        )}
+        onClick={(e) => handleServiceAction(e, 'click')}
         data-testid={`calendar-service-${service.id}`}
       >
-        <div className="font-medium truncate">{service.client?.name || 'Unknown'}</div>
-        {size === 'large' && (
-          <>
-            <div className="flex items-center text-xs mt-1 opacity-75">
-              <MapPin className="h-3 w-3 mr-1" />
-              <span className="truncate">{service.client?.city || 'Location not set'}</span>
+        <div className="flex items-center justify-between mb-1">
+            <div className="flex items-center space-x-1">
+              {service.type === 'service_contract' && (
+                <Repeat className="h-3 w-3 text-primary" />
+              )}
+              <span className="font-medium truncate">{service.client?.name || 'Unknown'}</span>
             </div>
-            {service.team && (
-              <div className="flex items-center text-xs mt-1 opacity-75">
-                <User className="h-3 w-3 mr-1" />
-                <span className="truncate">{service.team.name}</span>
-              </div>
+            <div className="flex items-center space-x-1">
+              <span className="text-[9px] px-1 py-0.5 bg-white bg-opacity-20 rounded uppercase font-semibold">
+                {effectiveStatus}
+              </span>
+              <span className="text-[10px] opacity-75">{service.team?.name}</span>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] opacity-75">
+              {format(new Date(forDate || service.installationDate || new Date()), 'HH:mm')}
+            </span>
+            {effectiveStatus !== 'completed' && (
+              <button
+                onClick={(e) => handleServiceAction(e, 'complete')}
+                className="text-[9px] px-1 py-0.5 bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
+                title="Mark as completed"
+              >
+                ✓
+              </button>
             )}
-            {service.estimatedDuration && (
-              <div className="flex items-center text-xs mt-1 opacity-75">
-                <Clock className="h-3 w-3 mr-1" />
-                <span>{service.estimatedDuration}min</span>
-              </div>
-            )}
-          </>
-        )}
-        <Badge className={`mt-1 text-xs ${getStatusColor(effectiveStatus)}`}>
-          {effectiveStatus.replace('_', ' ').toUpperCase()}
-        </Badge>
+          </div>
       </div>
     );
   };
@@ -383,7 +398,7 @@ export default function ServiceCalendar({ services, onServiceClick, onServiceMov
         <CardContent className="p-6 cursor-pointer hover:bg-muted/20 transition-colors" onClick={() => onDateClick?.(currentDate)}>
           {dayServices.length === 0 ? (
             <div className="text-center text-muted-foreground py-12">
-              <Calendar className="h-12 w-12 mx-auto mb-4" />
+              <CalendarIcon className="h-12 w-12 mx-auto mb-4" />
               <p>No services scheduled for this day</p>
             </div>
           ) : (

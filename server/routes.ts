@@ -590,6 +590,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get the specific date for this completion (from request body or current date)
       const completionDate = req.body.completionDate || new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
       
+      console.log(`Marking service ${id} as completed for date: ${completionDate}`);
+      
       // Validate equipment IDs exist in database
       if (equipmentItems && equipmentItems.length > 0) {
         const equipmentIds = equipmentItems.map(item => item.id);
