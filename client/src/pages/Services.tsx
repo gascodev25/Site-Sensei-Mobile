@@ -148,9 +148,34 @@ export default function Services() {
     },
   });
 
-  const handleDelete = (service: ServiceWithDetails) => {
-    if (confirm(`Are you sure you want to delete this service for ${service.client?.name}?`)) {
-      deleteServiceMutation.mutate(service.id);
+  const handleDelete = (service: ServiceWithDetails, specificDate?: Date) => {
+    const isRecurring = service.recurrencePattern &&
+                       typeof service.recurrencePattern === 'object' &&
+                       service.recurrencePattern !== null &&
+                       'interval' in service.recurrencePattern;
+
+    if (isRecurring && specificDate) {
+      // For recurring services, exclude this specific date instead of deleting the entire record
+      const dateString = specificDate.toISOString().split('T')[0]; // YYYY-MM-DD format
+      const currentExcludedDates = (service.excludedDates as string[]) || [];
+      
+      if (confirm(`Are you sure you want to cancel the service on ${specificDate.toLocaleDateString()} for ${service.client?.name}? This will only cancel this occurrence.`)) {
+        const updatedExcludedDates = [...currentExcludedDates, dateString];
+        
+        updateServiceMutation.mutate({
+          serviceId: service.id,
+          data: { excludedDates: updatedExcludedDates }
+        });
+      }
+    } else {
+      // For non-recurring services or deleting entire recurring series
+      const confirmMessage = isRecurring 
+        ? `Are you sure you want to delete the entire recurring service series for ${service.client?.name}? This will cancel all future occurrences.`
+        : `Are you sure you want to delete this service for ${service.client?.name}?`;
+        
+      if (confirm(confirmMessage)) {
+        deleteServiceMutation.mutate(service.id);
+      }
     }
   };
 
@@ -511,8 +536,21 @@ export default function Services() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => handleDelete(service)}
-                            disabled={deleteServiceMutation.isPending}
+                            onClick={() => {
+                              const isRecurring = service.recurrencePattern &&
+                                                 typeof service.recurrencePattern === 'object' &&
+                                                 service.recurrencePattern !== null &&
+                                                 'interval' in service.recurrencePattern;
+                              
+                              if (isRecurring) {
+                                // For recurring services, pass the installation date as the specific date to exclude
+                                const serviceDate = service.installationDate ? new Date(service.installationDate) : new Date();
+                                handleDelete(service, serviceDate);
+                              } else {
+                                handleDelete(service);
+                              }
+                            }}
+                            disabled={deleteServiceMutation.isPending || updateServiceMutation.isPending}
                             data-testid={`button-delete-${service.id}`}
                           >
                             <Trash2 className="h-4 w-4" />
@@ -562,6 +600,7 @@ export default function Services() {
               onServiceClick={handleServiceClick}
               onServiceMove={handleServiceMove}
               onDateClick={handleDateClick}
+              onServiceDelete={handleDelete}
             />
           </TabsContent>
         </Tabs>

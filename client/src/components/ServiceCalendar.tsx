@@ -3,19 +3,20 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { ChevronLeft, ChevronRight, Calendar, User, Clock, MapPin, Trash2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Calendar, User, Clock, MapPin, Trash2, Edit } from "lucide-react";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, parseISO, addWeeks, subWeeks, startOfWeek, endOfWeek } from "date-fns";
 import type { ServiceWithDetails } from "@shared/schema";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
 interface ServiceCalendarProps {
   services: ServiceWithDetails[];
-  onServiceClick?: (service: ServiceWithDetails) => void;
-  onDelete?: (service: ServiceWithDetails, specificDate?: Date) => void;
-  onComplete?: (service: ServiceWithDetails) => void;
-  onMove?: (service: ServiceWithDetails, originalDate: Date, newDate: Date) => void;
+  onServiceClick: (service: ServiceWithDetails) => void;
+  onServiceMove: (serviceId: number, newDate: Date, draggedFromDate?: Date) => void;
+  onDateClick: (date: Date) => void;
+  onServiceDelete?: (service: ServiceWithDetails, specificDate?: Date) => void;
 }
 
-export default function ServiceCalendar({ services, onServiceClick, onServiceMove, onDateClick, onDelete }: ServiceCalendarProps) {
+export default function ServiceCalendar({ services, onServiceClick, onServiceMove, onDateClick, onServiceDelete }: ServiceCalendarProps) {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [view, setView] = useState<'month' | 'week' | 'day'>('month');
   const [selectedTeam, setSelectedTeam] = useState<string>('all');
@@ -172,7 +173,7 @@ export default function ServiceCalendar({ services, onServiceClick, onServiceMov
 
   const handleDrop = (date: Date) => {
     if (draggedService && onServiceMove) {
-      onServiceMove(draggedService, date, draggedFromDate || new Date()); // Pass the whole service object
+      onServiceMove(draggedService.id, date, draggedFromDate || new Date()); // Pass the whole service object
       setDraggedService(null);
       setDraggedFromDate(null);
       // Reset dragging state after a small delay to prevent click events
@@ -184,66 +185,106 @@ export default function ServiceCalendar({ services, onServiceClick, onServiceMov
     e.preventDefault();
   };
 
-  // Render service item
-  const renderServiceItem = (service: ServiceWithDetails, size: 'small' | 'large' = 'small', forDate?: Date) => {
-    // Check if this specific occurrence is completed
-    const dateString = forDate?.toISOString().split('T')[0] || new Date().toISOString().split('T')[0];
+  // Helper to get service status, considering recurring service completion
+  const getServiceStatus = (service: ServiceWithDetails, date?: Date) => {
+    if (!date) return service.status || 'scheduled';
+
+    const dateString = date.toISOString().split('T')[0];
     const completedDates = (service.completedDates as string[]) || [];
     const isThisOccurrenceCompleted = completedDates.includes(dateString);
 
-    // Determine status: check completedDates for service contracts, otherwise use service status
     const isServiceContract = service.type === 'service_contract';
-    const hasRecurrence = service.recurrencePattern && 'interval' in (service.recurrencePattern as any);
+    const hasRecurrence = service.recurrencePattern && typeof service.recurrencePattern === 'object' && 'interval' in service.recurrencePattern;
 
-    const effectiveStatus = (isServiceContract || hasRecurrence)
-      ? (isThisOccurrenceCompleted ? 'completed' : 'scheduled')
-      : service.status || 'scheduled';
+    if ((isServiceContract || hasRecurrence) && isThisOccurrenceCompleted) {
+      return 'completed';
+    }
+    return service.status || 'scheduled';
+  };
+
+  // Render service item
+  const renderServiceItem = (service: ServiceWithDetails, size: 'small' | 'large' = 'small', date?: Date) => {
+    const effectiveStatus = getServiceStatus(service, date);
 
     return (
-      <div
-        key={service.id}
-        draggable
-        onDragStart={() => handleDragStart(service, forDate || new Date())}
-        onDragEnd={() => {
-          // Reset dragging state if drag is cancelled or completed without drop
-          setTimeout(() => setIsDragging(false), 0);
-        }}
-        onClick={(e) => {
-          e.stopPropagation();
-          onServiceClick?.(service);
-        }}
-        className={`
-          ${getTeamBackgroundColor(service.team?.name, effectiveStatus)}
-          border rounded p-2 cursor-pointer hover:shadow-sm transition-shadow text-xs
-          ${size === 'large' ? 'mb-2' : 'mb-1'}
-        `}
-        data-testid={`calendar-service-${service.id}`}
-      >
-        <div className="font-medium truncate">{service.client?.name || 'Unknown'}</div>
-        {size === 'large' && (
-          <>
-            <div className="flex items-center text-xs mt-1 opacity-75">
-              <MapPin className="h-3 w-3 mr-1" />
-              <span className="truncate">{service.client?.city || 'Location not set'}</span>
-            </div>
-            {service.team && (
-              <div className="flex items-center text-xs mt-1 opacity-75">
-                <User className="h-3 w-3 mr-1" />
-                <span className="truncate">{service.team.name}</span>
-              </div>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <div
+            key={service.id}
+            draggable
+            onDragStart={() => handleDragStart(service, date || new Date())}
+            onDragEnd={() => {
+              // Reset dragging state if drag is cancelled or completed without drop
+              setTimeout(() => setIsDragging(false), 0);
+            }}
+            onClick={(e) => {
+              e.stopPropagation();
+              if (isDragging) return; // Prevent click if dragging
+              onServiceClick?.(service);
+            }}
+            className={`
+              ${getTeamBackgroundColor(service.team?.name, effectiveStatus)}
+              border rounded p-2 cursor-pointer hover:shadow-sm transition-shadow text-xs
+              ${size === 'large' ? 'mb-2' : 'mb-1'}
+            `}
+            data-testid={`calendar-service-${service.id}`}
+          >
+            <div className="font-medium truncate">{service.client?.name || 'Unknown'}</div>
+            {size === 'large' && (
+              <>
+                <div className="flex items-center text-xs mt-1 opacity-75">
+                  <MapPin className="h-3 w-3 mr-1" />
+                  <span className="truncate">{service.client?.city || 'Location not set'}</span>
+                </div>
+                {service.team && (
+                  <div className="flex items-center text-xs mt-1 opacity-75">
+                    <User className="h-3 w-3 mr-1" />
+                    <span className="truncate">{service.team.name}</span>
+                  </div>
+                )}
+                {service.estimatedDuration && (
+                  <div className="flex items-center text-xs mt-1 opacity-75">
+                    <Clock className="h-3 w-3 mr-1" />
+                    <span>{service.estimatedDuration}min</span>
+                  </div>
+                )}
+              </>
             )}
-            {service.estimatedDuration && (
-              <div className="flex items-center text-xs mt-1 opacity-75">
-                <Clock className="h-3 w-3 mr-1" />
-                <span>{service.estimatedDuration}min</span>
-              </div>
-            )}
-          </>
-        )}
-        <Badge className={`mt-1 text-xs ${getStatusColor(effectiveStatus)}`}>
-          {effectiveStatus.replace('_', ' ').toUpperCase()}
-        </Badge>
-      </div>
+            <Badge className={`mt-1 text-xs ${getStatusColor(effectiveStatus)}`}>
+              {effectiveStatus.replace('_', ' ').toUpperCase()}
+            </Badge>
+          </div>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" className="w-48">
+          <DropdownMenuItem
+            onClick={() => onServiceClick(service)}
+            className="cursor-pointer"
+          >
+            <Edit className="h-3 w-3 mr-1" />
+            Edit Service
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onClick={() => {
+              const isRecurring = service.recurrencePattern &&
+                                 typeof service.recurrencePattern === 'object' &&
+                                 service.recurrencePattern !== null &&
+                                 'interval' in service.recurrencePattern;
+
+              if (isRecurring && onServiceDelete) {
+                onServiceDelete(service, date);
+              } else if (onServiceDelete) {
+                onServiceDelete(service);
+              }
+            }}
+            className="cursor-pointer text-red-600"
+          >
+            <Trash2 className="h-3 w-3 mr-1" />
+            {service.recurrencePattern && typeof service.recurrencePattern === 'object' && 'interval' in service.recurrencePattern
+              ? 'Cancel This Date'
+              : 'Delete Service'}
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
     );
   };
 
