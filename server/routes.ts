@@ -1016,8 +1016,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const clientData = {
             name: row.name.trim(),
             addressText: row.addressText.trim(),
-            latitude: 0, // Will be updated by geocoding if needed
-            longitude: 0,
+            latitude: "0", // Will be updated by geocoding if needed
+            longitude: "0",
             city: row.city && typeof row.city === 'string' ? row.city.trim() : null,
             contactPerson: row.contactPerson && typeof row.contactPerson === 'string' ? row.contactPerson.trim() : null,
             phone: row.phone && typeof row.phone === 'string' ? row.phone.trim() : null,
