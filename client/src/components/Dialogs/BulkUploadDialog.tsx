@@ -174,8 +174,32 @@ export default function BulkUploadDialog({
     setProgress(0);
 
     try {
+      // Transform data to handle numeric coercion and other type conversions
+      const transformedData = parseResult.data.map((row: any) => {
+        const transformedRow = { ...row };
+        
+        // Convert numeric fields for equipment and consumables
+        if (entityType === "equipment" || entityType === "consumables") {
+          if (transformedRow.price !== undefined && transformedRow.price !== '') {
+            transformedRow.price = parseFloat(transformedRow.price);
+          }
+        }
+        
+        // Convert consumable-specific numeric fields
+        if (entityType === "consumables") {
+          if (transformedRow.currentStock !== undefined && transformedRow.currentStock !== '') {
+            transformedRow.currentStock = parseInt(transformedRow.currentStock);
+          }
+          if (transformedRow.minStockLevel !== undefined && transformedRow.minStockLevel !== '') {
+            transformedRow.minStockLevel = parseInt(transformedRow.minStockLevel);
+          }
+        }
+        
+        return transformedRow;
+      });
+
       const response = await apiRequest("POST", `/api/bulk-upload/${entityType}`, {
-        data: parseResult.data
+        data: transformedData
       });
 
       const result = await response.json();
