@@ -663,6 +663,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
             interval: serviceInterval,
             end_date: endDate.toISOString().split('T')[0]
           };
+          
+          // Mark the installation date as completed in the new service contract
+          const installationDateString = existingService.installationDate 
+            ? new Date(existingService.installationDate).toISOString().split('T')[0]
+            : completionDate;
+          
+          const currentCompletedDates = (existingService.completedDates as string[]) || [];
+          if (!currentCompletedDates.includes(installationDateString)) {
+            updateData.completedDates = [...currentCompletedDates, installationDateString];
+          }
         }
       }
 

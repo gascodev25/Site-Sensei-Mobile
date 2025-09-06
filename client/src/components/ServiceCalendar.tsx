@@ -185,8 +185,11 @@ export default function ServiceCalendar({ services, onServiceClick, onServiceMov
     const completedDates = (service.completedDates as string[]) || [];
     const isThisOccurrenceCompleted = completedDates.includes(dateString);
     
-    // Determine status: if it's a recurring service, check completedDates; otherwise use service status
-    const effectiveStatus = service.recurrencePattern && 'interval' in (service.recurrencePattern as any)
+    // Determine status: check completedDates for service contracts, otherwise use service status
+    const isServiceContract = service.type === 'service_contract';
+    const hasRecurrence = service.recurrencePattern && 'interval' in (service.recurrencePattern as any);
+    
+    const effectiveStatus = (isServiceContract || hasRecurrence)
       ? (isThisOccurrenceCompleted ? 'completed' : 'scheduled')
       : service.status || 'scheduled';
     

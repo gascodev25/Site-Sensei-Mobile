@@ -262,13 +262,23 @@ export default function Services() {
     );
   });
 
-  const getStatusBadge = (status: string) => {
+  const getStatusBadge = (service: ServiceWithDetails) => {
+    const status = service.status || 'scheduled';
     const statusColors = {
       scheduled: "bg-blue-100 text-blue-800",
       completed: "bg-green-100 text-green-800", 
       missed: "bg-red-100 text-red-800",
       in_progress: "bg-yellow-100 text-yellow-800"
     };
+    
+    // For service contracts, show completion count if any occurrences are completed
+    if (service.type === 'service_contract' && service.completedDates && (service.completedDates as string[]).length > 0) {
+      return (
+        <Badge className="bg-green-100 text-green-800">
+          {(service.completedDates as string[]).length} COMPLETED
+        </Badge>
+      );
+    }
     
     return (
       <Badge className={statusColors[status as keyof typeof statusColors] || "bg-gray-100 text-gray-800"}>
@@ -457,7 +467,7 @@ export default function Services() {
                         <div className="flex-1">
                           <div className="flex items-center space-x-2 mb-2">
                             <CardTitle className="text-lg">{service.client?.name || 'Unknown Client'}</CardTitle>
-                            {getStatusBadge(service.status || 'scheduled')}
+                            {getStatusBadge(service)}
                           </div>
                           <div className="flex items-center text-sm text-muted-foreground mb-1">
                             <MapPin className="h-3 w-3 mr-1" />
