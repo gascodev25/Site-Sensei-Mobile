@@ -8,13 +8,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Plus, Search, Edit, Trash2 } from "lucide-react";
+import { Plus, Search, Edit, Trash2, Upload } from "lucide-react";
 import type { Client } from "@shared/schema";
+import BulkUploadDialog from "@/components/Dialogs/BulkUploadDialog";
 
 export default function Clients() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
+  const [isBulkUploadOpen, setIsBulkUploadOpen] = useState(false);
   const { toast } = useToast();
 
   const { data: clients = [], isLoading } = useQuery<Client[]>({
@@ -81,23 +83,33 @@ export default function Clients() {
         {/* Page Header */}
         <div className="flex items-center justify-between mb-8">
           <h1 className="text-3xl font-bold text-foreground">Clients</h1>
-          <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-            <DialogTrigger asChild>
-              <Button data-testid="button-add-client">
-                <Plus className="h-4 w-4 mr-2" />
-                Add Client
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-2xl">
-              <DialogHeader>
-                <DialogTitle>Add New Client</DialogTitle>
-              </DialogHeader>
-              <ClientForm 
-                onSuccess={() => setIsCreateOpen(false)}
-                onCancel={() => setIsCreateOpen(false)}
-              />
-            </DialogContent>
-          </Dialog>
+          <div className="flex gap-3">
+            <Button 
+              variant="outline" 
+              onClick={() => setIsBulkUploadOpen(true)}
+              data-testid="button-bulk-upload-clients"
+            >
+              <Upload className="h-4 w-4 mr-2" />
+              Bulk Upload
+            </Button>
+            <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+              <DialogTrigger asChild>
+                <Button data-testid="button-add-client">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Client
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-2xl">
+                <DialogHeader>
+                  <DialogTitle>Add New Client</DialogTitle>
+                </DialogHeader>
+                <ClientForm 
+                  onSuccess={() => setIsCreateOpen(false)}
+                  onCancel={() => setIsCreateOpen(false)}
+                />
+              </DialogContent>
+            </Dialog>
+          </div>
         </div>
 
         {/* Search */}
@@ -203,6 +215,20 @@ export default function Clients() {
             ))}
           </div>
         )}
+
+        {/* Bulk Upload Dialog */}
+        <BulkUploadDialog
+          open={isBulkUploadOpen}
+          onOpenChange={setIsBulkUploadOpen}
+          entityType="clients"
+          onSuccess={() => {
+            queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
+            toast({
+              title: "Success",
+              description: "Clients uploaded successfully",
+            });
+          }}
+        />
       </div>
     </div>
   );
