@@ -201,8 +201,7 @@ export default function ServiceCalendar({ services, onServiceClick, onServiceMov
     const itemClass = `
           p-2 mb-1 rounded text-xs cursor-pointer transition-all duration-200 
           ${getTeamBackgroundColor(service.team?.name, effectiveStatus)} 
-          hover:shadow-md border-l-4 
-          ${isCompletedOnThisDate ? 'opacity-75 line-through' : ''}
+          hover:shadow-md border-l-4
         `;
 
     return (
