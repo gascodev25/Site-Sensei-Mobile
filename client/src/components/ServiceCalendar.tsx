@@ -224,9 +224,6 @@ export default function ServiceCalendar({ services, onServiceClick, onServiceMov
         <div className="text-xs opacity-75">
           {service.type?.replace('_', ' ')} - {service.team?.name || 'No Team'}
         </div>
-        <div className="text-xs font-medium mt-1">
-          Status: {effectiveStatus.replace('_', ' ').toUpperCase()}
-        </div>
 
         {size === 'large' && (
           <>
