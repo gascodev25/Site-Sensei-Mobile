@@ -285,7 +285,14 @@ export default function ServiceCalendar({ services, onServiceClick, onServiceMov
         )}
         {getStatusBadge(service, forDate)}
         <div className="text-xs font-medium mt-1">
-          Status: {service.type === 'service_contract' && service.completedDates && (service.completedDates as string[]).length > 0 ? 'COMPLETED' : (service.status || 'scheduled').replace('_', ' ').toUpperCase()}
+          Status: {(() => {
+            const currentDateStr = forDate?.toISOString().split('T')[0] || new Date().toISOString().split('T')[0];
+            const isCompletedOnThisDate = service.type === 'service_contract' && 
+              service.completedDates && 
+              (service.completedDates as string[]).includes(currentDateStr);
+            
+            return isCompletedOnThisDate ? 'COMPLETED' : (service.status || 'scheduled').replace('_', ' ').toUpperCase();
+          })()}
         </div>
       </div>
     );
