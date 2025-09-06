@@ -31,6 +31,105 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // User Management routes
+  app.get('/api/users', isAuthenticated, async (req: any, res) => {
+    try {
+      // Check permissions: Only super_user or general_manager can view all users
+      const currentUser = await storage.getUser(req.user?.claims?.sub);
+      if (!currentUser || !currentUser.roles) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      const hasRole = (role: string) => currentUser.roles?.split(",").includes(role);
+      const canManageUsers = hasRole("super_user") || hasRole("general_manager");
+      
+      if (!canManageUsers) {
+        return res.status(403).json({ 
+          message: "Unauthorized: Only super users and general managers can view users" 
+        });
+      }
+
+      const users = await storage.getAllUsers();
+      res.json(users);
+    } catch (error) {
+      console.error("Error fetching users:", error);
+      res.status(500).json({ message: "Failed to fetch users" });
+    }
+  });
+
+  app.put('/api/users/:id/roles', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.params.id;
+      const { roles } = req.body;
+      
+      // Check permissions: Only super_user or general_manager can update roles
+      const currentUser = await storage.getUser(req.user?.claims?.sub);
+      if (!currentUser || !currentUser.roles) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      const hasRole = (role: string) => currentUser.roles?.split(",").includes(role);
+      const canManageUsers = hasRole("super_user") || hasRole("general_manager");
+      
+      if (!canManageUsers) {
+        return res.status(403).json({ 
+          message: "Unauthorized: Only super users and general managers can update user roles" 
+        });
+      }
+
+      // Validate roles
+      const validRoles = ["super_user", "general_manager", "ops_manager", "admin", "warehouse_clerk", "team_member"];
+      const rolesArray = typeof roles === 'string' ? roles.split(',') : [];
+      const invalidRoles = rolesArray.filter((role: string) => !validRoles.includes(role.trim()));
+      
+      if (invalidRoles.length > 0) {
+        return res.status(400).json({ 
+          message: `Invalid roles: ${invalidRoles.join(', ')}` 
+        });
+      }
+
+      if (rolesArray.length === 0) {
+        return res.status(400).json({ message: "At least one role must be assigned" });
+      }
+
+      // Get the target user's current roles for audit log
+      const targetUser = await storage.getUser(userId);
+      if (!targetUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Update user roles
+      const updatedUser = await storage.updateUserRoles(userId, roles);
+      
+      // Create audit log for role change
+      await storage.createRoleChangeLog({
+        userId: userId,
+        oldRoles: targetUser.roles,
+        newRoles: roles,
+        changedBy: req.user?.claims?.sub,
+        reason: "Manual role assignment via user management"
+      });
+      
+      // Also create regular audit log
+      await storage.createAuditLog({
+        userId: req.user?.claims?.sub,
+        action: 'update_roles',
+        entityType: 'user',
+        entityId: null,
+        metadata: { 
+          targetUserId: userId,
+          oldRoles: targetUser.roles,
+          newRoles: roles
+        }
+      });
+      
+      res.json(updatedUser);
+    } catch (error) {
+      console.error("Error updating user roles:", error);
+      res.status(500).json({ message: "Failed to update user roles" });
+    }
+  });
+
   // Dashboard routes
   app.get('/api/dashboard/metrics', isAuthenticated, async (req, res) => {
     try {
@@ -80,7 +179,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Audit log
       await storage.createAuditLog({
-        userId: req.user?.claims?.sub ?? null,
+        userId: req.user?.claims?.sub,
         action: 'create',
         entityType: 'client',
         entityId: client.id,
@@ -105,7 +204,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Audit log
       await storage.createAuditLog({
-        userId: req.user?.claims?.sub ?? null,
+        userId: req.user?.claims?.sub,
         action: 'update',
         entityType: 'client',
         entityId: client.id,
@@ -129,7 +228,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Audit log
       await storage.createAuditLog({
-        userId: req.user?.claims?.sub ?? null,
+        userId: req.user?.claims?.sub,
         action: 'delete',
         entityType: 'client',
         entityId: id,
@@ -185,7 +284,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Audit log
       await storage.createAuditLog({
-        userId: req.user?.claims?.sub ?? null,
+        userId: req.user?.claims?.sub,
         action: 'create',
         entityType: 'equipment',
         entityId: equipment.id,
@@ -217,7 +316,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Audit log
       await storage.createAuditLog({
-        userId: req.user?.claims?.sub ?? null,
+        userId: req.user?.claims?.sub,
         action: 'update',
         entityType: 'equipment',
         entityId: equipment.id,
@@ -241,7 +340,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Audit log
       await storage.createAuditLog({
-        userId: req.user?.claims?.sub ?? null,
+        userId: req.user?.claims?.sub,
         action: 'delete',
         entityType: 'equipment',
         entityId: id,
@@ -285,14 +384,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { consumableIds, ...templateData } = req.body;
       const parsedTemplateData = insertEquipmentTemplateSchema.parse({
         ...templateData,
-        createdBy: req.user?.claims?.sub ?? null
+        createdBy: req.user?.claims?.sub
       });
       
       const template = await storage.createEquipmentTemplate(parsedTemplateData, consumableIds || []);
       
       // Audit log
       await storage.createAuditLog({
-        userId: req.user?.claims?.sub ?? null,
+        userId: req.user?.claims?.sub,
         action: 'create',
         entityType: 'equipment_template',
         entityId: template.id,
@@ -319,7 +418,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Audit log
       await storage.createAuditLog({
-        userId: req.user?.claims?.sub ?? null,
+        userId: req.user?.claims?.sub,
         action: 'update',
         entityType: 'equipment_template',
         entityId: template.id,
@@ -354,7 +453,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Audit log
       await storage.createAuditLog({
-        userId: req.user?.claims?.sub ?? null,
+        userId: req.user?.claims?.sub,
         action: 'delete',
         entityType: 'equipment_template',
         entityId: id,
@@ -392,7 +491,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Audit log
       await storage.createAuditLog({
-        userId: req.user?.claims?.sub ?? null,
+        userId: req.user?.claims?.sub,
         action: 'create',
         entityType: 'consumable',
         entityId: consumable.id,
@@ -417,7 +516,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Audit log
       await storage.createAuditLog({
-        userId: req.user?.claims?.sub ?? null,
+        userId: req.user?.claims?.sub,
         action: 'update',
         entityType: 'consumable',
         entityId: consumable.id,
@@ -441,7 +540,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Audit log
       await storage.createAuditLog({
-        userId: req.user?.claims?.sub ?? null,
+        userId: req.user?.claims?.sub,
         action: 'delete',
         entityType: 'consumable',
         entityId: id,
@@ -509,7 +608,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Audit log
       await storage.createAuditLog({
-        userId: req.user?.claims?.sub ?? null,
+        userId: req.user?.claims?.sub,
         action: 'create',
         entityType: 'service',
         entityId: service.id,
@@ -534,7 +633,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Audit log
       await storage.createAuditLog({
-        userId: req.user?.claims?.sub ?? null,
+        userId: req.user?.claims?.sub,
         action: 'update',
         entityType: 'service',
         entityId: service.id,
@@ -562,10 +661,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Permission check: Only ops_manager or team_member can mark services as complete
-      if (!req.user?.claims?.sub) {
-        return res.status(401).json({ message: "User not authenticated" });
-      }
-      const user = await storage.getUser(req.user.claims.sub);
+      const user = await storage.getUser(req.user?.claims?.sub);
       if (!user || !user.roles) {
         return res.status(403).json({ message: "User not found or no roles assigned" });
       }
@@ -692,7 +788,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Audit log
       await storage.createAuditLog({
-        userId: req.user?.claims?.sub ?? null,
+        userId: req.user?.claims?.sub,
         action: 'complete',
         entityType: 'service',
         entityId: service.id,
@@ -725,7 +821,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Audit log
       await storage.createAuditLog({
-        userId: req.user?.claims?.sub ?? null,
+        userId: req.user?.claims?.sub,
         action: 'delete',
         entityType: 'service',
         entityId: id,
@@ -771,7 +867,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Audit log
       await storage.createAuditLog({
-        userId: req.user?.claims?.sub ?? null,
+        userId: req.user?.claims?.sub,
         action: 'create',
         entityType: 'team_member',
         entityId: member.id,
@@ -795,7 +891,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Audit log
       await storage.createAuditLog({
-        userId: req.user?.claims?.sub ?? null,
+        userId: req.user?.claims?.sub,
         action: 'create',
         entityType: 'service_team',
         entityId: team.id,
@@ -824,7 +920,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Audit log
       await storage.createAuditLog({
-        userId: req.user?.claims?.sub ?? null,
+        userId: req.user?.claims?.sub,
         action: 'update',
         entityType: 'team_member',
         entityId: member.id,
@@ -848,7 +944,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Audit log
       await storage.createAuditLog({
-        userId: req.user?.claims?.sub ?? null,
+        userId: req.user?.claims?.sub,
         action: 'delete',
         entityType: 'team_member',
         entityId: id,
@@ -870,7 +966,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Audit log
       await storage.createAuditLog({
-        userId: req.user?.claims?.sub ?? null,
+        userId: req.user?.claims?.sub,
         action: 'update',
         entityType: 'service_team',
         entityId: team.id,
@@ -894,7 +990,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Audit log
       await storage.createAuditLog({
-        userId: req.user?.claims?.sub ?? null,
+        userId: req.user?.claims?.sub,
         action: 'delete',
         entityType: 'service_team',
         entityId: id,
@@ -926,7 +1022,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Audit log
       await storage.createAuditLog({
-        userId: req.user?.claims?.sub ?? null,
+        userId: req.user?.claims?.sub,
         action: 'update',
         entityType: 'team_assignment',
         entityId: teamId,
@@ -962,7 +1058,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Audit log
       await storage.createAuditLog({
-        userId: req.user?.claims?.sub ?? null,
+        userId: req.user?.claims?.sub,
         action: 'create',
         entityType: 'service_stock',
         entityId: assignment.id,
@@ -1035,7 +1131,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           // Audit log for each client
           await storage.createAuditLog({
-            userId: req.user?.claims?.sub ?? null,
+            userId: req.user?.claims?.sub,
             action: 'bulk_create',
             entityType: 'client',
             entityId: createdClient.id,
@@ -1096,7 +1192,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           // Audit log for each equipment
           await storage.createAuditLog({
-            userId: req.user?.claims?.sub ?? null,
+            userId: req.user?.claims?.sub,
             action: 'bulk_create',
             entityType: 'equipment',
             entityId: null,
@@ -1151,7 +1247,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           // Audit log for each consumable
           await storage.createAuditLog({
-            userId: req.user?.claims?.sub ?? null,
+            userId: req.user?.claims?.sub,
             action: 'bulk_create',
             entityType: 'consumable',
             entityId: null,
