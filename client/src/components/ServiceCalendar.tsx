@@ -193,7 +193,7 @@ export default function ServiceCalendar({ services, onServiceClick, onServiceMov
       missed: "bg-red-100 text-red-800 border-red-300",
       in_progress: "bg-yellow-100 text-yellow-800 border-yellow-300"
     };
-    
+
     // For non-recurring services, use the main status
     if (service.type !== 'service_contract') {
       return (
@@ -202,11 +202,11 @@ export default function ServiceCalendar({ services, onServiceClick, onServiceMov
         </Badge>
       );
     }
-    
+
     // For service contracts (recurring), check if this specific date is completed
     const isCompletedOnThisDate = service.completedDates && 
       (service.completedDates as string[]).includes(currentDateStr);
-      
+
     if (isCompletedOnThisDate) {
       return (
         <Badge className="text-xs bg-green-100 text-green-800 border-green-300">
@@ -214,7 +214,7 @@ export default function ServiceCalendar({ services, onServiceClick, onServiceMov
         </Badge>
       );
     }
-    
+
     // For recurring services that are not completed on this date, show as scheduled
     return (
       <Badge className="text-xs bg-blue-100 text-blue-800 border-blue-300">
@@ -288,6 +288,9 @@ export default function ServiceCalendar({ services, onServiceClick, onServiceMov
           </>
         )}
         {getStatusBadge(service, forDate)}
+        <div className="text-xs font-medium mt-1">
+          Status: {service.type === 'service_contract' && service.completedDates && (service.completedDates as string[]).length > 0 ? 'COMPLETED' : (service.status || 'scheduled').replace('_', ' ').toUpperCase()}
+        </div>
       </div>
     );
   };

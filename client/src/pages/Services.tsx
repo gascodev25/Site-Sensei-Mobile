@@ -292,10 +292,9 @@ export default function Services() {
       service.completedDates.length > 0;
     
     if (hasCompletedDates) {
-      const totalCompleted = (service.completedDates as string[]).length;
       return (
         <Badge className="bg-green-100 text-green-800">
-          {totalCompleted} COMPLETED
+          COMPLETED
         </Badge>
       );
     }
