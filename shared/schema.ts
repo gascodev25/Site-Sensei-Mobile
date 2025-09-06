@@ -299,15 +299,15 @@ export const insertTemplateConsumableSchema = createInsertSchema(templateConsuma
 // Service Completion Schema
 export const serviceCompletionSchema = z.object({
   equipmentItems: z.array(z.object({
-    id: z.number().int().positive(),
-    quantity: z.number().int().positive()
+    id: z.coerce.number().int().positive(),
+    quantity: z.coerce.number().int().positive()
   })).optional(),
   consumableItems: z.array(z.object({
-    id: z.number().int().positive(),
-    quantity: z.number().int().positive()
+    id: z.coerce.number().int().positive(),
+    quantity: z.coerce.number().int().positive()
   })).optional(),
   convertToContract: z.boolean().optional(),
-});
+}).strict();
 
 // Types
 export type UpsertUser = typeof users.$inferInsert;
