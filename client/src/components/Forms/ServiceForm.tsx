@@ -9,12 +9,14 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { CalendarIcon, Repeat, Package, Wrench } from "lucide-react";
+import { CalendarIcon, Repeat, Package, Wrench, CheckCircle } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { format } from "date-fns";
+import { format, addDays } from "date-fns";
 import { cn } from "@/lib/utils";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 
 interface ServiceFormProps {
   service?: Service;
@@ -45,9 +47,62 @@ const recurrenceIntervals = [
   { value: "once", label: "Once-off" },
 ];
 
+// Helper function to generate service occurrence dates
+function generateServiceOccurrences(
+  installationDate: string | Date,
+  recurrencePattern: { interval: string; end_date?: string | null } | null,
+  contractLengthMonths?: number,
+  completedDates: string[] = [],
+  excludedDates: string[] = []
+): { date: Date; status: 'scheduled' | 'completed' | 'missed' }[] {
+  if (!recurrencePattern || recurrencePattern.interval === 'once') {
+    return [];
+  }
+
+  const startDate = new Date(installationDate);
+  const intervalDays = parseInt(recurrencePattern.interval.replace('d', ''));
+  const endDate = contractLengthMonths 
+    ? new Date(startDate.getTime() + (contractLengthMonths * 30 * 24 * 60 * 60 * 1000))
+    : new Date(Date.now() + (365 * 24 * 60 * 60 * 1000)); // Default 1 year if no contract length
+
+  const occurrences: { date: Date; status: 'scheduled' | 'completed' | 'missed' }[] = [];
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  let currentDate = new Date(startDate);
+  
+  while (currentDate <= endDate) {
+    const dateStr = currentDate.toISOString().split('T')[0];
+    
+    if (!excludedDates.includes(dateStr)) {
+      let status: 'scheduled' | 'completed' | 'missed' = 'scheduled';
+      
+      if (completedDates.includes(dateStr)) {
+        status = 'completed';
+      } else if (currentDate < today) {
+        status = 'missed';
+      }
+      
+      occurrences.push({
+        date: new Date(currentDate),
+        status
+      });
+    }
+    
+    currentDate = addDays(currentDate, intervalDays);
+  }
+
+  return occurrences;
+}
+
 export default function ServiceForm({ service, onSuccess, onCancel, onDelete, onComplete }: ServiceFormProps) {
   const { toast } = useToast();
   const isEditing = !!service;
+  
+  // Completion state
+  const [selectedCompletionDate, setSelectedCompletionDate] = useState<Date | null>(null);
+  const [completionEquipment, setCompletionEquipment] = useState<{ id: number; quantity: number }[]>([]);
+  const [completionConsumables, setCompletionConsumables] = useState<{ id: number; quantity: number }[]>([]);
 
   const { data: clients = [] } = useQuery<Client[]>({
     queryKey: ["/api/clients"],
@@ -101,6 +156,9 @@ export default function ServiceForm({ service, onSuccess, onCancel, onDelete, on
           quantity: item.quantity
         }));
         form.setValue("equipmentItems", equipmentFormData);
+        
+        // Pre-populate completion equipment from service template
+        setCompletionEquipment(equipmentFormData);
       }
       
       // Set consumable items (only id and quantity for form validation)
@@ -110,6 +168,9 @@ export default function ServiceForm({ service, onSuccess, onCancel, onDelete, on
           quantity: Math.max(1, item.quantity || 1) // Ensure minimum quantity of 1
         }));
         form.setValue("consumableItems", consumableFormData);
+        
+        // Pre-populate completion consumables from service template
+        setCompletionConsumables(consumableFormData);
       }
     }
   }, [serviceWithStock, isEditing, form]);
@@ -150,6 +211,70 @@ export default function ServiceForm({ service, onSuccess, onCancel, onDelete, on
   const onSubmit = (data: InsertService) => {
     createServiceMutation.mutate(data);
   };
+
+  // Completion mutation for service contract occurrences
+  const completeOccurrenceMutation = useMutation({
+    mutationFn: async () => {
+      if (!selectedCompletionDate || !service) {
+        throw new Error("Completion date and service are required");
+      }
+
+      const completionData = {
+        completionDate: selectedCompletionDate.toISOString().split('T')[0],
+        equipmentItems: completionEquipment,
+        consumableItems: completionConsumables,
+      };
+
+      return await apiRequest("POST", `/api/services/${service.id}/complete`, completionData);
+    },
+    onSuccess: (updatedService) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/services"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/services", service?.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/metrics"] });
+      
+      // Update service template with new items if any were added
+      if (completionEquipment.length > 0 || completionConsumables.length > 0) {
+        const newEquipmentItems = completionEquipment.filter(item => 
+          !form.getValues('equipmentItems')?.some(existing => existing.id === item.id)
+        );
+        const newConsumableItems = completionConsumables.filter(item => 
+          !form.getValues('consumableItems')?.some(existing => existing.id === item.id)
+        );
+
+        if (newEquipmentItems.length > 0 || newConsumableItems.length > 0) {
+          // Update the service template
+          const updatedEquipment = [...(form.getValues('equipmentItems') || []), ...newEquipmentItems];
+          const updatedConsumables = [...(form.getValues('consumableItems') || []), ...newConsumableItems];
+          
+          form.setValue('equipmentItems', updatedEquipment);
+          form.setValue('consumableItems', updatedConsumables);
+        }
+      }
+
+      toast({
+        title: "Success",
+        description: `Service occurrence completed for ${selectedCompletionDate ? format(selectedCompletionDate, "PPP") : "selected date"}`,
+      });
+      
+      // Reset completion form
+      setSelectedCompletionDate(null);
+      setCompletionEquipment(serviceWithStock?.equipmentItems?.map((item: any) => ({
+        id: item.id,
+        quantity: item.quantity
+      })) || []);
+      setCompletionConsumables(serviceWithStock?.consumableItems?.map((item: any) => ({
+        id: item.id,
+        quantity: Math.max(1, item.quantity || 1)
+      })) || []);
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
 
 
   const handleConvertToServiceContract = () => {
@@ -204,7 +329,7 @@ export default function ServiceForm({ service, onSuccess, onCancel, onDelete, on
                 <FormLabel>Service Type *</FormLabel>
                 <FormControl>
                   <div className="flex items-center space-x-2">
-                    <Select value={field.value} onValueChange={field.onChange}>
+                    <Select value={field.value || undefined} onValueChange={field.onChange}>
                       <SelectTrigger data-testid="select-service-type">
                         <SelectValue placeholder="Select service type" />
                       </SelectTrigger>
@@ -263,7 +388,7 @@ export default function ServiceForm({ service, onSuccess, onCancel, onDelete, on
                   <PopoverContent className="w-auto p-0" align="start">
                     <Calendar
                       mode="single"
-                      selected={field.value}
+                      selected={field.value || undefined}
                       onSelect={field.onChange}
                       disabled={(date) =>
                         date < new Date() || date < new Date("1900-01-01")
@@ -314,7 +439,7 @@ export default function ServiceForm({ service, onSuccess, onCancel, onDelete, on
               <FormItem>
                 <FormLabel>Priority</FormLabel>
                 <FormControl>
-                  <Select value={field.value} onValueChange={field.onChange}>
+                  <Select value={field.value || undefined} onValueChange={field.onChange}>
                     <SelectTrigger data-testid="select-priority">
                       <SelectValue placeholder="Select priority" />
                     </SelectTrigger>
@@ -343,6 +468,7 @@ export default function ServiceForm({ service, onSuccess, onCancel, onDelete, on
                     type="number"
                     placeholder="60"
                     {...field}
+                    value={field.value || ""}
                     onChange={(e) => field.onChange(parseInt(e.target.value))}
                     data-testid="input-duration"
                   />
@@ -369,6 +495,7 @@ export default function ServiceForm({ service, onSuccess, onCancel, onDelete, on
                         type="number"
                         placeholder="12"
                         {...field}
+                        value={field.value || ""}
                         onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : undefined)}
                         data-testid="input-contract-length"
                       />
@@ -386,7 +513,7 @@ export default function ServiceForm({ service, onSuccess, onCancel, onDelete, on
                     <FormLabel>Recurrence</FormLabel>
                     <FormControl>
                       <Select 
-                        value={field.value?.interval || ""}
+                        value={(field.value as { interval: string; end_date?: string | null } | null)?.interval || ""}
                         onValueChange={(value) => {
                           if (value === "once") {
                             field.onChange(null);
@@ -551,6 +678,220 @@ export default function ServiceForm({ service, onSuccess, onCancel, onDelete, on
             )}
           />
         </div>
+
+        {/* Service Contract Occurrence Completion */}
+        {isEditing && service?.type === 'service_contract' && service.recurrencePattern && (
+          <div className="space-y-4 border-t border-border pt-4">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center space-x-2">
+                  <CheckCircle className="h-5 w-5 text-green-600" />
+                  <CardTitle className="text-lg">Complete Service Occurrence</CardTitle>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {(() => {
+                  if (!service.installationDate) return null;
+                  const occurrences = generateServiceOccurrences(
+                    service.installationDate,
+                    service.recurrencePattern as { interval: string; end_date?: string | null } | null,
+                    service.contractLengthMonths || undefined,
+                    (service as any).completedDates || [],
+                    (service as any).excludedDates || []
+                  );
+                  
+                  const availableOccurrences = occurrences.filter(occ => occ.status !== 'completed');
+                  
+                  return (
+                    <>
+                      {/* Completion History */}
+                      {occurrences.filter(occ => occ.status === 'completed').length > 0 && (
+                        <div className="mb-4">
+                          <h4 className="font-medium mb-2">Completed Services:</h4>
+                          <div className="flex flex-wrap gap-2">
+                            {occurrences
+                              .filter(occ => occ.status === 'completed')
+                              .map((occ, idx) => (
+                                <Badge key={idx} className="bg-green-100 text-green-800">
+                                  {format(occ.date, "MMM dd, yyyy")}
+                                </Badge>
+                              ))}
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* Date Selection */}
+                      <div>
+                        <h4 className="font-medium mb-2">Select Date to Complete:</h4>
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+                          {availableOccurrences.slice(0, 12).map((occ, idx) => {
+                            const isSelected = selectedCompletionDate && 
+                              selectedCompletionDate.toISOString().split('T')[0] === occ.date.toISOString().split('T')[0];
+                            
+                            return (
+                              <Button
+                                key={idx}
+                                type="button"
+                                variant={isSelected ? "default" : "outline"}
+                                size="sm"
+                                onClick={() => setSelectedCompletionDate(occ.date)}
+                                className={cn(
+                                  occ.status === 'missed' && "border-red-300 text-red-600",
+                                  occ.status === 'scheduled' && "border-blue-300 text-blue-600",
+                                  isSelected && "bg-blue-600 text-white"
+                                )}
+                                data-testid={`button-select-completion-date-${idx}`}
+                              >
+                                <div className="text-center">
+                                  <div className="text-xs">{format(occ.date, "MMM dd")}</div>
+                                  <div className="text-xs capitalize">{occ.status}</div>
+                                </div>
+                              </Button>
+                            );
+                          })}
+                        </div>
+                        {availableOccurrences.length > 12 && (
+                          <p className="text-xs text-muted-foreground mt-2">
+                            Showing next 12 available dates
+                          </p>
+                        )}
+                      </div>
+                      
+                      {selectedCompletionDate && (
+                        <div className="space-y-4 border-t pt-4">
+                          <h4 className="font-medium">
+                            Equipment & Consumables for {format(selectedCompletionDate, "PPP")}
+                          </h4>
+                          
+                          {/* Completion Equipment */}
+                          <div className="space-y-2">
+                            <h5 className="text-sm font-medium flex items-center">
+                              <Wrench className="h-4 w-4 mr-2" />
+                              Equipment
+                            </h5>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                              {equipment.map((item) => {
+                                const isSelected = completionEquipment.some(eq => eq.id === item.id);
+                                const selectedItem = completionEquipment.find(eq => eq.id === item.id);
+                                
+                                return (
+                                  <div key={item.id} className="flex items-center space-x-3 p-3 border rounded-lg">
+                                    <Checkbox
+                                      checked={isSelected}
+                                      onCheckedChange={(checked) => {
+                                        if (checked) {
+                                          setCompletionEquipment([...completionEquipment, { id: item.id, quantity: 1 }]);
+                                        } else {
+                                          setCompletionEquipment(completionEquipment.filter(eq => eq.id !== item.id));
+                                        }
+                                      }}
+                                      data-testid={`checkbox-completion-equipment-${item.id}`}
+                                    />
+                                    <div className="flex-1">
+                                      <p className="font-medium text-sm">{item.name}</p>
+                                      <p className="text-xs text-muted-foreground">{item.stockCode}</p>
+                                    </div>
+                                    {isSelected && (
+                                      <div className="flex items-center space-x-2">
+                                        <span className="text-xs">Qty:</span>
+                                        <Input
+                                          type="number"
+                                          min="1"
+                                          value={selectedItem?.quantity || 1}
+                                          onChange={(e) => {
+                                            const newQty = parseInt(e.target.value) || 1;
+                                            setCompletionEquipment(
+                                              completionEquipment.map(eq => 
+                                                eq.id === item.id ? { ...eq, quantity: newQty } : eq
+                                              )
+                                            );
+                                          }}
+                                          className="w-16 h-8 text-xs"
+                                          data-testid={`input-completion-equipment-quantity-${item.id}`}
+                                        />
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                          
+                          {/* Completion Consumables */}
+                          <div className="space-y-2">
+                            <h5 className="text-sm font-medium flex items-center">
+                              <Package className="h-4 w-4 mr-2" />
+                              Consumables
+                            </h5>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                              {consumables.map((item) => {
+                                const isSelected = completionConsumables.some(con => con.id === item.id);
+                                const selectedItem = completionConsumables.find(con => con.id === item.id);
+                                
+                                return (
+                                  <div key={item.id} className="flex items-center space-x-3 p-3 border rounded-lg">
+                                    <Checkbox
+                                      checked={isSelected}
+                                      onCheckedChange={(checked) => {
+                                        if (checked) {
+                                          setCompletionConsumables([...completionConsumables, { id: item.id, quantity: 1 }]);
+                                        } else {
+                                          setCompletionConsumables(completionConsumables.filter(con => con.id !== item.id));
+                                        }
+                                      }}
+                                      data-testid={`checkbox-completion-consumable-${item.id}`}
+                                    />
+                                    <div className="flex-1">
+                                      <p className="font-medium text-sm">{item.name}</p>
+                                      <p className="text-xs text-muted-foreground">{item.stockCode}</p>
+                                    </div>
+                                    {isSelected && (
+                                      <div className="flex items-center space-x-2">
+                                        <span className="text-xs">Qty:</span>
+                                        <Input
+                                          type="number"
+                                          min="1"
+                                          value={selectedItem?.quantity || 1}
+                                          onChange={(e) => {
+                                            const newQty = parseInt(e.target.value) || 1;
+                                            setCompletionConsumables(
+                                              completionConsumables.map(con => 
+                                                con.id === item.id ? { ...con, quantity: newQty } : con
+                                              )
+                                            );
+                                          }}
+                                          className="w-16 h-8 text-xs"
+                                          data-testid={`input-completion-consumable-quantity-${item.id}`}
+                                        />
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                          
+                          {/* Complete Occurrence Button */}
+                          <div className="flex justify-end">
+                            <Button
+                              type="button"
+                              onClick={() => completeOccurrenceMutation.mutate()}
+                              disabled={completeOccurrenceMutation.isPending}
+                              className="bg-green-600 hover:bg-green-700 text-white"
+                              data-testid="button-complete-occurrence"
+                            >
+                              {completeOccurrenceMutation.isPending ? "Completing..." : "Complete Service"}
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  );
+                })() as React.ReactNode}
+              </CardContent>
+            </Card>
+          </div>
+        )}
 
         <div className="flex justify-end space-x-4">
           <Button
