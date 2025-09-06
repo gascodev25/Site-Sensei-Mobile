@@ -984,6 +984,168 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Bulk upload routes
+  app.post('/api/bulk-upload/clients', isAuthenticated, async (req, res) => {
+    try {
+      const { data } = req.body;
+      if (!Array.isArray(data)) {
+        return res.status(400).json({ message: "Data must be an array" });
+      }
+
+      let successCount = 0;
+      let errorCount = 0;
+      const errors: any[] = [];
+
+      for (const [index, row] of data.entries()) {
+        try {
+          // Transform CSV row to match schema
+          const clientData = {
+            name: row.name,
+            addressText: row.address_text,
+            latitude: "0", // Will be updated by geocoding if needed
+            longitude: "0",
+            city: row.city || null,
+            contactPerson: row.contact_person || null,
+            phone: row.phone || null,
+          };
+
+          const validatedData = insertClientSchema.parse(clientData);
+          await storage.createClient(validatedData);
+          successCount++;
+
+          // Audit log for each client
+          await storage.createAuditLog({
+            userId: req.user?.claims?.sub,
+            action: 'bulk_create',
+            entityType: 'client',
+            entityId: null,
+            metadata: { bulkUpload: true, clientName: row.name }
+          });
+        } catch (error) {
+          errorCount++;
+          errors.push({ row: index + 1, error: error.message });
+        }
+      }
+
+      res.json({
+        success: successCount,
+        errors: errorCount,
+        total: data.length,
+        errorDetails: errors
+      });
+    } catch (error) {
+      console.error("Error in bulk client upload:", error);
+      res.status(500).json({ message: "Failed to process bulk upload" });
+    }
+  });
+
+  app.post('/api/bulk-upload/equipment', isAuthenticated, async (req, res) => {
+    try {
+      const { data } = req.body;
+      if (!Array.isArray(data)) {
+        return res.status(400).json({ message: "Data must be an array" });
+      }
+
+      let successCount = 0;
+      let errorCount = 0;
+      const errors: any[] = [];
+
+      for (const [index, row] of data.entries()) {
+        try {
+          // Transform CSV row to match schema
+          const equipmentData = {
+            name: row.name,
+            stockCode: row.stock_code,
+            price: row.price ? parseFloat(row.price) : null,
+            status: row.status || "in_warehouse",
+            barcode: row.barcode || null,
+            qrCode: row.qr_code || null,
+          };
+
+          const validatedData = insertEquipmentSchema.parse(equipmentData);
+          await storage.createEquipment(validatedData);
+          successCount++;
+
+          // Audit log for each equipment
+          await storage.createAuditLog({
+            userId: req.user?.claims?.sub,
+            action: 'bulk_create',
+            entityType: 'equipment',
+            entityId: null,
+            metadata: { bulkUpload: true, equipmentName: row.name }
+          });
+        } catch (error) {
+          errorCount++;
+          errors.push({ row: index + 1, error: error.message });
+        }
+      }
+
+      res.json({
+        success: successCount,
+        errors: errorCount,
+        total: data.length,
+        errorDetails: errors
+      });
+    } catch (error) {
+      console.error("Error in bulk equipment upload:", error);
+      res.status(500).json({ message: "Failed to process bulk upload" });
+    }
+  });
+
+  app.post('/api/bulk-upload/consumables', isAuthenticated, async (req, res) => {
+    try {
+      const { data } = req.body;
+      if (!Array.isArray(data)) {
+        return res.status(400).json({ message: "Data must be an array" });
+      }
+
+      let successCount = 0;
+      let errorCount = 0;
+      const errors: any[] = [];
+
+      for (const [index, row] of data.entries()) {
+        try {
+          // Transform CSV row to match schema
+          const consumableData = {
+            name: row.name,
+            stockCode: row.stock_code,
+            price: row.price ? parseFloat(row.price) : null,
+            minStockLevel: row.min_stock_level ? parseInt(row.min_stock_level) : 0,
+            currentStock: row.current_stock ? parseInt(row.current_stock) : 0,
+            barcode: row.barcode || null,
+            qrCode: row.qr_code || null,
+          };
+
+          const validatedData = insertConsumableSchema.parse(consumableData);
+          await storage.createConsumable(validatedData);
+          successCount++;
+
+          // Audit log for each consumable
+          await storage.createAuditLog({
+            userId: req.user?.claims?.sub,
+            action: 'bulk_create',
+            entityType: 'consumable',
+            entityId: null,
+            metadata: { bulkUpload: true, consumableName: row.name }
+          });
+        } catch (error) {
+          errorCount++;
+          errors.push({ row: index + 1, error: error.message });
+        }
+      }
+
+      res.json({
+        success: successCount,
+        errors: errorCount,
+        total: data.length,
+        errorDetails: errors
+      });
+    } catch (error) {
+      console.error("Error in bulk consumables upload:", error);
+      res.status(500).json({ message: "Failed to process bulk upload" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
