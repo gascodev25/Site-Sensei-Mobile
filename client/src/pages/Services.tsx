@@ -155,6 +155,12 @@ export default function Services() {
   };
 
   const handleServiceClick = (service: ServiceWithDetails, occurrenceDate?: Date) => {
+    console.log('🔵 Service clicked:', {
+      serviceId: service.id,
+      clientName: service.client?.name,
+      occurrenceDate: occurrenceDate?.toISOString(),
+      installationDate: service.installationDate
+    });
     setEditingService(service);
     setSelectedOccurrenceDate(occurrenceDate || null);
   };
@@ -171,6 +177,13 @@ export default function Services() {
         : service.installationDate 
         ? new Date(service.installationDate).toISOString().split('T')[0]
         : new Date().toISOString().split('T')[0];
+      
+      console.log('🟢 Completing service:', {
+        serviceId: service.id,
+        selectedOccurrenceDate: selectedOccurrenceDate?.toISOString(),
+        completionDate,
+        installationDate: service.installationDate
+      });
       
       completeServiceMutation.mutate({
         serviceId: service.id,

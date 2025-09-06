@@ -185,6 +185,18 @@ export default function ServiceCalendar({ services, onServiceClick, onServiceMov
     const completedDates = (service.completedDates as string[]) || [];
     const isThisOccurrenceCompleted = completedDates.includes(dateString);
     
+    // Debug logging for service 12 (Green House)
+    if (service.id === 12) {
+      console.log('🟡 Rendering Green House service:', {
+        serviceId: service.id,
+        forDate: forDate?.toISOString(),
+        dateString,
+        completedDates,
+        isThisOccurrenceCompleted,
+        type: service.type
+      });
+    }
+    
     
     // Determine status: check completedDates for service contracts, otherwise use service status
     const isServiceContract = service.type === 'service_contract';
