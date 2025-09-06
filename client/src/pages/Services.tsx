@@ -21,7 +21,6 @@ export default function Services() {
   const [activeTab, setActiveTab] = useState("list");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingService, setEditingService] = useState<ServiceWithDetails | null>(null);
-  const [selectedOccurrenceDate, setSelectedOccurrenceDate] = useState<Date | null>(null);
   const [recurringMoveDialog, setRecurringMoveDialog] = useState<{
     open: boolean;
     service: ServiceWithDetails | null;
@@ -154,15 +153,8 @@ export default function Services() {
     }
   };
 
-  const handleServiceClick = (service: ServiceWithDetails, occurrenceDate?: Date) => {
-    console.log('🔵 Service clicked:', {
-      serviceId: service.id,
-      clientName: service.client?.name,
-      occurrenceDate: occurrenceDate?.toISOString(),
-      installationDate: service.installationDate
-    });
+  const handleServiceClick = (service: ServiceWithDetails) => {
     setEditingService(service);
-    setSelectedOccurrenceDate(occurrenceDate || null);
   };
 
   const handleServiceComplete = (service: ServiceWithDetails) => {
@@ -170,28 +162,10 @@ export default function Services() {
       // For installations, show completion dialog to update equipment/consumables
       setCompletionDialog({ open: true, service });
     } else {
-      // For service contracts and other types, complete directly with current equipment/consumables
-      // Use the specific occurrence date if available, otherwise fall back to installation date
-      const completionDate = selectedOccurrenceDate
-        ? selectedOccurrenceDate.toISOString().split('T')[0]
-        : service.installationDate 
-        ? new Date(service.installationDate).toISOString().split('T')[0]
-        : new Date().toISOString().split('T')[0];
-      
-      console.log('🟢 Completing service:', {
-        serviceId: service.id,
-        selectedOccurrenceDate: selectedOccurrenceDate?.toISOString(),
-        completionDate,
-        installationDate: service.installationDate
-      });
-      
+      // For regular services, just mark as completed
       completeServiceMutation.mutate({
         serviceId: service.id,
-        data: {
-          completionDate: completionDate,
-          equipmentItems: service.equipmentItems || [],
-          consumableItems: service.consumableItems || []
-        }
+        data: { status: 'completed' }
       });
     }
   };
@@ -571,12 +545,7 @@ export default function Services() {
         </Tabs>
 
         {/* Edit Service Dialog */}
-        <Dialog open={!!editingService} onOpenChange={(open) => {
-          if (!open) {
-            setEditingService(null);
-            setSelectedOccurrenceDate(null);
-          }
-        }}>
+        <Dialog open={!!editingService} onOpenChange={(open) => !open && setEditingService(null)}>
           <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Edit Service</DialogTitle>

@@ -9,7 +9,7 @@ import type { ServiceWithDetails } from "@shared/schema";
 
 interface ServiceCalendarProps {
   services: ServiceWithDetails[];
-  onServiceClick?: (service: ServiceWithDetails, occurrenceDate?: Date) => void;
+  onServiceClick?: (service: ServiceWithDetails) => void;
   onServiceMove?: (serviceId: number, newDate: Date, originalDate?: Date) => void;
 }
 
@@ -185,19 +185,6 @@ export default function ServiceCalendar({ services, onServiceClick, onServiceMov
     const completedDates = (service.completedDates as string[]) || [];
     const isThisOccurrenceCompleted = completedDates.includes(dateString);
     
-    // Debug logging for service 12 (Green House)
-    if (service.id === 12) {
-      console.log('🟡 Rendering Green House service:', {
-        serviceId: service.id,
-        forDate: forDate?.toISOString(),
-        dateString,
-        completedDates,
-        isThisOccurrenceCompleted,
-        type: service.type
-      });
-    }
-    
-    
     // Determine status: check completedDates for service contracts, otherwise use service status
     const isServiceContract = service.type === 'service_contract';
     const hasRecurrence = service.recurrencePattern && 'interval' in (service.recurrencePattern as any);
@@ -211,7 +198,7 @@ export default function ServiceCalendar({ services, onServiceClick, onServiceMov
         key={service.id}
         draggable
         onDragStart={() => handleDragStart(service, forDate || new Date())}
-        onClick={() => onServiceClick?.(service, forDate)}
+        onClick={() => onServiceClick?.(service)}
         className={`
           ${getTeamBackgroundColor(service.team?.name, effectiveStatus)}
           border rounded p-2 cursor-pointer hover:shadow-sm transition-shadow text-xs
@@ -365,7 +352,7 @@ export default function ServiceCalendar({ services, onServiceClick, onServiceMov
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {dayServices.map(service => (
-                <Card key={service.id} className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => onServiceClick?.(service, currentDate)}>
+                <Card key={service.id} className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => onServiceClick?.(service)}>
                   <CardContent className="p-4">
                     {renderServiceItem(service, 'large', currentDate)}
                   </CardContent>

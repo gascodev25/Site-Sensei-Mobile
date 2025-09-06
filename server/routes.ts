@@ -635,18 +635,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
                          typeof existingService.recurrencePattern === 'object' && 
                          existingService.recurrencePattern !== null &&
                          'interval' in existingService.recurrencePattern;
-      
-      // Debug logging for service 12
-      if (id === 12) {
-        console.log('🔧 Backend completion debug for service 12:', {
-          serviceId: id,
-          type: existingService.type,
-          completionDate,
-          isRecurring,
-          recurrencePattern: existingService.recurrencePattern,
-          currentCompletedDates: existingService.completedDates
-        });
-      }
 
       if (isRecurring) {
         // For recurring services: Add to completedDates but keep service status as scheduled
@@ -655,13 +643,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           updateData.completedDates = [...currentCompletedDates, completionDate];
         }
         // Don't change the main service status for recurring services
-      } else if (existingService.type === 'service_contract') {
-        // For service contracts without explicit recurrence, also use completedDates
-        const currentCompletedDates = (existingService.completedDates as string[]) || [];
-        if (!currentCompletedDates.includes(completionDate)) {
-          updateData.completedDates = [...currentCompletedDates, completionDate];
-        }
-        // Keep service status as scheduled for service contracts
       } else {
         // For non-recurring services: Mark as completed normally
         updateData.status = 'completed';
