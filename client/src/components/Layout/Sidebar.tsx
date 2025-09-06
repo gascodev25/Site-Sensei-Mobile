@@ -60,8 +60,19 @@ export default function Sidebar({ className }: SidebarProps) {
   const [location] = useLocation();
   const { user } = useAuth();
   
+  // Force console log on every render
+  console.log("=== SIDEBAR RENDER ===");
+  console.log("Sidebar component rendered");
+  console.log("User from useAuth:", user);
+  
   // Filter navigation items based on user permissions
   const getVisibleNavigationItems = () => {
+    // TEMPORARY: Always show Users menu for testing
+    console.log("TEMP: Showing Users menu for testing");
+    return navigationItems;
+    
+    // Original logic (commented out for testing):
+    /*
     const baseItems = navigationItems.filter(item => item.title !== "Users");
     
     // Debug logging
@@ -81,6 +92,7 @@ export default function Sidebar({ className }: SidebarProps) {
       userRoles: user?.roles 
     });
     return baseItems;
+    */
   };
 
   const visibleNavigationItems = getVisibleNavigationItems();
