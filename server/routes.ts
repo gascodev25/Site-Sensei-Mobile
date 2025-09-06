@@ -31,105 +31,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // User Management routes
-  app.get('/api/users', isAuthenticated, async (req: any, res) => {
-    try {
-      // Check permissions: Only super_user or general_manager can view all users
-      const currentUser = await storage.getUser(req.user?.claims?.sub);
-      if (!currentUser || !currentUser.roles) {
-        return res.status(403).json({ message: "Access denied" });
-      }
-
-      const hasRole = (role: string) => currentUser.roles?.split(",").includes(role);
-      const canManageUsers = hasRole("super_user") || hasRole("general_manager");
-
-      if (!canManageUsers) {
-        return res.status(403).json({ 
-          message: "Unauthorized: Only super users and general managers can view users" 
-        });
-      }
-
-      const users = await storage.getAllUsers();
-      res.json(users);
-    } catch (error) {
-      console.error("Error fetching users:", error);
-      res.status(500).json({ message: "Failed to fetch users" });
-    }
-  });
-
-  app.put('/api/users/:id/roles', isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.params.id;
-      const { roles } = req.body;
-
-      // Check permissions: Only super_user or general_manager can update roles
-      const currentUser = await storage.getUser(req.user?.claims?.sub);
-      if (!currentUser || !currentUser.roles) {
-        return res.status(403).json({ message: "Access denied" });
-      }
-
-      const hasRole = (role: string) => currentUser.roles?.split(",").includes(role);
-      const canManageUsers = hasRole("super_user") || hasRole("general_manager");
-
-      if (!canManageUsers) {
-        return res.status(403).json({ 
-          message: "Unauthorized: Only super users and general managers can update user roles" 
-        });
-      }
-
-      // Validate roles
-      const validRoles = ["super_user", "general_manager", "ops_manager", "admin", "warehouse_clerk", "team_member"];
-      const rolesArray = typeof roles === 'string' ? roles.split(',') : [];
-      const invalidRoles = rolesArray.filter((role: string) => !validRoles.includes(role.trim()));
-
-      if (invalidRoles.length > 0) {
-        return res.status(400).json({ 
-          message: `Invalid roles: ${invalidRoles.join(', ')}` 
-        });
-      }
-
-      if (rolesArray.length === 0) {
-        return res.status(400).json({ message: "At least one role must be assigned" });
-      }
-
-      // Get the target user's current roles for audit log
-      const targetUser = await storage.getUser(userId);
-      if (!targetUser) {
-        return res.status(404).json({ message: "User not found" });
-      }
-
-      // Update user roles
-      const updatedUser = await storage.updateUserRoles(userId, roles);
-
-      // Create audit log for role change
-      await storage.createRoleChangeLog({
-        userId: userId,
-        oldRoles: targetUser.roles,
-        newRoles: roles,
-        changedBy: req.user?.claims?.sub,
-        reason: "Manual role assignment via user management"
-      });
-
-      // Also create regular audit log
-      await storage.createAuditLog({
-        userId: req.user?.claims?.sub,
-        action: 'update_roles',
-        entityType: 'user',
-        entityId: null,
-        metadata: { 
-          targetUserId: userId,
-          oldRoles: targetUser.roles,
-          newRoles: roles
-        }
-      });
-
-      res.json(updatedUser);
-    } catch (error) {
-      console.error("Error updating user roles:", error);
-      res.status(500).json({ message: "Failed to update user roles" });
-    }
-  });
-
   // Dashboard routes
   app.get('/api/dashboard/metrics', isAuthenticated, async (req, res) => {
     try {
@@ -176,7 +77,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const clientData = insertClientSchema.parse(req.body);
       const client = await storage.createClient(clientData);
-
+      
       // Audit log
       await storage.createAuditLog({
         userId: req.user?.claims?.sub,
@@ -185,7 +86,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         entityId: client.id,
         metadata: { clientName: client.name }
       });
-
+      
       res.status(201).json(client);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -201,7 +102,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const id = parseInt(req.params.id);
       const clientData = insertClientSchema.partial().parse(req.body);
       const client = await storage.updateClient(id, clientData);
-
+      
       // Audit log
       await storage.createAuditLog({
         userId: req.user?.claims?.sub,
@@ -210,7 +111,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         entityId: client.id,
         metadata: { changes: clientData }
       });
-
+      
       res.json(client);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -225,7 +126,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const id = parseInt(req.params.id);
       await storage.deleteClient(id);
-
+      
       // Audit log
       await storage.createAuditLog({
         userId: req.user?.claims?.sub,
@@ -234,7 +135,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         entityId: id,
         metadata: {}
       });
-
+      
       res.status(204).send();
     } catch (error) {
       console.error("Error deleting client:", error);
@@ -274,14 +175,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { consumableIds, ...equipmentData } = req.body;
       const parsedEquipmentData = insertEquipmentSchema.parse(equipmentData);
-
+      
       let equipment;
       if (consumableIds && consumableIds.length > 0) {
         equipment = await storage.createEquipmentWithConsumables(parsedEquipmentData, consumableIds);
       } else {
         equipment = await storage.createEquipment(parsedEquipmentData);
       }
-
+      
       // Audit log
       await storage.createAuditLog({
         userId: req.user?.claims?.sub,
@@ -290,7 +191,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         entityId: equipment.id,
         metadata: { equipmentName: equipment.name, stockCode: equipment.stockCode, consumableIds: consumableIds || [] }
       });
-
+      
       res.status(201).json(equipment);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -306,14 +207,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const id = parseInt(req.params.id);
       const { consumableIds, ...equipmentData } = req.body;
       const parsedEquipmentData = insertEquipmentSchema.partial().parse(equipmentData);
-
+      
       const equipment = await storage.updateEquipment(id, parsedEquipmentData);
-
+      
       // Update consumables if provided
       if (consumableIds !== undefined) {
         await storage.updateEquipmentConsumables(id, consumableIds);
       }
-
+      
       // Audit log
       await storage.createAuditLog({
         userId: req.user?.claims?.sub,
@@ -322,7 +223,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         entityId: equipment.id,
         metadata: { equipmentName: equipment.name, stockCode: equipment.stockCode, consumableIds: consumableIds || [] }
       });
-
+      
       res.json(equipment);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -337,7 +238,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const id = parseInt(req.params.id);
       await storage.deleteEquipment(id);
-
+      
       // Audit log
       await storage.createAuditLog({
         userId: req.user?.claims?.sub,
@@ -346,7 +247,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         entityId: id,
         metadata: {}
       });
-
+      
       res.status(204).send();
     } catch (error) {
       console.error("Error deleting equipment:", error);
@@ -386,9 +287,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ...templateData,
         createdBy: req.user?.claims?.sub
       });
-
+      
       const template = await storage.createEquipmentTemplate(parsedTemplateData, consumableIds || []);
-
+      
       // Audit log
       await storage.createAuditLog({
         userId: req.user?.claims?.sub,
@@ -397,7 +298,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         entityId: template.id,
         metadata: { templateName: template.name, consumableIds }
       });
-
+      
       res.status(201).json(template);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -413,9 +314,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const id = parseInt(req.params.id);
       const { consumableIds, ...templateData } = req.body;
       const parsedTemplateData = insertEquipmentTemplateSchema.partial().parse(templateData);
-
+      
       const template = await storage.updateEquipmentTemplate(id, parsedTemplateData, consumableIds || []);
-
+      
       // Audit log
       await storage.createAuditLog({
         userId: req.user?.claims?.sub,
@@ -424,7 +325,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         entityId: template.id,
         metadata: { templateName: template.name, consumableIds }
       });
-
+      
       res.json(template);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -450,7 +351,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const id = parseInt(req.params.id);
       await storage.deleteEquipmentTemplate(id);
-
+      
       // Audit log
       await storage.createAuditLog({
         userId: req.user?.claims?.sub,
@@ -459,7 +360,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         entityId: id,
         metadata: {}
       });
-
+      
       res.status(204).send();
     } catch (error) {
       console.error("Error deleting equipment template:", error);
@@ -488,7 +389,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const consumableData = insertConsumableSchema.parse(req.body);
       const consumable = await storage.createConsumable(consumableData);
-
+      
       // Audit log
       await storage.createAuditLog({
         userId: req.user?.claims?.sub,
@@ -497,7 +398,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         entityId: consumable.id,
         metadata: { consumableName: consumable.name, stockCode: consumable.stockCode }
       });
-
+      
       res.status(201).json(consumable);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -513,7 +414,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const id = parseInt(req.params.id);
       const consumableData = insertConsumableSchema.partial().parse(req.body);
       const consumable = await storage.updateConsumable(id, consumableData);
-
+      
       // Audit log
       await storage.createAuditLog({
         userId: req.user?.claims?.sub,
@@ -522,7 +423,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         entityId: consumable.id,
         metadata: { consumableName: consumable.name, stockCode: consumable.stockCode }
       });
-
+      
       res.json(consumable);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -537,7 +438,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const id = parseInt(req.params.id);
       await storage.deleteConsumable(id);
-
+      
       // Audit log
       await storage.createAuditLog({
         userId: req.user?.claims?.sub,
@@ -546,7 +447,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         entityId: id,
         metadata: {}
       });
-
+      
       res.status(204).send();
     } catch (error) {
       console.error("Error deleting consumable:", error);
@@ -559,7 +460,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { status, date, search } = req.query;
       let services;
-
+      
       if (search && typeof search === 'string') {
         services = await storage.searchServices(search);
       } else if (status && typeof status === 'string') {
@@ -569,7 +470,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } else {
         services = await storage.getServices();
       }
-
+      
       res.json(services);
     } catch (error) {
       console.error("Error fetching services:", error);
@@ -605,7 +506,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const serviceData = insertServiceSchema.parse(req.body);
       const service = await storage.createService(serviceData);
-
+      
       // Audit log
       await storage.createAuditLog({
         userId: req.user?.claims?.sub,
@@ -614,7 +515,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         entityId: service.id,
         metadata: { serviceType: service.type, clientId: service.clientId }
       });
-
+      
       res.status(201).json(service);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -630,7 +531,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const id = parseInt(req.params.id);
       const serviceData = insertServiceSchema.partial().parse(req.body);
       const service = await storage.updateService(id, serviceData);
-
+      
       // Audit log
       await storage.createAuditLog({
         userId: req.user?.claims?.sub,
@@ -639,7 +540,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         entityId: service.id,
         metadata: { changes: serviceData }
       });
-
+      
       res.json(service);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -654,27 +555,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/services/:id/complete', isAuthenticated, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-
+      
       // Validate service ID
       if (!id || id <= 0) {
         return res.status(400).json({ message: "Invalid service ID" });
       }
-
+      
       // Permission check: Only ops_manager or team_member can mark services as complete
       const user = await storage.getUser(req.user?.claims?.sub);
       if (!user || !user.roles) {
         return res.status(403).json({ message: "User not found or no roles assigned" });
       }
-
+      
       const hasRole = (role: string) => user.roles?.split(",").includes(role);
       const canMarkComplete = hasRole("ops_manager") || hasRole("team_member");
-
+      
       if (!canMarkComplete) {
         return res.status(403).json({ 
           message: "Unauthorized: Only operations managers and team members can complete services" 
         });
       }
-
+      
       // Validate request body using safeParse
       const validationResult = serviceCompletionSchema.safeParse(req.body);
       if (!validationResult.success) {
@@ -683,18 +584,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
           errors: validationResult.error.errors 
         });
       }
-
+      
       const { equipmentItems, consumableItems, convertToContract, serviceInterval, contractLengthMonths } = validationResult.data;
-
+      
       // Get the specific date for this completion (from request body or current date)
       const completionDate = req.body.completionDate || new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
-
+      
       // Validate equipment IDs exist in database
       if (equipmentItems && equipmentItems.length > 0) {
         const equipmentIds = equipmentItems.map(item => item.id);
         const existingEquipment = await storage.getEquipment();
         const existingEquipmentIds = existingEquipment.map(eq => eq.id);
-
+        
         const invalidEquipmentIds = equipmentIds.filter(id => !existingEquipmentIds.includes(id));
         if (invalidEquipmentIds.length > 0) {
           return res.status(400).json({ 
@@ -702,13 +603,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         }
       }
-
+      
       // Validate consumable IDs exist in database
       if (consumableItems && consumableItems.length > 0) {
         const consumableIds = consumableItems.map(item => item.id);
         const existingConsumables = await storage.getConsumables();
         const existingConsumableIds = existingConsumables.map(c => c.id);
-
+        
         const invalidConsumableIds = consumableIds.filter(id => !existingConsumableIds.includes(id));
         if (invalidConsumableIds.length > 0) {
           return res.status(400).json({ 
@@ -716,13 +617,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         }
       }
-
+      
       // Get the existing service
       const existingService = await storage.getService(id);
       if (!existingService) {
         return res.status(404).json({ message: "Service not found" });
       }
-
+      
       // Check if service is already completed (idempotent operation)
       if (existingService.status === 'completed') {
         return res.json(existingService);
@@ -752,22 +653,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (existingService.type === 'installation' && convertToContract) {
         updateData.type = 'service_contract';
         updateData.contractLengthMonths = contractLengthMonths || 12;
-
+        
         // Set recurrence pattern based on service interval
         if (serviceInterval) {
           const endDate = new Date(existingService.installationDate || new Date());
           endDate.setMonth(endDate.getMonth() + (contractLengthMonths || 12));
-
+          
           updateData.recurrencePattern = {
             interval: serviceInterval,
             end_date: endDate.toISOString().split('T')[0]
           };
-
+          
           // Mark the installation date as completed in the new service contract
           const installationDateString = existingService.installationDate 
             ? new Date(existingService.installationDate).toISOString().split('T')[0]
             : completionDate;
-
+          
           const currentCompletedDates = (existingService.completedDates as string[]) || [];
           if (!currentCompletedDates.includes(installationDateString)) {
             updateData.completedDates = [...currentCompletedDates, installationDateString];
@@ -785,7 +686,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Update the service
       const service = await storage.updateService(id, updateData);
-
+      
       // Audit log
       await storage.createAuditLog({
         userId: req.user?.claims?.sub,
@@ -800,7 +701,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           contractLengthMonths: contractLengthMonths
         }
       });
-
+      
       res.json(service);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -818,7 +719,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const id = parseInt(req.params.id);
       await storage.deleteService(id);
-
+      
       // Audit log
       await storage.createAuditLog({
         userId: req.user?.claims?.sub,
@@ -827,7 +728,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         entityId: id,
         metadata: {}
       });
-
+      
       res.status(204).send();
     } catch (error) {
       console.error("Error deleting service:", error);
@@ -864,7 +765,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         memberData.skill = null;
       }
       const member = await storage.createTeamMember(memberData);
-
+      
       // Audit log
       await storage.createAuditLog({
         userId: req.user?.claims?.sub,
@@ -873,7 +774,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         entityId: member.id,
         metadata: { memberName: member.name, skill: member.skill }
       });
-
+      
       res.status(201).json(member);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -888,7 +789,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const teamData = insertServiceTeamSchema.parse(req.body);
       const team = await storage.createServiceTeam(teamData);
-
+      
       // Audit log
       await storage.createAuditLog({
         userId: req.user?.claims?.sub,
@@ -897,7 +798,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         entityId: team.id,
         metadata: { teamName: team.name }
       });
-
+      
       res.status(201).json(team);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -917,7 +818,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         memberData.skill = null;
       }
       const member = await storage.updateTeamMember(id, memberData);
-
+      
       // Audit log
       await storage.createAuditLog({
         userId: req.user?.claims?.sub,
@@ -926,7 +827,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         entityId: member.id,
         metadata: { memberName: member.name, skill: member.skill }
       });
-
+      
       res.json(member);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -941,7 +842,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const id = parseInt(req.params.id);
       await storage.deleteTeamMember(id);
-
+      
       // Audit log
       await storage.createAuditLog({
         userId: req.user?.claims?.sub,
@@ -950,7 +851,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         entityId: id,
         metadata: {}
       });
-
+      
       res.status(204).send();
     } catch (error) {
       console.error("Error deleting team member:", error);
@@ -963,7 +864,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const id = parseInt(req.params.id);
       const teamData = insertServiceTeamSchema.partial().parse(req.body);
       const team = await storage.updateServiceTeam(id, teamData);
-
+      
       // Audit log
       await storage.createAuditLog({
         userId: req.user?.claims?.sub,
@@ -972,7 +873,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         entityId: team.id,
         metadata: { teamName: team.name }
       });
-
+      
       res.json(team);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -987,7 +888,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const id = parseInt(req.params.id);
       await storage.deleteServiceTeam(id);
-
+      
       // Audit log
       await storage.createAuditLog({
         userId: req.user?.claims?.sub,
@@ -996,7 +897,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         entityId: id,
         metadata: {}
       });
-
+      
       res.status(204).send();
     } catch (error) {
       console.error("Error deleting service team:", error);
@@ -1019,7 +920,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const teamId = parseInt(req.params.id);
       const { memberIds } = req.body;
       await storage.updateTeamAssignments(teamId, memberIds);
-
+      
       // Audit log
       await storage.createAuditLog({
         userId: req.user?.claims?.sub,
@@ -1028,7 +929,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         entityId: teamId,
         metadata: { memberIds }
       });
-
+      
       res.json({ success: true });
     } catch (error) {
       console.error("Error updating team assignments:", error);
@@ -1040,22 +941,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/service-stock', isAuthenticated, async (req, res) => {
     try {
       const { serviceId, equipmentId, consumableId, quantity } = req.body;
-
+      
       const payload: any = {
         serviceId,
         quantity: quantity || 1,
       };
-
+      
       if (equipmentId) {
         payload.equipmentId = equipmentId;
       }
-
+      
       if (consumableId) {
         payload.consumableId = consumableId;
       }
-
+      
       const assignment = await storage.createServiceStockAssignment(payload);
-
+      
       // Audit log
       await storage.createAuditLog({
         userId: req.user?.claims?.sub,
@@ -1064,7 +965,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         entityId: assignment.id,
         metadata: { serviceId, equipmentId, consumableId, quantity }
       });
-
+      
       res.status(201).json(assignment);
     } catch (error) {
       console.error("Error creating service stock assignment:", error);
