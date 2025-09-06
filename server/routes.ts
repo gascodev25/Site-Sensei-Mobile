@@ -1002,11 +1002,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Transform CSV row to match schema
           const clientData = {
             name: row.name,
-            addressText: row.addressText,
-            latitude: "0", // Decimal type expects string
-            longitude: "0", // Decimal type expects string
+            addressText: row.address_text,
+            latitude: 0, // Will be updated by geocoding if needed
+            longitude: 0,
             city: row.city || null,
-            contactPerson: row.contactPerson || null,
+            contactPerson: row.contact_person || null,
             phone: row.phone || null,
           };
 
@@ -1024,27 +1024,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         } catch (error: any) {
           errorCount++;
-          console.error(`Bulk upload client error for row ${index + 1}:`, error);
-          console.error('Row data:', JSON.stringify(row, null, 2));
-          console.error('Transformed data:', JSON.stringify(clientData, null, 2));
-          
-          // Provide detailed error information
-          if (error instanceof z.ZodError) {
-            errors.push({ 
-              row: index + 1, 
-              error: 'Validation failed', 
-              details: error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(', '),
-              rowData: row,
-              transformedData: clientData
-            });
-          } else {
-            errors.push({ 
-              row: index + 1, 
-              error: error.message,
-              rowData: row,
-              transformedData: clientData
-            });
-          }
+          errors.push({ row: index + 1, error: error.message });
         }
       }
 
@@ -1077,11 +1057,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Transform CSV row to match schema
           const equipmentData = {
             name: row.name,
-            stockCode: row.stockCode,
+            stockCode: row.stock_code,
             price: row.price ? parseFloat(row.price) : null,
             status: row.status || "in_warehouse",
             barcode: row.barcode || null,
-            qrCode: row.qrCode || null,
+            qrCode: row.qr_code || null,
           };
 
           const validatedData = insertEquipmentSchema.parse(equipmentData);
@@ -1131,12 +1111,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Transform CSV row to match schema
           const consumableData = {
             name: row.name,
-            stockCode: row.stockCode,
+            stockCode: row.stock_code,
             price: row.price ? parseFloat(row.price) : null,
-            minStockLevel: row.minStockLevel ? parseInt(row.minStockLevel) : 0,
-            currentStock: row.currentStock ? parseInt(row.currentStock) : 0,
+            minStockLevel: row.min_stock_level ? parseInt(row.min_stock_level) : 0,
+            currentStock: row.current_stock ? parseInt(row.current_stock) : 0,
             barcode: row.barcode || null,
-            qrCode: row.qrCode || null,
+            qrCode: row.qr_code || null,
           };
 
           const validatedData = insertConsumableSchema.parse(consumableData);
