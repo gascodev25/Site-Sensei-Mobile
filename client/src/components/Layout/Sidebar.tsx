@@ -1,5 +1,7 @@
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/hooks/useAuth";
+import { canCreateUser } from "@/lib/permissions";
 import { 
   LayoutDashboard, 
   Building2, 
@@ -56,6 +58,21 @@ const navigationItems = [
 
 export default function Sidebar({ className }: SidebarProps) {
   const [location] = useLocation();
+  const { user } = useAuth();
+  
+  // Filter navigation items based on user permissions
+  const getVisibleNavigationItems = () => {
+    const baseItems = navigationItems.filter(item => item.title !== "Users");
+    
+    // Only show Users link if user has permission to manage users
+    if (user && canCreateUser(user)) {
+      return [...baseItems, navigationItems.find(item => item.title === "Users")!];
+    }
+    
+    return baseItems;
+  };
+
+  const visibleNavigationItems = getVisibleNavigationItems();
 
   return (
     <div className={cn("pb-12", className)}>
@@ -65,7 +82,7 @@ export default function Sidebar({ className }: SidebarProps) {
             ACG Works
           </h2>
           <div className="space-y-1">
-            {navigationItems.map((item) => {
+            {visibleNavigationItems.map((item) => {
               const isActive = location === item.href || 
                 (item.href !== "/" && location.startsWith(item.href));
                 
