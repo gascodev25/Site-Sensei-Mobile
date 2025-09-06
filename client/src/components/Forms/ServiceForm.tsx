@@ -21,6 +21,7 @@ interface ServiceFormProps {
   onSuccess: () => void;
   onCancel: () => void;
   onDelete?: () => void;
+  onComplete?: () => void;
 }
 
 const serviceTypes = [
@@ -44,7 +45,7 @@ const recurrenceIntervals = [
   { value: "once", label: "Once-off" },
 ];
 
-export default function ServiceForm({ service, onSuccess, onCancel, onDelete }: ServiceFormProps) {
+export default function ServiceForm({ service, onSuccess, onCancel, onDelete, onComplete }: ServiceFormProps) {
   const { toast } = useToast();
   const isEditing = !!service;
 
@@ -570,6 +571,18 @@ export default function ServiceForm({ service, onSuccess, onCancel, onDelete }: 
               data-testid="button-delete"
             >
               Delete
+            </Button>
+          )}
+          {isEditing && onComplete && service?.status !== 'completed' && (
+            <Button
+              type="button"
+              variant="default"
+              onClick={onComplete}
+              disabled={createServiceMutation.isPending}
+              className="bg-green-600 hover:bg-green-700 text-white"
+              data-testid="button-complete"
+            >
+              Complete
             </Button>
           )}
           <Button
