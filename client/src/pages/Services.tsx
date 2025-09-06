@@ -481,7 +481,6 @@ export default function Services() {
                         <div className="flex-1">
                           <div className="flex items-center space-x-2 mb-2">
                             <CardTitle className="text-lg">{service.client?.name || 'Unknown Client'}</CardTitle>
-                            {getStatusBadge(service)}
                           </div>
                           <div className="flex items-center text-sm text-muted-foreground mb-1">
                             <MapPin className="h-3 w-3 mr-1" />
