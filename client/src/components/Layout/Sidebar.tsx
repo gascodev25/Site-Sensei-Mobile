@@ -18,43 +18,58 @@ interface SidebarProps {
   className?: string;
 }
 
-
-const navigationItems = [
-  {
-    title: "Dashboard",
-    href: "/",
-    icon: LayoutDashboard,
-  },
-  {
-    title: "Clients",
-    href: "/clients", 
-    icon: Building2,
-  },
-  {
-    title: "Services",
-    href: "/services",
-    icon: Calendar,
-  },
-  {
-    title: "Inventory",
-    href: "/inventory",
-    icon: Package,
-  },
-  {
-    title: "Teams",
-    href: "/teams",
-    icon: Users,
-  },
-  {
-    title: "Reports",
-    href: "/reports",
-    icon: BarChart3,
-  },
-];
-
 export default function Sidebar({ className }: SidebarProps) {
   const [location] = useLocation();
   const { user } = useAuth();
+
+  // Check if user has management permissions
+  const hasUserManagementPermission = user?.roles && 
+    (user.roles.includes("super_user") || user.roles.includes("general_manager"));
+
+  const navigation = [
+    { 
+      name: "Dashboard", 
+      href: "/", 
+      icon: LayoutDashboard,
+      current: location === "/"
+    },
+    { 
+      name: "Clients", 
+      href: "/clients", 
+      icon: Building2,
+      current: location === "/clients"
+    },
+    { 
+      name: "Services", 
+      href: "/services", 
+      icon: Calendar,
+      current: location === "/services"
+    },
+    { 
+      name: "Inventory", 
+      href: "/inventory", 
+      icon: Package,
+      current: location === "/inventory"
+    },
+    { 
+      name: "Teams", 
+      href: "/teams", 
+      icon: Users,
+      current: location === "/teams"
+    },
+    ...(hasUserManagementPermission ? [{
+      name: "Users",
+      href: "/users", 
+      icon: Shield,
+      current: location === "/users"
+    }] : []),
+    { 
+      name: "Reports", 
+      href: "/reports", 
+      icon: BarChart3,
+      current: location === "/reports"
+    },
+  ];
 
   return (
     <div className={cn("pb-12", className)}>
@@ -64,7 +79,7 @@ export default function Sidebar({ className }: SidebarProps) {
             ACG Works
           </h2>
           <div className="space-y-1">
-            {navigationItems.map((item) => {
+            {navigation.map((item) => {
               const isActive = location === item.href || 
                 (item.href !== "/" && location.startsWith(item.href));
 
@@ -77,10 +92,10 @@ export default function Sidebar({ className }: SidebarProps) {
                         ? "bg-accent text-accent-foreground" 
                         : "transparent"
                     )}
-                    data-testid={`sidebar-link-${item.title.toLowerCase()}`}
+                    data-testid={`sidebar-link-${item.name.toLowerCase()}`}
                   >
                     <item.icon className="mr-2 h-4 w-4" />
-                    <span>{item.title}</span>
+                    <span>{item.name}</span>
                     {isActive && (
                       <ChevronRight className="ml-auto h-4 w-4" />
                     )}
@@ -92,21 +107,21 @@ export default function Sidebar({ className }: SidebarProps) {
         </div>
       </div>
 
-      {/* Users section - only show for super_user or general_manager */}
-      {user && canCreateUser(user) && (
+      {/* Settings section - only show for super_user or general_manager */}
+      {user && hasUserManagementPermission && (
         <div className="px-3 py-2">
           <div className="space-y-1">
-            <Link href="/users">
+            <Link href="/settings">
               <a
                 className={cn(
                   "flex items-center rounded-lg px-3 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground",
-                  location === "/users" && "bg-accent text-accent-foreground"
+                  location === "/settings" && "bg-accent text-accent-foreground"
                 )}
-                data-testid="sidebar-link-users"
+                data-testid="sidebar-link-settings"
               >
-                <Shield className="mr-2 h-4 w-4" />
-                <span>Users</span>
-                {location === "/users" && (
+                <Settings className="mr-2 h-4 w-4" />
+                <span>Settings</span>
+                {location === "/settings" && (
                   <ChevronRight className="ml-auto h-4 w-4" />
                 )}
               </a>
