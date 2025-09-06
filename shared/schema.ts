@@ -174,6 +174,32 @@ export const auditLog = pgTable("audit_log", {
   metadata: jsonb("metadata"),
 });
 
+// Warehouse Locations (basic implementation)
+export const locations = pgTable("locations", {
+  id: serial("id").primaryKey(),
+  name: varchar("name", { length: 100 }).notNull(),
+  type: varchar("type", { length: 20 }).notNull(), // 'warehouse' or 'service_team'
+  serviceTeamId: integer("service_team_id").references(() => serviceTeams.id), // Only for service_team type
+  active: boolean("active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Stock Movements (audit trail for all inventory movements)
+export const stockMovements = pgTable("stock_movements", {
+  id: serial("id").primaryKey(),
+  itemType: varchar("item_type", { length: 20 }).notNull(), // 'equipment' or 'consumable'
+  itemId: integer("item_id").notNull(), // refers to equipment.id or consumables.id
+  quantity: integer("quantity").notNull(), // positive for inbound, negative for outbound
+  fromLocationId: integer("from_location_id").references(() => locations.id),
+  toLocationId: integer("to_location_id").references(() => locations.id),
+  reason: varchar("reason", { length: 50 }).notNull(), // 'issue', 'return', 'adjustment', 'receipt'
+  referenceType: varchar("reference_type", { length: 20 }), // 'service', 'manual', 'initial'
+  referenceId: integer("reference_id"), // refers to service.id, etc.
+  notes: text("notes"),
+  movedBy: varchar("moved_by").references(() => users.id),
+  movedAt: timestamp("moved_at").defaultNow(),
+});
+
 // Role Changes (V3-ready)
 export const roleChanges = pgTable("role_changes", {
   id: serial("id").primaryKey(),
@@ -296,6 +322,16 @@ export const insertEquipmentTemplateSchema = createInsertSchema(equipmentTemplat
 
 export const insertTemplateConsumableSchema = createInsertSchema(templateConsumables);
 
+export const insertLocationSchema = createInsertSchema(locations).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertStockMovementSchema = createInsertSchema(stockMovements).omit({
+  id: true,
+  movedAt: true,
+});
+
 // Types
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
@@ -330,3 +366,9 @@ export type InsertTeamMember = z.infer<typeof insertTeamMemberSchema>;
 export type ServiceTeam = typeof serviceTeams.$inferSelect;
 export type InsertServiceTeam = z.infer<typeof insertServiceTeamSchema>;
 export type AuditLogEntry = typeof auditLog.$inferSelect;
+
+// Warehouse Types
+export type Location = typeof locations.$inferSelect;
+export type InsertLocation = z.infer<typeof insertLocationSchema>;
+export type StockMovement = typeof stockMovements.$inferSelect;
+export type InsertStockMovement = z.infer<typeof insertStockMovementSchema>;
