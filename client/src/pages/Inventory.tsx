@@ -18,7 +18,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Plus, Search, Edit, Trash2, Package, AlertTriangle, MapPin, Calendar as CalendarIcon, Barcode, QrCode } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
-import type { Equipment, Consumable, Client, InsertEquipment, InsertConsumable, Location, StockMovement } from "@shared/schema";
+import type { Equipment, Consumable, Client, InsertEquipment, InsertConsumable } from "@shared/schema";
 import { z } from "zod";
 
 export default function Inventory() {
@@ -52,22 +52,6 @@ export default function Inventory() {
 
   const { data: clients = [] } = useQuery<Client[]>({
     queryKey: ["/api/clients"],
-  });
-
-  // Warehouse queries
-  const { data: locations = [] } = useQuery<Location[]>({
-    queryKey: ["/api/locations"],
-    enabled: activeTab === "warehouse",
-  });
-
-  const { data: stockMovements = [] } = useQuery<StockMovement[]>({
-    queryKey: ["/api/stock-movements"],
-    enabled: activeTab === "warehouse",
-  });
-
-  const { data: warehouseStockSummary } = useQuery({
-    queryKey: ["/api/stock/summary/warehouse-vs-field"],
-    enabled: activeTab === "warehouse",
   });
 
   // Equipment form schema
@@ -650,11 +634,10 @@ export default function Inventory() {
         {/* Inventory Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <div className="flex items-center justify-between mb-6">
-            <TabsList className="grid w-fit grid-cols-4">
+            <TabsList className="grid w-fit grid-cols-3">
               <TabsTrigger value="equipment">Equipment</TabsTrigger>
               <TabsTrigger value="consumables">Consumables</TabsTrigger>
               <TabsTrigger value="templates">Templates</TabsTrigger>
-              <TabsTrigger value="warehouse">Warehouse</TabsTrigger>
             </TabsList>
             
             <div className="flex space-x-2">
@@ -1870,231 +1853,6 @@ export default function Inventory() {
                 ))}
               </div>
             )}
-          </TabsContent>
-
-          {/* Warehouse Tab */}
-          <TabsContent value="warehouse">
-            <div className="space-y-6">
-              {/* Warehouse Stock Summary Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <Card>
-                  <CardContent className="p-4">
-                    <div className="flex items-center space-x-2">
-                      <Package className="h-4 w-4 text-blue-600" />
-                      <div>
-                        <p className="text-sm font-medium text-muted-foreground">Warehouse Locations</p>
-                        <p className="text-2xl font-bold text-blue-600">
-                          {locations.filter(l => l.type === 'warehouse').length}
-                        </p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-                
-                <Card>
-                  <CardContent className="p-4">
-                    <div className="flex items-center space-x-2">
-                      <MapPin className="h-4 w-4 text-green-600" />
-                      <div>
-                        <p className="text-sm font-medium text-muted-foreground">Service Teams</p>
-                        <p className="text-2xl font-bold text-green-600">
-                          {locations.filter(l => l.type === 'service_team').length}
-                        </p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-                
-                <Card>
-                  <CardContent className="p-4">
-                    <div className="flex items-center space-x-2">
-                      <Package className="h-4 w-4 text-purple-600" />
-                      <div>
-                        <p className="text-sm font-medium text-muted-foreground">Total Movements</p>
-                        <p className="text-2xl font-bold text-purple-600">{stockMovements.length}</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-                
-                <Card>
-                  <CardContent className="p-4">
-                    <div className="flex items-center space-x-2">
-                      <AlertTriangle className="h-4 w-4 text-orange-600" />
-                      <div>
-                        <p className="text-sm font-medium text-muted-foreground">Recent Movements</p>
-                        <p className="text-2xl font-bold text-orange-600">
-                          {stockMovements.filter(m => {
-                            const moveDate = new Date(m.movedAt);
-                            const today = new Date();
-                            const diffTime = Math.abs(today.getTime() - moveDate.getTime());
-                            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                            return diffDays <= 7;
-                          }).length}
-                        </p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Stock by Location */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center space-x-2">
-                      <MapPin className="h-5 w-5" />
-                      <span>Stock by Location</span>
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    {warehouseStockSummary ? (
-                      <div className="space-y-4">
-                        {/* Warehouse Stock */}
-                        <div>
-                          <h4 className="font-medium text-sm text-muted-foreground mb-2">Warehouse Stock</h4>
-                          <div className="space-y-2">
-                            {warehouseStockSummary.warehouse.consumables.length === 0 ? (
-                              <p className="text-sm text-muted-foreground">No warehouse stock</p>
-                            ) : (
-                              warehouseStockSummary.warehouse.consumables.slice(0, 5).map((item: any) => (
-                                <div key={item.id} className="flex justify-between items-center py-1">
-                                  <span className="text-sm">{item.name}</span>
-                                  <Badge variant="outline" className="bg-blue-50 text-blue-700">{item.quantity} units</Badge>
-                                </div>
-                              ))
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Field Stock */}
-                        <div>
-                          <h4 className="font-medium text-sm text-muted-foreground mb-2">Field Stock</h4>
-                          <div className="space-y-2">
-                            {warehouseStockSummary.field.consumables.length === 0 ? (
-                              <p className="text-sm text-muted-foreground">No field stock</p>
-                            ) : (
-                              warehouseStockSummary.field.consumables.slice(0, 5).map((item: any) => (
-                                <div key={item.id} className="flex justify-between items-center py-1">
-                                  <span className="text-sm">{item.name}</span>
-                                  <Badge variant="outline" className="bg-green-50 text-green-700">{item.quantity} units</Badge>
-                                </div>
-                              ))
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="flex items-center justify-center py-8">
-                        <div className="animate-pulse">
-                          <div className="h-4 bg-muted rounded w-32 mb-2"></div>
-                          <div className="h-4 bg-muted rounded w-24"></div>
-                        </div>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-
-                {/* Recent Stock Movements */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center space-x-2">
-                      <Package className="h-5 w-5" />
-                      <span>Recent Stock Movements</span>
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    {stockMovements.length === 0 ? (
-                      <div className="text-center py-8">
-                        <Package className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                        <p className="text-muted-foreground">No stock movements yet</p>
-                      </div>
-                    ) : (
-                      <div className="space-y-3">
-                        {stockMovements.slice(0, 8).map((movement) => (
-                          <div key={movement.id} className="flex items-center justify-between py-2 border-b border-border/50 last:border-0">
-                            <div className="flex-1">
-                              <div className="flex items-center space-x-2">
-                                <Badge 
-                                  variant="outline" 
-                                  className={
-                                    movement.reason === 'issue' ? 'bg-orange-50 text-orange-700' :
-                                    movement.reason === 'return' ? 'bg-blue-50 text-blue-700' :
-                                    movement.reason === 'receipt' ? 'bg-green-50 text-green-700' :
-                                    'bg-gray-50 text-gray-700'
-                                  }
-                                >
-                                  {movement.reason}
-                                </Badge>
-                                <span className="text-sm font-medium">{movement.itemType}</span>
-                              </div>
-                              <p className="text-xs text-muted-foreground mt-1">
-                                {movement.quantity} units • {formatDate(movement.movedAt)}
-                              </p>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              </div>
-
-              {/* All Locations */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center space-x-2">
-                    <MapPin className="h-5 w-5" />
-                    <span>All Locations</span>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {locations.length === 0 ? (
-                    <div className="text-center py-8">
-                      <MapPin className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                      <p className="text-muted-foreground">No locations configured yet</p>
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {locations.map((location) => (
-                        <Card key={location.id} className="hover:shadow-md transition-shadow">
-                          <CardContent className="p-4">
-                            <div className="flex items-center space-x-2 mb-2">
-                              <MapPin className="h-4 w-4 text-muted-foreground" />
-                              <h4 className="font-medium">{location.name}</h4>
-                            </div>
-                            <div className="flex items-center justify-between">
-                              <Badge 
-                                variant="outline"
-                                className={
-                                  location.type === 'warehouse' ? 'bg-blue-50 text-blue-700' :
-                                  'bg-green-50 text-green-700'
-                                }
-                              >
-                                {location.type.replace('_', ' ').toUpperCase()}
-                              </Badge>
-                              <div className="flex items-center space-x-1">
-                                <Badge 
-                                  variant={location.active ? "default" : "secondary"}
-                                  className="text-xs"
-                                >
-                                  {location.active ? "Active" : "Inactive"}
-                                </Badge>
-                              </div>
-                            </div>
-                            {location.serviceTeamId && (
-                              <p className="text-xs text-muted-foreground mt-2">
-                                Team ID: {location.serviceTeamId}
-                              </p>
-                            )}
-                          </CardContent>
-                        </Card>
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
           </TabsContent>
         </Tabs>
       </div>
