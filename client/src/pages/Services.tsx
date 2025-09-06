@@ -129,15 +129,21 @@ export default function Services() {
       return await apiRequest("POST", `/api/services/${serviceId}/complete`, data);
     },
     onSuccess: async () => {
-      // Force clear all service-related cache entries
+      // Remove all service-related queries from cache
       queryClient.removeQueries({ queryKey: ["/api/services"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/metrics"] });
+      queryClient.removeQueries({ queryKey: ["/api/dashboard/metrics"] });
       
       // Small delay to ensure server has processed the update
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise(resolve => setTimeout(resolve, 200));
       
-      // Refetch the services data
-      await queryClient.refetchQueries({ queryKey: ["/api/services"] });
+      // Force fresh fetch of services data
+      await queryClient.fetchQuery({ 
+        queryKey: ["/api/services"],
+        staleTime: 0 // Force fresh data
+      });
+      
+      // Also refresh dashboard metrics
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/metrics"] });
       
       setCompletionDialog({ open: false, service: null });
       setEditingService(null);
