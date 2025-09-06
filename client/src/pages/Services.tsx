@@ -298,7 +298,7 @@ export default function Services() {
       );
     }
     
-    // For recurring services (service contracts), check if any dates have been completed
+    // For services with completed dates but not marked as completed overall
     if (service.completedDates && Array.isArray(service.completedDates) && service.completedDates.length > 0) {
       // Check if this is a recurring service
       const isRecurring = service.recurrencePattern && 
@@ -310,13 +310,6 @@ export default function Services() {
         return (
           <Badge className="bg-green-100 border-green-400 text-green-800">
             {service.completedDates.length} COMPLETED
-          </Badge>
-        );
-      } else {
-        // For non-recurring services with completed dates, show as completed
-        return (
-          <Badge className="bg-green-100 border-green-400 text-green-800">
-            COMPLETED
           </Badge>
         );
       }
