@@ -629,11 +629,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.json(existingService);
       }
 
-      // Prepare update data - all services should be marked as completed when completed
-      const updateData: any = {
-        status: 'completed',
-        completedAt: new Date()
-      };
+      // Check if this is a recurring service (has recurrence pattern)
+      const isRecurring = existingService.recurrencePattern && 
+        existingService.recurrencePattern !== null && 
+        typeof existingService.recurrencePattern === 'object' &&
+        (existingService.recurrencePattern as any).interval;
+
+      // Prepare update data
+      const updateData: any = {};
       
       // Add completion date to completedDates array
       const currentCompletedDates = (existingService.completedDates as string[]) || [];
@@ -641,7 +644,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         updateData.completedDates = [...currentCompletedDates, completionDate];
       }
 
-      // If it's an installation and conversion is requested
+      // Handle non-recurring services (mark as completed)
+      if (!isRecurring) {
+        updateData.status = 'completed';
+        updateData.completedAt = new Date();
+      }
+
+      // If it's an installation and conversion is requested, convert to recurring service contract
       if (existingService.type === 'installation' && convertToContract) {
         updateData.type = 'service_contract';
         updateData.contractLengthMonths = contractLengthMonths || 12;
@@ -661,10 +670,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
             ? new Date(existingService.installationDate).toISOString().split('T')[0]
             : completionDate;
           
-          const currentCompletedDates = (existingService.completedDates as string[]) || [];
           if (!currentCompletedDates.includes(installationDateString)) {
             updateData.completedDates = [...currentCompletedDates, installationDateString];
           }
+          
+          // Keep status as scheduled since it's now a recurring contract
+          updateData.status = 'scheduled';
+          updateData.completedAt = null;
         }
       }
 
