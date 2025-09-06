@@ -136,6 +136,7 @@ export const services = pgTable("services", {
   status: varchar("status", { length: 20 }).default("scheduled"), // 'scheduled', 'completed', 'missed'
   recurrencePattern: jsonb("recurrence_pattern"), // { interval: '30d', end_date: '2026-01-01' }
   excludedDates: jsonb("excluded_dates").$type<string[]>().default([]), // Array of ISO date strings to skip
+  completedDates: jsonb("completed_dates").$type<string[]>().default([]), // Array of ISO date strings for completed occurrences
   contractLengthMonths: integer("contract_length_months"),
   createdAt: timestamp("created_at").defaultNow(),
   completedAt: timestamp("completed_at"),
@@ -308,7 +309,8 @@ export const serviceCompletionSchema = z.object({
   })).optional(),
   convertToContract: z.boolean().optional(),
   serviceInterval: z.string().optional(),
-  contractLengthMonths: z.coerce.number().int().positive().optional()
+  contractLengthMonths: z.coerce.number().int().positive().optional(),
+  completionDate: z.string().optional() // YYYY-MM-DD format for specific occurrence completion
 }).strict();
 
 // Types

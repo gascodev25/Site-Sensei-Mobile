@@ -587,6 +587,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const { equipmentItems, consumableItems, convertToContract, serviceInterval, contractLengthMonths } = validationResult.data;
       
+      // Get the specific date for this completion (from request body or current date)
+      const completionDate = req.body.completionDate || new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
+      
       // Validate equipment IDs exist in database
       if (equipmentItems && equipmentItems.length > 0) {
         const equipmentIds = equipmentItems.map(item => item.id);
@@ -626,11 +629,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.json(existingService);
       }
 
-      // Prepare update data
-      const updateData: any = {
-        status: 'completed',
-        completedAt: new Date(),
-      };
+      // Prepare update data - handle recurring vs non-recurring services differently
+      const updateData: any = {};
+      const isRecurring = existingService.recurrencePattern && 
+                         typeof existingService.recurrencePattern === 'object' && 
+                         existingService.recurrencePattern !== null &&
+                         'interval' in existingService.recurrencePattern;
+
+      if (isRecurring) {
+        // For recurring services: Add to completedDates but keep service status as scheduled
+        const currentCompletedDates = (existingService.completedDates as string[]) || [];
+        if (!currentCompletedDates.includes(completionDate)) {
+          updateData.completedDates = [...currentCompletedDates, completionDate];
+        }
+        // Don't change the main service status for recurring services
+      } else {
+        // For non-recurring services: Mark as completed normally
+        updateData.status = 'completed';
+        updateData.completedAt = new Date();
+      }
 
       // If it's an installation and conversion is requested
       if (existingService.type === 'installation' && convertToContract) {

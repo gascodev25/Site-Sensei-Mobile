@@ -179,45 +179,57 @@ export default function ServiceCalendar({ services, onServiceClick, onServiceMov
   };
 
   // Render service item
-  const renderServiceItem = (service: ServiceWithDetails, size: 'small' | 'large' = 'small', forDate?: Date) => (
-    <div
-      key={service.id}
-      draggable
-      onDragStart={() => handleDragStart(service, forDate || new Date())}
-      onClick={() => onServiceClick?.(service)}
-      className={`
-        ${getTeamBackgroundColor(service.team?.name, service.status)}
-        border rounded p-2 cursor-pointer hover:shadow-sm transition-shadow text-xs
-        ${size === 'large' ? 'mb-2' : 'mb-1'}
-      `}
-      data-testid={`calendar-service-${service.id}`}
-    >
-      <div className="font-medium truncate">{service.client?.name || 'Unknown'}</div>
-      {size === 'large' && (
-        <>
-          <div className="flex items-center text-xs mt-1 opacity-75">
-            <MapPin className="h-3 w-3 mr-1" />
-            <span className="truncate">{service.client?.city || 'Location not set'}</span>
-          </div>
-          {service.team && (
+  const renderServiceItem = (service: ServiceWithDetails, size: 'small' | 'large' = 'small', forDate?: Date) => {
+    // Check if this specific occurrence is completed
+    const dateString = forDate?.toISOString().split('T')[0] || new Date().toISOString().split('T')[0];
+    const completedDates = (service.completedDates as string[]) || [];
+    const isThisOccurrenceCompleted = completedDates.includes(dateString);
+    
+    // Determine status: if it's a recurring service, check completedDates; otherwise use service status
+    const effectiveStatus = service.recurrencePattern && 'interval' in (service.recurrencePattern as any)
+      ? (isThisOccurrenceCompleted ? 'completed' : 'scheduled')
+      : service.status || 'scheduled';
+    
+    return (
+      <div
+        key={service.id}
+        draggable
+        onDragStart={() => handleDragStart(service, forDate || new Date())}
+        onClick={() => onServiceClick?.(service)}
+        className={`
+          ${getTeamBackgroundColor(service.team?.name, effectiveStatus)}
+          border rounded p-2 cursor-pointer hover:shadow-sm transition-shadow text-xs
+          ${size === 'large' ? 'mb-2' : 'mb-1'}
+        `}
+        data-testid={`calendar-service-${service.id}`}
+      >
+        <div className="font-medium truncate">{service.client?.name || 'Unknown'}</div>
+        {size === 'large' && (
+          <>
             <div className="flex items-center text-xs mt-1 opacity-75">
-              <User className="h-3 w-3 mr-1" />
-              <span className="truncate">{service.team.name}</span>
+              <MapPin className="h-3 w-3 mr-1" />
+              <span className="truncate">{service.client?.city || 'Location not set'}</span>
             </div>
-          )}
-          {service.estimatedDuration && (
-            <div className="flex items-center text-xs mt-1 opacity-75">
-              <Clock className="h-3 w-3 mr-1" />
-              <span>{service.estimatedDuration}min</span>
-            </div>
-          )}
-        </>
-      )}
-      <Badge className={`mt-1 text-xs ${getStatusColor(service.status || 'scheduled')}`}>
-        {(service.status || 'scheduled').replace('_', ' ').toUpperCase()}
-      </Badge>
-    </div>
-  );
+            {service.team && (
+              <div className="flex items-center text-xs mt-1 opacity-75">
+                <User className="h-3 w-3 mr-1" />
+                <span className="truncate">{service.team.name}</span>
+              </div>
+            )}
+            {service.estimatedDuration && (
+              <div className="flex items-center text-xs mt-1 opacity-75">
+                <Clock className="h-3 w-3 mr-1" />
+                <span>{service.estimatedDuration}min</span>
+              </div>
+            )}
+          </>
+        )}
+        <Badge className={`mt-1 text-xs ${getStatusColor(effectiveStatus)}`}>
+          {effectiveStatus.replace('_', ' ').toUpperCase()}
+        </Badge>
+      </div>
+    );
+  };
 
   // Monthly view
   const renderMonthView = () => {

@@ -24,6 +24,7 @@ interface ServiceCompletionDialogProps {
   onOpenChange: (open: boolean) => void;
   service: ServiceWithDetails | null;
   onComplete: () => void;
+  completionDate?: Date; // Optional specific date for completion
 }
 
 interface CompletionFormData {
@@ -39,6 +40,7 @@ export default function ServiceCompletionDialog({
   onOpenChange,
   service,
   onComplete,
+  completionDate,
 }: ServiceCompletionDialogProps) {
   const { toast } = useToast();
   
@@ -81,6 +83,7 @@ export default function ServiceCompletionDialog({
         convertToContract: data.convertToContract,
         serviceInterval: data.serviceInterval,
         contractLengthMonths: data.contractLengthMonths,
+        completionDate: completionDate?.toISOString().split('T')[0] || new Date().toISOString().split('T')[0],
       });
     },
     onSuccess: () => {
