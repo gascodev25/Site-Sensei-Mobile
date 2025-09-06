@@ -68,7 +68,7 @@ export default function Sidebar({ className }: SidebarProps) {
     console.log("Current user in sidebar:", user);
     console.log("User roles:", user?.roles);
     
-    // Only show Users link if user has permission to manage users
+    // Only show Users link if user has permission to manage users and user has roles
     if (user && user.roles && canCreateUser(user)) {
       console.log("User can create users - showing Users menu");
       return [...baseItems, navigationItems.find(item => item.title === "Users")!];
