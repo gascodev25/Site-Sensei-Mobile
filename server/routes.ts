@@ -996,14 +996,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let errorCount = 0;
       const errors: any[] = [];
 
-      for (const [index, row] of data.entries()) {
+      for (let index = 0; index < data.length; index++) {
+        const row = data[index];
         try {
           // Transform CSV row to match schema
           const clientData = {
             name: row.name,
             addressText: row.address_text,
-            latitude: "0", // Will be updated by geocoding if needed
-            longitude: "0",
+            latitude: 0, // Will be updated by geocoding if needed
+            longitude: 0,
             city: row.city || null,
             contactPerson: row.contact_person || null,
             phone: row.phone || null,
@@ -1021,7 +1022,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             entityId: null,
             metadata: { bulkUpload: true, clientName: row.name }
           });
-        } catch (error) {
+        } catch (error: any) {
           errorCount++;
           errors.push({ row: index + 1, error: error.message });
         }
@@ -1050,7 +1051,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let errorCount = 0;
       const errors: any[] = [];
 
-      for (const [index, row] of data.entries()) {
+      for (let index = 0; index < data.length; index++) {
+        const row = data[index];
         try {
           // Transform CSV row to match schema
           const equipmentData = {
@@ -1074,7 +1076,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             entityId: null,
             metadata: { bulkUpload: true, equipmentName: row.name }
           });
-        } catch (error) {
+        } catch (error: any) {
           errorCount++;
           errors.push({ row: index + 1, error: error.message });
         }
@@ -1103,7 +1105,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let errorCount = 0;
       const errors: any[] = [];
 
-      for (const [index, row] of data.entries()) {
+      for (let index = 0; index < data.length; index++) {
+        const row = data[index];
         try {
           // Transform CSV row to match schema
           const consumableData = {
@@ -1128,7 +1131,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             entityId: null,
             metadata: { bulkUpload: true, consumableName: row.name }
           });
-        } catch (error) {
+        } catch (error: any) {
           errorCount++;
           errors.push({ row: index + 1, error: error.message });
         }
