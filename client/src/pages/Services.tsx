@@ -13,7 +13,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Plus, Search, Edit, Trash2, Calendar, Clock, User, MapPin, List } from "lucide-react";
 import type { ServiceWithDetails } from "@shared/schema";
 import ServiceCalendar from "@/components/ServiceCalendar";
-import { cn } from "@/lib/utils";
 import RecurringServiceMoveDialog from "@/components/Dialogs/RecurringServiceMoveDialog";
 import ServiceCompletionDialog from "@/components/Dialogs/ServiceCompletionDialog";
 
@@ -177,7 +176,7 @@ export default function Services() {
     setEditingService(service);
   };
 
-  const handleServiceComplete = (service: ServiceWithDetails, completionDate?: Date) => {
+  const handleServiceComplete = (service: ServiceWithDetails) => {
     if (service.type === 'installation') {
       // For installations, show completion dialog to update equipment/consumables
       setCompletionDialog({ open: true, service });
@@ -185,9 +184,7 @@ export default function Services() {
       // For regular services, just mark as completed
       completeServiceMutation.mutate({
         serviceId: service.id,
-        data: { 
-          completionDate: completionDate?.toISOString().split('T')[0] || new Date().toISOString().split('T')[0]
-        }
+        data: {}
       });
     }
   };
@@ -526,18 +523,6 @@ export default function Services() {
                           </div>
                         </div>
                         <div className="flex space-x-1">
-                          {getEffectiveStatus(service) !== 'completed' && (
-                            <Button 
-                              variant="ghost" 
-                              size="sm"
-                              onClick={() => handleServiceComplete(service)}
-                              className="text-green-600 hover:text-green-700 hover:bg-green-50"
-                              data-testid={`button-complete-${service.id}`}
-                              title="Mark as completed"
-                            >
-                              <Clock className="h-4 w-4" />
-                            </Button>
-                          )}
                           <Button 
                             variant="ghost" 
                             size="sm"
@@ -560,20 +545,8 @@ export default function Services() {
                     </CardHeader>
                     <CardContent>
                       <div className="space-y-2 text-sm">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <span className="font-medium">Type:</span> {service.type?.replace('_', ' ') || 'Not specified'}
-                          </div>
-                          <div className={cn(
-                            "px-2 py-1 rounded text-xs font-medium uppercase",
-                            {
-                              "bg-green-100 text-green-800": getEffectiveStatus(service) === 'completed',
-                              "bg-blue-100 text-blue-800": getEffectiveStatus(service) === 'scheduled',
-                              "bg-red-100 text-red-800": getEffectiveStatus(service) === 'missed',
-                            }
-                          )}>
-                            {getEffectiveStatus(service)}
-                          </div>
+                        <div>
+                          <span className="font-medium">Type:</span> {service.type?.replace('_', ' ') || 'Not specified'}
                         </div>
                         {service.team && (
                           <div className="flex items-center">
@@ -612,12 +585,6 @@ export default function Services() {
               onServiceClick={handleServiceClick}
               onServiceMove={handleServiceMove}
               onDateClick={handleDateClick}
-              onServiceComplete={(service, completionDate) => {
-                completeServiceMutation.mutate({
-                  serviceId: service.id,
-                  data: { completionDate: completionDate?.toISOString().split('T')[0] }
-                });
-              }}
             />
           </TabsContent>
         </Tabs>
