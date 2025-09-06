@@ -39,7 +39,6 @@ export default function BulkUploadDialog({
   const [parseResult, setParseResult] = useState<ParseResult | null>(null);
   const [validationErrors, setValidationErrors] = useState<ValidationError[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [progress, setProgress] = useState(0);
   const [uploadResult, setUploadResult] = useState<{
     success: number;
     errors: number;
@@ -171,7 +170,6 @@ export default function BulkUploadDialog({
     if (!parseResult || validationErrors.length > 0) return;
 
     setIsProcessing(true);
-    setProgress(0);
 
     try {
       // Transform data to handle numeric coercion and other type conversions
@@ -243,7 +241,6 @@ export default function BulkUploadDialog({
     setValidationErrors([]);
     setUploadResult(null);
     setIsProcessing(false);
-    setProgress(0);
   };
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
@@ -390,10 +387,9 @@ export default function BulkUploadDialog({
                 <div className="flex items-center gap-4">
                   <div className="flex-1">
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-medium">Processing...</span>
-                      <span className="text-sm text-muted-foreground">{progress}%</span>
+                      <span className="text-sm font-medium">Processing upload...</span>
                     </div>
-                    <Progress value={progress} />
+                    <Progress value={100} className="animate-pulse" />
                   </div>
                 </div>
               </CardContent>
