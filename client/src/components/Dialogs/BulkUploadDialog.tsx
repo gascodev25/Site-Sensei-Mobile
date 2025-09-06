@@ -43,6 +43,7 @@ export default function BulkUploadDialog({
     success: number;
     errors: number;
     total: number;
+    errorDetails?: any[];
   } | null>(null);
   const { toast } = useToast();
 
@@ -437,18 +438,45 @@ export default function BulkUploadDialog({
               <CardContent>
                 <div className="grid grid-cols-3 gap-4 text-center">
                   <div>
-                    <p className="text-2xl font-bold text-green-600">{uploadResult.success}</p>
+                    <p className="text-2xl font-bold text-green-600" data-testid="text-success-count">{uploadResult.success}</p>
                     <p className="text-sm text-muted-foreground">Successful</p>
                   </div>
                   <div>
-                    <p className="text-2xl font-bold text-red-600">{uploadResult.errors}</p>
+                    <p className="text-2xl font-bold text-red-600" data-testid="text-error-count">{uploadResult.errors}</p>
                     <p className="text-sm text-muted-foreground">Errors</p>
                   </div>
                   <div>
-                    <p className="text-2xl font-bold">{uploadResult.total}</p>
+                    <p className="text-2xl font-bold" data-testid="text-total-count">{uploadResult.total}</p>
                     <p className="text-sm text-muted-foreground">Total</p>
                   </div>
                 </div>
+                
+                {/* Detailed Error Information */}
+                {uploadResult.errorDetails && uploadResult.errorDetails.length > 0 && (
+                  <div className="mt-6">
+                    <h4 className="font-medium text-foreground mb-3">Error Details:</h4>
+                    <div className="space-y-3 max-h-60 overflow-y-auto">
+                      {uploadResult.errorDetails.map((error: any, index: number) => (
+                        <div key={index} className="border border-red-200 dark:border-red-800 rounded-lg p-3 bg-red-50 dark:bg-red-900/20">
+                          <div className="flex items-start justify-between mb-2">
+                            <span className="font-medium text-red-700 dark:text-red-400">Row {error.row}</span>
+                          </div>
+                          <p className="text-sm text-red-600 dark:text-red-300 mb-2">
+                            {error.details || error.error}
+                          </p>
+                          {error.rowData && (
+                            <details className="text-xs">
+                              <summary className="cursor-pointer text-muted-foreground hover:text-foreground">View Row Data</summary>
+                              <pre className="mt-2 p-2 bg-background rounded text-xs overflow-x-auto">
+                                {JSON.stringify(error.rowData, null, 2)}
+                              </pre>
+                            </details>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
           )}

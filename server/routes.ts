@@ -1027,7 +1027,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.error(`Bulk upload client error for row ${index + 1}:`, error);
           console.error('Row data:', JSON.stringify(row, null, 2));
           console.error('Transformed data:', JSON.stringify(clientData, null, 2));
-          errors.push({ row: index + 1, error: error.message });
+          
+          // Provide detailed error information
+          if (error instanceof z.ZodError) {
+            errors.push({ 
+              row: index + 1, 
+              error: 'Validation failed', 
+              details: error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(', '),
+              rowData: row,
+              transformedData: clientData
+            });
+          } else {
+            errors.push({ 
+              row: index + 1, 
+              error: error.message,
+              rowData: row,
+              transformedData: clientData
+            });
+          }
         }
       }
 
