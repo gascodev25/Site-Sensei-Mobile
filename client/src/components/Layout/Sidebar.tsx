@@ -1,7 +1,5 @@
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
-import { useAuth } from "@/hooks/useAuth";
-import { canCreateUser } from "@/lib/permissions";
 import { 
   LayoutDashboard, 
   Building2, 
@@ -10,8 +8,7 @@ import {
   Users, 
   BarChart3,
   Settings,
-  ChevronRight,
-  Shield
+  ChevronRight
 } from "lucide-react";
 
 interface SidebarProps {
@@ -49,53 +46,10 @@ const navigationItems = [
     href: "/reports",
     icon: BarChart3,
   },
-  {
-    title: "Users",
-    href: "/users",
-    icon: Shield,
-  },
 ];
 
 export default function Sidebar({ className }: SidebarProps) {
   const [location] = useLocation();
-  const { user } = useAuth();
-  
-  // Force console log on every render
-  console.log("=== SIDEBAR RENDER ===");
-  console.log("Sidebar component rendered");
-  console.log("User from useAuth:", user);
-  
-  // Filter navigation items based on user permissions
-  const getVisibleNavigationItems = () => {
-    // TEMPORARY: Always show Users menu for testing
-    console.log("TEMP: Showing Users menu for testing");
-    return navigationItems;
-    
-    // Original logic (commented out for testing):
-    /*
-    const baseItems = navigationItems.filter(item => item.title !== "Users");
-    
-    // Debug logging
-    console.log("Current user in sidebar:", user);
-    console.log("User roles:", user?.roles);
-    console.log("User authenticated:", !!user);
-    
-    // Only show Users link if user has permission to manage users and user has roles
-    if (user && user.roles && canCreateUser(user)) {
-      console.log("User can create users - showing Users menu");
-      return [...baseItems, navigationItems.find(item => item.title === "Users")!];
-    }
-    
-    console.log("User cannot create users - hiding Users menu", { 
-      hasUser: !!user, 
-      hasRoles: !!user?.roles,
-      userRoles: user?.roles 
-    });
-    return baseItems;
-    */
-  };
-
-  const visibleNavigationItems = getVisibleNavigationItems();
 
   return (
     <div className={cn("pb-12", className)}>
@@ -105,7 +59,7 @@ export default function Sidebar({ className }: SidebarProps) {
             ACG Works
           </h2>
           <div className="space-y-1">
-            {visibleNavigationItems.map((item) => {
+            {navigationItems.map((item) => {
               const isActive = location === item.href || 
                 (item.href !== "/" && location.startsWith(item.href));
                 
