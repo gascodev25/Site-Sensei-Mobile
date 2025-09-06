@@ -133,13 +133,17 @@ export default function Services() {
       queryClient.removeQueries({ queryKey: ["/api/services"] });
       queryClient.removeQueries({ queryKey: ["/api/dashboard/metrics"] });
       
-      // Small delay to ensure server has processed the update
-      await new Promise(resolve => setTimeout(resolve, 200));
+      // Clear all query cache to force fresh data
+      queryClient.clear();
       
-      // Force fresh fetch of services data
+      // Small delay to ensure server has processed the update
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
+      // Force fresh fetch of services data with no cache
       await queryClient.fetchQuery({ 
         queryKey: ["/api/services"],
-        staleTime: 0 // Force fresh data
+        staleTime: 0,
+        gcTime: 0 // Don't cache this result
       });
       
       // Also refresh dashboard metrics
@@ -283,12 +287,6 @@ export default function Services() {
 
   const getStatusBadge = (service: ServiceWithDetails) => {
     const status = service.status || 'scheduled';
-    const statusColors = {
-      scheduled: "bg-amber-100 border-amber-400 text-amber-800",
-      completed: "bg-green-100 border-green-400 text-green-800", 
-      missed: "bg-red-100 border-red-400 text-red-800",
-      in_progress: "bg-blue-100 border-blue-400 text-blue-800"
-    };
     
     // Always prioritize the actual status first
     if (status === 'completed') {
@@ -307,6 +305,22 @@ export default function Services() {
         </Badge>
       );
     }
+    
+    // For installations and other single services, check if they have been completed
+    if (service.completedAt || (service.completedDates && (service.completedDates as string[]).length > 0)) {
+      return (
+        <Badge className="bg-green-100 border-green-400 text-green-800">
+          COMPLETED
+        </Badge>
+      );
+    }
+    
+    const statusColors = {
+      scheduled: "bg-amber-100 border-amber-400 text-amber-800",
+      completed: "bg-green-100 border-green-400 text-green-800", 
+      missed: "bg-red-100 border-red-400 text-red-800",
+      in_progress: "bg-blue-100 border-blue-400 text-blue-800"
+    };
     
     return (
       <Badge className={statusColors[status as keyof typeof statusColors] || "bg-gray-100 border-gray-400 text-gray-800"}>
