@@ -6,8 +6,14 @@ export function useAuth() {
     retry: false,
   });
 
+  // Transform user data to ensure roles is properly formatted
+  const transformedUser = user ? {
+    ...user,
+    roles: user.roles || "team_member" // Ensure roles field exists
+  } : null;
+
   return {
-    user,
+    user: transformedUser,
     isLoading,
     isAuthenticated: !!user,
   };

@@ -23,8 +23,13 @@ export default function Sidebar({ className }: SidebarProps) {
   const { user } = useAuth();
 
   // Check if user has management permissions
+  console.log("Current user in sidebar:", user);
+  console.log("User roles:", user?.roles);
+  
   const hasUserManagementPermission = user?.roles && 
     (user.roles.includes("super_user") || user.roles.includes("general_manager"));
+  
+  console.log("Has user management permission:", hasUserManagementPermission);
 
   const navigation = [
     { 
