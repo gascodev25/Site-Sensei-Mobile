@@ -573,7 +573,7 @@ export default function ServiceForm({ service, onSuccess, onCancel, onDelete, on
               Delete
             </Button>
           )}
-          {isEditing && onComplete && service?.status !== 'completed' && (
+          {isEditing && onComplete && (service?.status !== 'completed' || service?.type === 'service_contract') && (
             <Button
               type="button"
               variant="default"
