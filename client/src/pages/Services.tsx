@@ -14,6 +14,7 @@ import { Plus, Search, Edit, Trash2, Calendar, Clock, User, MapPin, List } from 
 import type { ServiceWithDetails } from "@shared/schema";
 import ServiceCalendar from "@/components/ServiceCalendar";
 import RecurringServiceMoveDialog from "@/components/Dialogs/RecurringServiceMoveDialog";
+import ServiceCompletionDialog from "@/components/Dialogs/ServiceCompletionDialog";
 
 export default function Services() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -30,6 +31,13 @@ export default function Services() {
     service: null,
     originalDate: null,
     newDate: null,
+  });
+  const [completionDialog, setCompletionDialog] = useState<{
+    open: boolean;
+    service: ServiceWithDetails | null;
+  }>({
+    open: false,
+    service: null,
   });
   const { toast } = useToast();
 
@@ -115,6 +123,30 @@ export default function Services() {
     },
   });
 
+  const completeServiceMutation = useMutation({
+    mutationFn: async ({ serviceId, data }: { serviceId: number; data: any }) => {
+      return await apiRequest("POST", `/api/services/${serviceId}/complete`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/services"] });
+      queryClient.refetchQueries({ queryKey: ["/api/services"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/metrics"] });
+      setCompletionDialog({ open: false, service: null });
+      setEditingService(null);
+      toast({
+        title: "Success",
+        description: "Service completed successfully",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleDelete = (service: ServiceWithDetails) => {
     if (confirm(`Are you sure you want to delete this service for ${service.client?.name}?`)) {
       deleteServiceMutation.mutate(service.id);
@@ -123,6 +155,19 @@ export default function Services() {
 
   const handleServiceClick = (service: ServiceWithDetails) => {
     setEditingService(service);
+  };
+
+  const handleServiceComplete = (service: ServiceWithDetails) => {
+    if (service.type === 'installation') {
+      // For installations, show completion dialog to update equipment/consumables
+      setCompletionDialog({ open: true, service });
+    } else {
+      // For regular services, just mark as completed
+      completeServiceMutation.mutate({
+        serviceId: service.id,
+        data: { status: 'completed' }
+      });
+    }
   };
 
   const handleServiceMove = (serviceId: number, newDate: Date, draggedFromDate?: Date) => {
@@ -507,6 +552,7 @@ export default function Services() {
                   setIsCreateOpen(false);
                 }}
                 onDelete={() => handleDelete(editingService)}
+                onComplete={() => handleServiceComplete(editingService)}
               />
             )}
           </DialogContent>
@@ -523,6 +569,20 @@ export default function Services() {
           newDate={recurringMoveDialog.newDate}
           onMoveThisOnly={handleMoveThisOnly}
           onMoveAllFuture={handleMoveAllFuture}
+        />
+
+        {/* Service Completion Dialog */}
+        <ServiceCompletionDialog
+          open={completionDialog.open}
+          onOpenChange={(open) => 
+            !open && setCompletionDialog({ open: false, service: null })
+          }
+          service={completionDialog.service}
+          onComplete={() => {
+            queryClient.invalidateQueries({ queryKey: ["/api/services"] });
+            queryClient.invalidateQueries({ queryKey: ["/api/dashboard/metrics"] });
+            setEditingService(null);
+          }}
         />
       </div>
     </div>
