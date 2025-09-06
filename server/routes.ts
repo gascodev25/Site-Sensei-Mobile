@@ -1003,8 +1003,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const clientData = {
             name: row.name,
             addressText: row.addressText,
-            latitude: 0, // Will be updated by geocoding if needed
-            longitude: 0,
+            latitude: "0", // Decimal type expects string
+            longitude: "0", // Decimal type expects string
             city: row.city || null,
             contactPerson: row.contactPerson || null,
             phone: row.phone || null,
