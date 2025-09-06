@@ -277,11 +277,21 @@ export default function Services() {
       in_progress: "bg-yellow-100 text-yellow-800"
     };
     
-    // For service contracts, show completion count if any occurrences are completed
-    if (service.type === 'service_contract' && service.completedDates && (service.completedDates as string[]).length > 0) {
+    // For non-recurring services, use the main status
+    if (service.type !== 'service_contract') {
+      return (
+        <Badge className={statusColors[status as keyof typeof statusColors] || "bg-gray-100 text-gray-800"}>
+          {status.replace('_', ' ').toUpperCase()}
+        </Badge>
+      );
+    }
+    
+    // For service contracts (recurring), show completion status
+    const completedDates = service.completedDates as string[] || [];
+    if (completedDates.length > 0) {
       return (
         <Badge className="bg-green-100 text-green-800">
-          {(service.completedDates as string[]).length} COMPLETED
+          {completedDates.length} COMPLETED
         </Badge>
       );
     }
