@@ -567,7 +567,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "User not found or no roles assigned" });
       }
       
-      const hasRole = (role: string) => user.roles.split(",").includes(role);
+      const hasRole = (role: string) => user.roles?.split(",").includes(role);
       const canMarkComplete = hasRole("ops_manager") || hasRole("team_member");
       
       if (!canMarkComplete) {
