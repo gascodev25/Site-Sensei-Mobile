@@ -1081,7 +1081,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const equipmentData = {
             name: row.name,
             stockCode: row.stockCode || row.stock_code,
-            price: row.price ? parseFloat(row.price) : null,
+            price: row.price ? parseFloat(row.price).toString() : null,
             status: row.status || "in_warehouse",
             barcode: row.barcode || null,
             qrCode: row.qrCode || row.qr_code || null,
