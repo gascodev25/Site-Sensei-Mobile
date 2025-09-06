@@ -307,6 +307,8 @@ export const serviceCompletionSchema = z.object({
     quantity: z.coerce.number().int().positive()
   })).optional(),
   convertToContract: z.boolean().optional(),
+  serviceInterval: z.string().optional(),
+  contractLengthMonths: z.coerce.number().int().positive().optional()
 }).strict();
 
 // Types

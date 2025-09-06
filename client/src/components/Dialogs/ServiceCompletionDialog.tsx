@@ -15,7 +15,8 @@ import { Form, FormControl, FormField, FormItem, FormLabel } from "@/components/
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { Check, Package, Wrench } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Check, Package, Wrench, Calendar } from "lucide-react";
 import type { ServiceWithDetails, Equipment, Consumable } from "@shared/schema";
 
 interface ServiceCompletionDialogProps {
@@ -29,6 +30,8 @@ interface CompletionFormData {
   equipmentItems: { id: number; quantity: number }[];
   consumableItems: { id: number; quantity: number }[];
   convertToContract: boolean;
+  serviceInterval: string;
+  contractLengthMonths: number;
 }
 
 export default function ServiceCompletionDialog({
@@ -52,6 +55,8 @@ export default function ServiceCompletionDialog({
       equipmentItems: [],
       consumableItems: [],
       convertToContract: false,
+      serviceInterval: "30d",
+      contractLengthMonths: 12,
     },
   });
 
@@ -62,6 +67,8 @@ export default function ServiceCompletionDialog({
         equipmentItems: service.equipmentItems || [],
         consumableItems: service.consumableItems || [],
         convertToContract: service.type === 'installation',
+        serviceInterval: "30d",
+        contractLengthMonths: 12,
       });
     }
   }, [service, form]);
@@ -72,6 +79,8 @@ export default function ServiceCompletionDialog({
         equipmentItems: data.equipmentItems,
         consumableItems: data.consumableItems,
         convertToContract: data.convertToContract,
+        serviceInterval: data.serviceInterval,
+        contractLengthMonths: data.contractLengthMonths,
       });
     },
     onSuccess: () => {
@@ -290,6 +299,70 @@ export default function ServiceCompletionDialog({
                       </FormItem>
                     )}
                   />
+
+                  {/* Service Contract Settings */}
+                  {form.watch("convertToContract") && (
+                    <div className="space-y-4 ml-6 pl-4 border-l-2 border-muted">
+                      <div className="flex items-center space-x-2">
+                        <Calendar className="h-4 w-4 text-muted-foreground" />
+                        <h4 className="font-medium">Service Contract Settings</h4>
+                      </div>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* Service Interval */}
+                        <FormField
+                          control={form.control}
+                          name="serviceInterval"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Service Interval</FormLabel>
+                              <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                <FormControl>
+                                  <SelectTrigger data-testid="select-service-interval">
+                                    <SelectValue placeholder="Select interval" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  <SelectItem value="7d">Weekly (7 days)</SelectItem>
+                                  <SelectItem value="14d">Bi-weekly (14 days)</SelectItem>
+                                  <SelectItem value="30d">Monthly (30 days)</SelectItem>
+                                  <SelectItem value="60d">Bi-monthly (60 days)</SelectItem>
+                                  <SelectItem value="90d">Quarterly (90 days)</SelectItem>
+                                  <SelectItem value="180d">Semi-annually (180 days)</SelectItem>
+                                  <SelectItem value="365d">Annually (365 days)</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </FormItem>
+                          )}
+                        />
+
+                        {/* Contract Length */}
+                        <FormField
+                          control={form.control}
+                          name="contractLengthMonths"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Contract Length (Months)</FormLabel>
+                              <Select onValueChange={(value) => field.onChange(parseInt(value))} defaultValue={String(field.value)}>
+                                <FormControl>
+                                  <SelectTrigger data-testid="select-contract-length">
+                                    <SelectValue placeholder="Select length" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  <SelectItem value="3">3 months</SelectItem>
+                                  <SelectItem value="6">6 months</SelectItem>
+                                  <SelectItem value="12">12 months</SelectItem>
+                                  <SelectItem value="24">24 months</SelectItem>
+                                  <SelectItem value="36">36 months</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
               </>
             )}
