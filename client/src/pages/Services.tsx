@@ -6,7 +6,7 @@ import Header from "@/components/Layout/Header";
 import ServiceForm from "@/components/Forms/ServiceForm";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
+
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -286,48 +286,7 @@ export default function Services() {
     );
   });
 
-  const getStatusBadge = (service: ServiceWithDetails) => {
-    const status = service.status || 'scheduled';
-    
-    // Check for completed status first - this covers all completion scenarios
-    if (status === 'completed' || service.completedAt) {
-      return (
-        <Badge className="bg-green-100 border-green-400 text-green-800">
-          COMPLETED
-        </Badge>
-      );
-    }
-    
-    // For services with completed dates but not marked as completed overall
-    if (service.completedDates && Array.isArray(service.completedDates) && service.completedDates.length > 0) {
-      // Check if this is a recurring service
-      const isRecurring = service.recurrencePattern && 
-        service.recurrencePattern !== null && 
-        typeof service.recurrencePattern === 'object' &&
-        (service.recurrencePattern as any).interval;
-        
-      if (isRecurring) {
-        return (
-          <Badge className="bg-green-100 border-green-400 text-green-800">
-            {service.completedDates.length} COMPLETED
-          </Badge>
-        );
-      }
-    }
-    
-    const statusColors = {
-      scheduled: "bg-amber-100 border-amber-400 text-amber-800",
-      completed: "bg-green-100 border-green-400 text-green-800", 
-      missed: "bg-red-100 border-red-400 text-red-800",
-      in_progress: "bg-blue-100 border-blue-400 text-blue-800"
-    };
-    
-    return (
-      <Badge className={statusColors[status as keyof typeof statusColors] || "bg-gray-100 border-gray-400 text-gray-800"}>
-        {status.replace('_', ' ').toUpperCase()}
-      </Badge>
-    );
-  };
+  
 
   const formatDate = (dateString: string | Date | null) => {
     if (!dateString) return "Not scheduled";
