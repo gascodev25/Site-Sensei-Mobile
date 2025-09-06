@@ -9,7 +9,7 @@ import type { ServiceWithDetails } from "@shared/schema";
 
 interface ServiceCalendarProps {
   services: ServiceWithDetails[];
-  onServiceClick?: (service: ServiceWithDetails) => void;
+  onServiceClick?: (service: ServiceWithDetails, occurrenceDate?: Date) => void;
   onServiceMove?: (serviceId: number, newDate: Date, originalDate?: Date) => void;
 }
 
@@ -199,7 +199,7 @@ export default function ServiceCalendar({ services, onServiceClick, onServiceMov
         key={service.id}
         draggable
         onDragStart={() => handleDragStart(service, forDate || new Date())}
-        onClick={() => onServiceClick?.(service)}
+        onClick={() => onServiceClick?.(service, forDate)}
         className={`
           ${getTeamBackgroundColor(service.team?.name, effectiveStatus)}
           border rounded p-2 cursor-pointer hover:shadow-sm transition-shadow text-xs
@@ -353,7 +353,7 @@ export default function ServiceCalendar({ services, onServiceClick, onServiceMov
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {dayServices.map(service => (
-                <Card key={service.id} className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => onServiceClick?.(service)}>
+                <Card key={service.id} className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => onServiceClick?.(service, currentDate)}>
                   <CardContent className="p-4">
                     {renderServiceItem(service, 'large', currentDate)}
                   </CardContent>
