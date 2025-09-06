@@ -286,19 +286,8 @@ export default function Services() {
       );
     }
     
-    // For service contracts (recurring), check if any dates are completed
-    const hasCompletedDates = service.completedDates && 
-      Array.isArray(service.completedDates) && 
-      service.completedDates.length > 0;
-    
-    if (hasCompletedDates) {
-      return (
-        <Badge className="bg-green-100 text-green-800">
-          COMPLETED
-        </Badge>
-      );
-    }
-    
+    // For service contracts (recurring), always show as SCHEDULED in list view
+    // Individual occurrences are handled in calendar view
     return (
       <Badge className={statusColors[status as keyof typeof statusColors] || "bg-gray-100 text-gray-800"}>
         {status.replace('_', ' ').toUpperCase()}
