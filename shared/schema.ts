@@ -311,7 +311,7 @@ export const serviceCompletionSchema = z.object({
   serviceInterval: z.string().optional(),
   contractLengthMonths: z.coerce.number().int().positive().optional(),
   completionDate: z.string().optional() // YYYY-MM-DD format for specific occurrence completion
-}).strict();
+});
 
 // Types
 export type UpsertUser = typeof users.$inferInsert;
