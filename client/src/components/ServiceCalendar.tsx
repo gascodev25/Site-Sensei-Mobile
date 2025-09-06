@@ -185,14 +185,6 @@ export default function ServiceCalendar({ services, onServiceClick, onServiceMov
     const completedDates = (service.completedDates as string[]) || [];
     const isThisOccurrenceCompleted = completedDates.includes(dateString);
     
-    // Debug logging
-    console.log(`Service ${service.id} (${service.client?.name}):`, {
-      dateString,
-      completedDates,
-      isThisOccurrenceCompleted,
-      type: service.type,
-      status: service.status
-    });
     
     // Determine status: check completedDates for service contracts, otherwise use service status
     const isServiceContract = service.type === 'service_contract';

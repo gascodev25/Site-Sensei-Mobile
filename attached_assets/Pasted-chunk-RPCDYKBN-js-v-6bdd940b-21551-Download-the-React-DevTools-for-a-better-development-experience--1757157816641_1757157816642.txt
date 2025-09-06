@@ -1,0 +1,133 @@
+chunk-RPCDYKBN.js?v=6bdd940b:21551 Download the React DevTools for a better development experience: https://reactjs.org/link/react-devtools
+chunk-RPCDYKBN.js?v=6bdd940b:521 Warning: validateDOMNesting(...): <a> cannot appear as a descendant of <a>.
+    at a
+    at a
+    at https://f7e6bacf-83dd-45ee-80f6-f413f067de71-00-vdxv1g2r39fv.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/wouter.js?v=6bdd940b:337:18
+    at nav
+    at div
+    at div
+    at div
+    at header
+    at Header (https://f7e6bacf-83dd-45ee-80f6-f413f067de71-00-vdxv1g2r39fv.janeway.replit.dev/src/components/Layout/Header.tsx:24:20)
+    at div
+    at Services (https://f7e6bacf-83dd-45ee-80f6-f413f067de71-00-vdxv1g2r39fv.janeway.replit.dev/src/pages/Services.tsx:36:41)
+    at Route (https://f7e6bacf-83dd-45ee-80f6-f413f067de71-00-vdxv1g2r39fv.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/wouter.js?v=6bdd940b:323:16)
+    at Switch (https://f7e6bacf-83dd-45ee-80f6-f413f067de71-00-vdxv1g2r39fv.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/wouter.js?v=6bdd940b:379:17)
+    at Router (https://f7e6bacf-83dd-45ee-80f6-f413f067de71-00-vdxv1g2r39fv.janeway.replit.dev/src/App.tsx?v=cgWYz2LHHByUpwV69YlMm:34:42)
+    at Provider (https://f7e6bacf-83dd-45ee-80f6-f413f067de71-00-vdxv1g2r39fv.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-7SUNRGEF.js?v=6bdd940b:38:15)
+    at TooltipProvider (https://f7e6bacf-83dd-45ee-80f6-f413f067de71-00-vdxv1g2r39fv.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-tooltip.js?v=6bdd940b:59:5)
+    at QueryClientProvider (https://f7e6bacf-83dd-45ee-80f6-f413f067de71-00-vdxv1g2r39fv.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@tanstack_react-query.js?v=6bdd940b:2805:3)
+    at App
+printWarning @ chunk-RPCDYKBN.js?v=6bdd940b:521
+ServiceCalendar.tsx:189 Service 10 (Smart Hygiene): Object
+ServiceCalendar.tsx:189 Service 9 (Smart Hygiene): Object
+ServiceCalendar.tsx:189 Service 11 (Green House): Object
+ServiceCalendar.tsx:189 Service 12 (Green House): Object
+ServiceCalendar.tsx:189 Service 5 (African Corporate Cleaning): Object
+ServiceCalendar.tsx:189 Service 10 (Smart Hygiene): Object
+ServiceCalendar.tsx:189 Service 11 (Green House): Object
+ServiceCalendar.tsx:189 Service 10 (Smart Hygiene): Object
+ServiceCalendar.tsx:189 Service 11 (Green House): Object
+ServiceCalendar.tsx:189 Service 12 (Green House): Object
+ServiceCalendar.tsx:189 Service 10 (Smart Hygiene): Object
+ServiceCalendar.tsx:189 Service 11 (Green House): Object
+ServiceCalendar.tsx:189 Service 10 (Smart Hygiene): Object
+ServiceCalendar.tsx:189 Service 9 (Smart Hygiene): Object
+ServiceCalendar.tsx:189 Service 11 (Green House): Object
+ServiceCalendar.tsx:189 Service 12 (Green House): Object
+ServiceCalendar.tsx:189 Service 5 (African Corporate Cleaning): Object
+ServiceCalendar.tsx:189 Service 10 (Smart Hygiene): Object
+ServiceCalendar.tsx:189 Service 11 (Green House): Object
+ServiceCalendar.tsx:189 Service 10 (Smart Hygiene): Object
+ServiceCalendar.tsx:189 Service 11 (Green House): Object
+ServiceCalendar.tsx:189 Service 12 (Green House): Object
+ServiceCalendar.tsx:189 Service 10 (Smart Hygiene): Object
+ServiceCalendar.tsx:189 Service 11 (Green House): Object
+@radix-ui_react-dialog.js?v=6bdd940b:337 Warning: Missing `Description` or `aria-describedby={undefined}` for {DialogContent}.
+(anonymous) @ @radix-ui_react-dialog.js?v=6bdd940b:337
+ServiceCalendar.tsx:189 Service 10 (Smart Hygiene): Object
+ServiceCalendar.tsx:189 Service 9 (Smart Hygiene): Object
+ServiceCalendar.tsx:189 Service 11 (Green House): Object
+ServiceCalendar.tsx:189 Service 12 (Green House): Object
+ServiceCalendar.tsx:189 Service 5 (African Corporate Cleaning): Object
+ServiceCalendar.tsx:189 Service 10 (Smart Hygiene): Object
+ServiceCalendar.tsx:189 Service 11 (Green House): Object
+ServiceCalendar.tsx:189 Service 10 (Smart Hygiene): Object
+ServiceCalendar.tsx:189 Service 11 (Green House): Object
+ServiceCalendar.tsx:189 Service 12 (Green House): Object
+ServiceCalendar.tsx:189 Service 10 (Smart Hygiene): Object
+ServiceCalendar.tsx:189 Service 11 (Green House): Object
+ServiceCalendar.tsx:189 Service 10 (Smart Hygiene): Object
+ServiceCalendar.tsx:189 Service 9 (Smart Hygiene): Object
+ServiceCalendar.tsx:189 Service 11 (Green House): Object
+ServiceCalendar.tsx:189 Service 12 (Green House): Object
+ServiceCalendar.tsx:189 Service 5 (African Corporate Cleaning): Object
+ServiceCalendar.tsx:189 Service 10 (Smart Hygiene): Object
+ServiceCalendar.tsx:189 Service 11 (Green House): Object
+ServiceCalendar.tsx:189 Service 10 (Smart Hygiene): Object
+ServiceCalendar.tsx:189 Service 11 (Green House): Object
+ServiceCalendar.tsx:189 Service 12 (Green House): Object
+ServiceCalendar.tsx:189 Service 10 (Smart Hygiene): Object
+ServiceCalendar.tsx:189 Service 11 (Green House): Object
+ServiceCalendar.tsx:189 Service 10 (Smart Hygiene): Object
+ServiceCalendar.tsx:189 Service 9 (Smart Hygiene): Object
+ServiceCalendar.tsx:189 Service 11 (Green House): Object
+ServiceCalendar.tsx:189 Service 12 (Green House): Object
+ServiceCalendar.tsx:189 Service 5 (African Corporate Cleaning): Object
+ServiceCalendar.tsx:189 Service 10 (Smart Hygiene): Object
+ServiceCalendar.tsx:189 Service 11 (Green House): Object
+ServiceCalendar.tsx:189 Service 10 (Smart Hygiene): Object
+ServiceCalendar.tsx:189 Service 11 (Green House): Object
+ServiceCalendar.tsx:189 Service 12 (Green House): Object
+ServiceCalendar.tsx:189 Service 10 (Smart Hygiene): Object
+ServiceCalendar.tsx:189 Service 11 (Green House): Object
+ServiceCalendar.tsx:189 Service 10 (Smart Hygiene): {dateString: '2025-09-07', completedDates: Array(0), isThisOccurrenceCompleted: false, type: 'service_contract', status: 'completed'}
+ServiceCalendar.tsx:189 Service 9 (Smart Hygiene): {dateString: '2025-09-07', completedDates: Array(0), isThisOccurrenceCompleted: false, type: 'installation', status: 'scheduled'}
+ServiceCalendar.tsx:189 Service 11 (Green House): {dateString: '2025-09-08', completedDates: Array(0), isThisOccurrenceCompleted: false, type: 'service_contract', status: 'completed'}
+ServiceCalendar.tsx:189 Service 12 (Green House): {dateString: '2025-09-09', completedDates: Array(1), isThisOccurrenceCompleted: true, type: 'service_contract', status: 'completed'}
+ServiceCalendar.tsx:189 Service 5 (African Corporate Cleaning): {dateString: '2025-09-11', completedDates: Array(0), isThisOccurrenceCompleted: false, type: 'service_contract', status: 'completed'}
+ServiceCalendar.tsx:189 Service 10 (Smart Hygiene): {dateString: '2025-09-14', completedDates: Array(0), isThisOccurrenceCompleted: false, type: 'service_contract', status: 'completed'}
+ServiceCalendar.tsx:189 Service 11 (Green House): {dateString: '2025-09-15', completedDates: Array(0), isThisOccurrenceCompleted: false, type: 'service_contract', status: 'completed'}
+ServiceCalendar.tsx:189 Service 10 (Smart Hygiene): {dateString: '2025-09-21', completedDates: Array(0), isThisOccurrenceCompleted: false, type: 'service_contract', status: 'completed'}
+ServiceCalendar.tsx:189 Service 11 (Green House): {dateString: '2025-09-22', completedDates: Array(0), isThisOccurrenceCompleted: false, type: 'service_contract', status: 'completed'}
+ServiceCalendar.tsx:189 Service 12 (Green House): {dateString: '2025-09-23', completedDates: Array(1), isThisOccurrenceCompleted: false, type: 'service_contract', status: 'completed'}
+ServiceCalendar.tsx:189 Service 10 (Smart Hygiene): {dateString: '2025-09-28', completedDates: Array(0), isThisOccurrenceCompleted: false, type: 'service_contract', status: 'completed'}
+ServiceCalendar.tsx:189 Service 11 (Green House): {dateString: '2025-09-29', completedDates: Array(0), isThisOccurrenceCompleted: false, type: 'service_contract', status: 'completed'}
+@radix-ui_react-dialog.js?v=6bdd940b:337 Warning: Missing `Description` or `aria-describedby={undefined}` for {DialogContent}.
+(anonymous) @ @radix-ui_react-dialog.js?v=6bdd940b:337
+commitHookEffectListMount @ chunk-RPCDYKBN.js?v=6bdd940b:16915
+commitPassiveMountOnFiber @ chunk-RPCDYKBN.js?v=6bdd940b:18156
+commitPassiveMountEffects_complete @ chunk-RPCDYKBN.js?v=6bdd940b:18129
+commitPassiveMountEffects_begin @ chunk-RPCDYKBN.js?v=6bdd940b:18119
+commitPassiveMountEffects @ chunk-RPCDYKBN.js?v=6bdd940b:18109
+flushPassiveEffectsImpl @ chunk-RPCDYKBN.js?v=6bdd940b:19490
+flushPassiveEffects @ chunk-RPCDYKBN.js?v=6bdd940b:19447
+commitRootImpl @ chunk-RPCDYKBN.js?v=6bdd940b:19416
+commitRoot @ chunk-RPCDYKBN.js?v=6bdd940b:19277
+performSyncWorkOnRoot @ chunk-RPCDYKBN.js?v=6bdd940b:18895
+flushSyncCallbacks @ chunk-RPCDYKBN.js?v=6bdd940b:9119
+(anonymous) @ chunk-RPCDYKBN.js?v=6bdd940b:18627
+ServiceCalendar.tsx:189 Service 10 (Smart Hygiene): {dateString: '2025-09-07', completedDates: Array(0), isThisOccurrenceCompleted: false, type: 'service_contract', status: 'completed'}
+ServiceCalendar.tsx:189 Service 9 (Smart Hygiene): {dateString: '2025-09-07', completedDates: Array(0), isThisOccurrenceCompleted: false, type: 'installation', status: 'scheduled'}
+ServiceCalendar.tsx:189 Service 11 (Green House): {dateString: '2025-09-08', completedDates: Array(0), isThisOccurrenceCompleted: false, type: 'service_contract', status: 'completed'}
+ServiceCalendar.tsx:189 Service 12 (Green House): {dateString: '2025-09-09', completedDates: Array(1), isThisOccurrenceCompleted: true, type: 'service_contract', status: 'completed'}
+ServiceCalendar.tsx:189 Service 5 (African Corporate Cleaning): {dateString: '2025-09-11', completedDates: Array(0), isThisOccurrenceCompleted: false, type: 'service_contract', status: 'completed'}
+ServiceCalendar.tsx:189 Service 10 (Smart Hygiene): {dateString: '2025-09-14', completedDates: Array(0), isThisOccurrenceCompleted: false, type: 'service_contract', status: 'completed'}
+ServiceCalendar.tsx:189 Service 11 (Green House): {dateString: '2025-09-15', completedDates: Array(0), isThisOccurrenceCompleted: false, type: 'service_contract', status: 'completed'}
+ServiceCalendar.tsx:189 Service 10 (Smart Hygiene): {dateString: '2025-09-21', completedDates: Array(0), isThisOccurrenceCompleted: false, type: 'service_contract', status: 'completed'}
+ServiceCalendar.tsx:189 Service 11 (Green House): {dateString: '2025-09-22', completedDates: Array(0), isThisOccurrenceCompleted: false, type: 'service_contract', status: 'completed'}
+ServiceCalendar.tsx:189 Service 12 (Green House): {dateString: '2025-09-23', completedDates: Array(1), isThisOccurrenceCompleted: false, type: 'service_contract', status: 'completed'}
+ServiceCalendar.tsx:189 Service 10 (Smart Hygiene): {dateString: '2025-09-28', completedDates: Array(0), isThisOccurrenceCompleted: false, type: 'service_contract', status: 'completed'}
+ServiceCalendar.tsx:189 Service 11 (Green House): {dateString: '2025-09-29', completedDates: Array(0), isThisOccurrenceCompleted: false, type: 'service_contract', status: 'completed'}
+ServiceCalendar.tsx:189 Service 10 (Smart Hygiene): {dateString: '2025-09-07', completedDates: Array(0), isThisOccurrenceCompleted: false, type: 'service_contract', status: 'completed'}
+ServiceCalendar.tsx:189 Service 9 (Smart Hygiene): {dateString: '2025-09-07', completedDates: Array(0), isThisOccurrenceCompleted: false, type: 'installation', status: 'scheduled'}
+ServiceCalendar.tsx:189 Service 11 (Green House): {dateString: '2025-09-08', completedDates: Array(0), isThisOccurrenceCompleted: false, type: 'service_contract', status: 'completed'}
+ServiceCalendar.tsx:189 Service 12 (Green House): {dateString: '2025-09-09', completedDates: Array(1), isThisOccurrenceCompleted: true, type: 'service_contract', status: 'completed'}
+ServiceCalendar.tsx:189 Service 5 (African Corporate Cleaning): {dateString: '2025-09-11', completedDates: Array(0), isThisOccurrenceCompleted: false, type: 'service_contract', status: 'completed'}
+ServiceCalendar.tsx:189 Service 10 (Smart Hygiene): {dateString: '2025-09-14', completedDates: Array(0), isThisOccurrenceCompleted: false, type: 'service_contract', status: 'completed'}
+ServiceCalendar.tsx:189 Service 11 (Green House): {dateString: '2025-09-15', completedDates: Array(0), isThisOccurrenceCompleted: false, type: 'service_contract', status: 'completed'}
+ServiceCalendar.tsx:189 Service 10 (Smart Hygiene): {dateString: '2025-09-21', completedDates: Array(0), isThisOccurrenceCompleted: false, type: 'service_contract', status: 'completed'}
+ServiceCalendar.tsx:189 Service 11 (Green House): {dateString: '2025-09-22', completedDates: Array(0), isThisOccurrenceCompleted: false, type: 'service_contract', status: 'completed'}
+ServiceCalendar.tsx:189 Service 12 (Green House): {dateString: '2025-09-23', completedDates: Array(1), isThisOccurrenceCompleted: false, type: 'service_contract', status: 'completed'}
+ServiceCalendar.tsx:189 Service 10 (Smart Hygiene): {dateString: '2025-09-28', completedDates: Array(0), isThisOccurrenceCompleted: false, type: 'service_contract', status: 'completed'}
+ServiceCalendar.tsx:189 Service 11 (Green House): {dateString: '2025-09-29', completedDates: Array(0), isThisOccurrenceCompleted: false, type: 'service_contract', status: 'completed'}

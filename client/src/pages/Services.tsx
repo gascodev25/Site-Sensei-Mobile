@@ -163,10 +163,15 @@ export default function Services() {
       setCompletionDialog({ open: true, service });
     } else {
       // For service contracts and other types, complete directly with current equipment/consumables
+      // Use the service's scheduled date (installationDate) instead of today's date
+      const scheduledDate = service.installationDate 
+        ? new Date(service.installationDate).toISOString().split('T')[0]
+        : new Date().toISOString().split('T')[0];
+      
       completeServiceMutation.mutate({
         serviceId: service.id,
         data: {
-          completionDate: new Date().toISOString().split('T')[0],
+          completionDate: scheduledDate,
           equipmentItems: service.equipmentItems || [],
           consumableItems: service.consumableItems || []
         }
