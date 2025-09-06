@@ -639,8 +639,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (isRecurring) {
         // For recurring services: Add to completedDates but keep service status as scheduled
         const currentCompletedDates = (existingService.completedDates as string[]) || [];
+        console.log(`Backend: Adding completion for service ${id}`, {
+          serviceId: id,
+          completionDate,
+          currentCompletedDates,
+          alreadyCompleted: currentCompletedDates.includes(completionDate)
+        });
         if (!currentCompletedDates.includes(completionDate)) {
           updateData.completedDates = [...currentCompletedDates, completionDate];
+          console.log(`Backend: Updated completedDates for service ${id}:`, updateData.completedDates);
         }
         // Don't change the main service status for recurring services
       } else {

@@ -185,19 +185,6 @@ export default function ServiceCalendar({ services, onServiceClick, onServiceMov
     const completedDates = (service.completedDates as string[]) || [];
     const isThisOccurrenceCompleted = completedDates.includes(dateString);
     
-    // Debug logging for service ID 13 (the one the user completed)
-    if (service.id === 13 && forDate) {
-      console.log('ServiceCalendar Debug for Service 13:', {
-        serviceId: service.id,
-        forDate: forDate.toISOString(),
-        dateString,
-        completedDates,
-        isThisOccurrenceCompleted,
-        serviceType: service.type,
-        recurrencePattern: service.recurrencePattern
-      });
-    }
-    
     // Determine status: check completedDates for service contracts, otherwise use service status
     const isServiceContract = service.type === 'service_contract';
     const hasRecurrence = service.recurrencePattern && 'interval' in (service.recurrencePattern as any);
