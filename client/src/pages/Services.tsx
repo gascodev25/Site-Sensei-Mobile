@@ -129,11 +129,12 @@ export default function Services() {
       return await apiRequest("POST", `/api/services/${serviceId}/complete`, data);
     },
     onSuccess: async () => {
-      // Clear all caches
-      queryClient.clear();
+      // Clear all related caches
+      queryClient.removeQueries({ queryKey: ["/api/services"] });
+      queryClient.removeQueries({ queryKey: ["/api/dashboard/metrics"] });
       
       // Small delay to ensure server has processed the update
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise(resolve => setTimeout(resolve, 300));
       
       // Force fresh fetch of services data
       await queryClient.fetchQuery({ 
@@ -142,8 +143,12 @@ export default function Services() {
         gcTime: 0
       });
       
-      // Invalidate related queries
-      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/metrics"] });
+      // Force refetch dashboard metrics
+      await queryClient.fetchQuery({ 
+        queryKey: ["/api/dashboard/metrics"],
+        staleTime: 0,
+        gcTime: 0
+      });
       
       setCompletionDialog({ open: false, service: null });
       setEditingService(null);
@@ -179,7 +184,7 @@ export default function Services() {
       // For regular services, just mark as completed
       completeServiceMutation.mutate({
         serviceId: service.id,
-        data: { status: 'completed' }
+        data: {}
       });
     }
   };
@@ -293,22 +298,28 @@ export default function Services() {
       );
     }
     
-    // For service contracts, check if any dates have been completed
-    if (service.type === 'service_contract' && service.completedDates && (service.completedDates as string[]).length > 0) {
-      return (
-        <Badge className="bg-green-100 border-green-400 text-green-800">
-          {(service.completedDates as string[]).length} COMPLETED
-        </Badge>
-      );
-    }
-    
-    // For other service types, check completedDates array
-    if (service.completedDates && (service.completedDates as string[]).length > 0) {
-      return (
-        <Badge className="bg-green-100 border-green-400 text-green-800">
-          COMPLETED
-        </Badge>
-      );
+    // For recurring services (service contracts), check if any dates have been completed
+    if (service.completedDates && Array.isArray(service.completedDates) && service.completedDates.length > 0) {
+      // Check if this is a recurring service
+      const isRecurring = service.recurrencePattern && 
+        service.recurrencePattern !== null && 
+        typeof service.recurrencePattern === 'object' &&
+        (service.recurrencePattern as any).interval;
+        
+      if (isRecurring) {
+        return (
+          <Badge className="bg-green-100 border-green-400 text-green-800">
+            {service.completedDates.length} COMPLETED
+          </Badge>
+        );
+      } else {
+        // For non-recurring services with completed dates, show as completed
+        return (
+          <Badge className="bg-green-100 border-green-400 text-green-800">
+            COMPLETED
+          </Badge>
+        );
+      }
     }
     
     const statusColors = {

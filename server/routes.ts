@@ -644,9 +644,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         // Don't change the main service status for recurring services
       } else {
-        // For non-recurring services: Mark as completed normally
+        // For non-recurring services: Mark as completed and add to completed dates
         updateData.status = 'completed';
         updateData.completedAt = new Date();
+        const currentCompletedDates = (existingService.completedDates as string[]) || [];
+        if (!currentCompletedDates.includes(completionDate)) {
+          updateData.completedDates = [...currentCompletedDates, completionDate];
+        }
       }
 
       // If it's an installation and conversion is requested
@@ -685,7 +689,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Update the service
+      console.log(`Updating service ${id} with data:`, JSON.stringify(updateData, null, 2));
       const service = await storage.updateService(id, updateData);
+      console.log(`Service ${id} updated successfully. New status: ${service.status}, completedDates:`, service.completedDates);
       
       // Audit log
       await storage.createAuditLog({
