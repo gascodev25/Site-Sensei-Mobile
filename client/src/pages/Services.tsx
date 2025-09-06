@@ -47,7 +47,7 @@ export default function Services() {
     if (!teamName) return "";
     const teamColors = {
       "Hygiene": "bg-blue-50 border-blue-200",
-      "Deep Clean": "bg-green-50 border-green-200", 
+      "Deep Clean": "bg-green-50 border-green-200",
       "Pest Control": "bg-orange-50 border-orange-200",
     };
     return teamColors[teamName as keyof typeof teamColors] || "";
@@ -176,8 +176,8 @@ export default function Services() {
     if (!service) return;
 
     // Check if this is a recurring service
-    const isRecurring = service.recurrencePattern && 
-      service.recurrencePattern !== null && 
+    const isRecurring = service.recurrencePattern &&
+      service.recurrencePattern !== null &&
       typeof service.recurrencePattern === 'object' &&
       (service.recurrencePattern as any).interval;
 
@@ -191,8 +191,8 @@ export default function Services() {
       });
     } else {
       // Handle non-recurring service or direct move
-      updateServiceMutation.mutate({ 
-        serviceId, 
+      updateServiceMutation.mutate({
+        serviceId,
         data: { installationDate: newDate }
       });
     }
@@ -238,7 +238,7 @@ export default function Services() {
     } catch (error) {
       console.error('Error in handleMoveThisOnly:', error);
     }
-    
+
     setRecurringMoveDialog({ open: false, service: null, originalDate: null, newDate: null });
   };
 
@@ -270,30 +270,30 @@ export default function Services() {
 
   const getStatusBadge = (service: ServiceWithDetails) => {
     let status = service.status || 'scheduled';
-    
+
     // For recurring services, check if today's date is in completedDates
-    const isRecurring = service.recurrencePattern && 
-                       typeof service.recurrencePattern === 'object' && 
+    const isRecurring = service.recurrencePattern &&
+                       typeof service.recurrencePattern === 'object' &&
                        service.recurrencePattern !== null &&
                        'interval' in service.recurrencePattern;
-    
+
     if (isRecurring && service.completedDates && Array.isArray(service.completedDates)) {
       const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
       const serviceDate = service.installationDate ? new Date(service.installationDate).toISOString().split('T')[0] : null;
-      
+
       // Check if the service date or today is in completed dates
       if (service.completedDates.includes(today) || (serviceDate && service.completedDates.includes(serviceDate))) {
         status = 'completed';
       }
     }
-    
+
     const statusColors = {
       scheduled: "bg-amber-100 border-amber-400 text-amber-800",
-      completed: "bg-green-100 border-green-400 text-green-800", 
+      completed: "bg-green-100 border-green-400 text-green-800",
       missed: "bg-red-100 border-red-400 text-red-800",
       in_progress: "bg-blue-100 border-blue-400 text-blue-800"
     };
-    
+
     return (
       <Badge className={statusColors[status as keyof typeof statusColors] || "bg-gray-100 border-gray-400 text-gray-800"}>
         {status.replace('_', ' ').toUpperCase()}
@@ -305,7 +305,7 @@ export default function Services() {
     if (!dateString) return "Not scheduled";
     return new Date(dateString).toLocaleDateString('en-ZA', {
       day: '2-digit',
-      month: 'short', 
+      month: 'short',
       year: 'numeric',
       hour: '2-digit',
       minute: '2-digit'
@@ -333,7 +333,7 @@ export default function Services() {
   return (
     <div className="min-h-screen bg-background">
       <Header />
-      
+
       <div className="container mx-auto px-6 py-8">
         {/* Page Header */}
         <div className="flex items-center justify-between mb-8">
@@ -411,7 +411,7 @@ export default function Services() {
                     <div>
                       <p className="text-sm font-medium text-muted-foreground">Today's Services</p>
                       <p className="text-2xl font-bold text-blue-600">
-                        {services.filter(s => s.installationDate && 
+                        {services.filter(s => s.installationDate &&
                           new Date(s.installationDate).toDateString() === new Date().toDateString()
                         ).length}
                       </p>
@@ -419,7 +419,7 @@ export default function Services() {
                   </div>
                 </CardContent>
               </Card>
-              
+
               <Card>
                 <CardContent className="p-4">
                   <div className="flex items-center space-x-2">
@@ -433,7 +433,7 @@ export default function Services() {
                   </div>
                 </CardContent>
               </Card>
-              
+
               <Card>
                 <CardContent className="p-4">
                   <div className="flex items-center space-x-2">
@@ -447,7 +447,7 @@ export default function Services() {
                   </div>
                 </CardContent>
               </Card>
-              
+
               <Card>
                 <CardContent className="p-4">
                   <div className="flex items-center space-x-2">
@@ -500,16 +500,16 @@ export default function Services() {
                           </div>
                         </div>
                         <div className="flex space-x-1">
-                          <Button 
-                            variant="ghost" 
+                          <Button
+                            variant="ghost"
                             size="sm"
                             onClick={() => setEditingService(service)}
                             data-testid={`button-edit-${service.id}`}
                           >
                             <Edit className="h-4 w-4" />
                           </Button>
-                          <Button 
-                            variant="ghost" 
+                          <Button
+                            variant="ghost"
                             size="sm"
                             onClick={() => handleDelete(service)}
                             disabled={deleteServiceMutation.isPending}
@@ -528,7 +528,7 @@ export default function Services() {
                         {service.team && (
                           <div className="flex items-center">
                             <User className="h-3 w-3 mr-1" />
-                            <span className="font-medium">Team:</span> 
+                            <span className="font-medium">Team:</span>
                             <span className="ml-1">{service.team.name}</span>
                           </div>
                         )}
@@ -538,7 +538,7 @@ export default function Services() {
                         {service.estimatedDuration && (
                           <div className="flex items-center">
                             <Clock className="h-3 w-3 mr-1" />
-                            <span className="font-medium">Duration:</span> 
+                            <span className="font-medium">Duration:</span>
                             <span className="ml-1">{service.estimatedDuration} minutes</span>
                           </div>
                         )}
@@ -576,15 +576,13 @@ export default function Services() {
               <ServiceForm
                 service={editingService}
                 onSuccess={() => {
+                  queryClient.invalidateQueries({ queryKey: ["/api/services"] });
+                  queryClient.invalidateQueries({ queryKey: ["/api/dashboard/metrics"] });
                   setEditingService(null);
-                  setIsCreateOpen(false);
                 }}
-                onCancel={() => {
-                  setEditingService(null);
-                  setIsCreateOpen(false);
-                }}
+                onCancel={() => setEditingService(null)}
                 onDelete={() => handleDelete(editingService)}
-                onComplete={() => handleServiceComplete(editingService)}
+                onComplete={() => setCompletionDialog({ open: true, service: editingService })}
               />
             )}
           </DialogContent>
@@ -593,7 +591,7 @@ export default function Services() {
         {/* Recurring Service Move Dialog */}
         <RecurringServiceMoveDialog
           open={recurringMoveDialog.open}
-          onOpenChange={(open) => 
+          onOpenChange={(open) =>
             !open && setRecurringMoveDialog({ open: false, service: null, originalDate: null, newDate: null })
           }
           service={recurringMoveDialog.service}
@@ -606,7 +604,7 @@ export default function Services() {
         {/* Service Completion Dialog */}
         <ServiceCompletionDialog
           open={completionDialog.open}
-          onOpenChange={(open) => 
+          onOpenChange={(open) =>
             !open && setCompletionDialog({ open: false, service: null })
           }
           service={completionDialog.service}
