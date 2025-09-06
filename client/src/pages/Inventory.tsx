@@ -15,11 +15,12 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDes
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Plus, Search, Edit, Trash2, Package, AlertTriangle, MapPin, Calendar as CalendarIcon, Barcode, QrCode } from "lucide-react";
+import { Plus, Search, Edit, Trash2, Package, AlertTriangle, MapPin, Calendar as CalendarIcon, Barcode, QrCode, Upload } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import type { Equipment, Consumable, Client, InsertEquipment, InsertConsumable } from "@shared/schema";
 import { z } from "zod";
+import BulkUploadDialog from "@/components/Dialogs/BulkUploadDialog";
 
 export default function Inventory() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -30,6 +31,7 @@ export default function Inventory() {
   const [editingConsumable, setEditingConsumable] = useState<Consumable | null>(null);
   const [isCreateTemplateOpen, setIsCreateTemplateOpen] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<any | null>(null);
+  const [isBulkUploadOpen, setIsBulkUploadOpen] = useState(false);
   const { toast } = useToast();
 
   // Equipment queries
@@ -641,6 +643,15 @@ export default function Inventory() {
             </TabsList>
             
             <div className="flex space-x-2">
+              <Button 
+                variant="outline" 
+                onClick={() => setIsBulkUploadOpen(true)}
+                data-testid="button-bulk-upload"
+              >
+                <Upload className="h-4 w-4 mr-2" />
+                Bulk Upload
+              </Button>
+              
               {activeTab === "equipment" && (
                 <Dialog open={isCreateEquipmentOpen} onOpenChange={setIsCreateEquipmentOpen}>
                   <DialogTrigger asChild>
@@ -1855,6 +1866,25 @@ export default function Inventory() {
             )}
           </TabsContent>
         </Tabs>
+        
+        {/* Bulk Upload Dialog */}
+        <BulkUploadDialog
+          open={isBulkUploadOpen}
+          onOpenChange={setIsBulkUploadOpen}
+          entityType={activeTab as "clients" | "equipment" | "consumables"}
+          onSuccess={() => {
+            // Refresh the appropriate data based on active tab
+            if (activeTab === "equipment") {
+              queryClient.invalidateQueries({ queryKey: ["/api/equipment"] });
+            } else if (activeTab === "consumables") {
+              queryClient.invalidateQueries({ queryKey: ["/api/consumables"] });
+            }
+            toast({
+              title: "Bulk Upload Complete",
+              description: "Your data has been uploaded successfully",
+            });
+          }}
+        />
       </div>
     </div>
   );
