@@ -629,28 +629,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.json(existingService);
       }
 
-      // Prepare update data - handle recurring vs non-recurring services differently
-      const updateData: any = {};
-      const isRecurring = existingService.recurrencePattern && 
-                         typeof existingService.recurrencePattern === 'object' && 
-                         existingService.recurrencePattern !== null &&
-                         'interval' in existingService.recurrencePattern;
-
-      if (isRecurring) {
-        // For recurring services: Add to completedDates but keep service status as scheduled
-        const currentCompletedDates = (existingService.completedDates as string[]) || [];
-        if (!currentCompletedDates.includes(completionDate)) {
-          updateData.completedDates = [...currentCompletedDates, completionDate];
-        }
-        // Don't change the main service status for recurring services
-      } else {
-        // For non-recurring services: Mark as completed and add to completed dates
-        updateData.status = 'completed';
-        updateData.completedAt = new Date();
-        const currentCompletedDates = (existingService.completedDates as string[]) || [];
-        if (!currentCompletedDates.includes(completionDate)) {
-          updateData.completedDates = [...currentCompletedDates, completionDate];
-        }
+      // Prepare update data - all services should be marked as completed when completed
+      const updateData: any = {
+        status: 'completed',
+        completedAt: new Date()
+      };
+      
+      // Add completion date to completedDates array
+      const currentCompletedDates = (existingService.completedDates as string[]) || [];
+      if (!currentCompletedDates.includes(completionDate)) {
+        updateData.completedDates = [...currentCompletedDates, completionDate];
       }
 
       // If it's an installation and conversion is requested
