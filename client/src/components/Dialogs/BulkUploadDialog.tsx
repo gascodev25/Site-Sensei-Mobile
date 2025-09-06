@@ -212,9 +212,32 @@ export default function BulkUploadDialog({
         onSuccess();
       }
     } catch (error: any) {
+      console.error('Bulk upload error:', error);
+      
+      let errorMessage = "An error occurred during upload";
+      
+      if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      // Try to extract more specific error information from the response
+      if (typeof error === 'object' && error.response) {
+        try {
+          const responseData = await error.response.json();
+          if (responseData.message) {
+            errorMessage = responseData.message;
+          }
+          if (responseData.errors && Array.isArray(responseData.errors)) {
+            errorMessage += `. Details: ${responseData.errors.map((e: any) => e.message || e).join(', ')}`;
+          }
+        } catch (e) {
+          // If we can't parse the response, use the original error
+        }
+      }
+      
       toast({
         title: "Upload failed",
-        description: error.message || "An error occurred during upload",
+        description: errorMessage,
         variant: "destructive"
       });
     } finally {
@@ -360,20 +383,26 @@ export default function BulkUploadDialog({
                 </div>
 
                 {validationErrors.length > 0 && (
-                  <div className="space-y-2 max-h-40 overflow-y-auto">
-                    {validationErrors.slice(0, 10).map((error, index) => (
-                      <div key={index} className="flex items-start gap-2 p-2 bg-red-50 rounded text-sm">
-                        <XCircle className="h-4 w-4 text-red-500 mt-0.5" />
-                        <div>
-                          <span className="font-medium">Row {error.row}:</span> {error.message}
+                  <div>
+                    <div className="text-sm text-red-600 mb-3 p-3 bg-red-50 rounded-lg border border-red-200">
+                      <p className="font-medium mb-1">Please fix the following errors before uploading:</p>
+                      <p className="text-xs">Make sure your CSV format matches the downloaded template exactly.</p>
+                    </div>
+                    <div className="space-y-2 max-h-40 overflow-y-auto">
+                      {validationErrors.slice(0, 10).map((error, index) => (
+                        <div key={index} className="flex items-start gap-2 p-2 bg-red-50 dark:bg-red-950 rounded text-sm border border-red-200 dark:border-red-800">
+                          <XCircle className="h-4 w-4 text-red-500 mt-0.5" />
+                          <div>
+                            <span className="font-medium">Row {error.row}:</span> {error.message}
+                          </div>
                         </div>
-                      </div>
-                    ))}
-                    {validationErrors.length > 10 && (
-                      <p className="text-sm text-muted-foreground">
-                        ...and {validationErrors.length - 10} more errors
-                      </p>
-                    )}
+                      ))}
+                      {validationErrors.length > 10 && (
+                        <p className="text-sm text-muted-foreground p-2">
+                          ...and {validationErrors.length - 10} more errors. Please review your data and try again.
+                        </p>
+                      )}
+                    </div>
                   </div>
                 )}
               </CardContent>
