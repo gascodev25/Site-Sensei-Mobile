@@ -288,6 +288,42 @@ export default function Services() {
 
   
 
+  // Get effective status for a service on a specific date (for recurring services)
+  const getEffectiveStatus = (service: ServiceWithDetails, checkDate?: Date) => {
+    const isRecurring = service.recurrencePattern && 
+      service.recurrencePattern !== null && 
+      typeof service.recurrencePattern === 'object' &&
+      (service.recurrencePattern as any).interval;
+
+    if (!isRecurring) {
+      return service.status;
+    }
+
+    // For recurring services, check if the installation date (or provided date) is completed
+    const dateToCheck = checkDate || (service.installationDate ? new Date(service.installationDate) : new Date());
+    const dateString = dateToCheck.toISOString().split('T')[0]; // YYYY-MM-DD format
+    const completedDates = (service.completedDates as string[]) || [];
+    const isDateCompleted = completedDates.some(completedDate => 
+      completedDate.split('T')[0] === dateString
+    );
+    
+    if (isDateCompleted) {
+      return 'completed';
+    }
+    
+    // Check if the date is in the past to mark as missed
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const serviceDate = new Date(dateToCheck);
+    serviceDate.setHours(0, 0, 0, 0);
+    
+    if (serviceDate < today) {
+      return 'missed';
+    }
+    
+    return 'scheduled';
+  };
+
   const formatDate = (dateString: string | Date | null) => {
     if (!dateString) return "Not scheduled";
     return new Date(dateString).toLocaleDateString('en-ZA', {
@@ -414,7 +450,7 @@ export default function Services() {
                     <div>
                       <p className="text-sm font-medium text-muted-foreground">Completed</p>
                       <p className="text-2xl font-bold text-green-600">
-                        {services.filter(s => s.status === 'completed').length}
+                        {services.filter(s => getEffectiveStatus(s) === 'completed').length}
                       </p>
                     </div>
                   </div>
@@ -428,7 +464,7 @@ export default function Services() {
                     <div>
                       <p className="text-sm font-medium text-muted-foreground">Scheduled</p>
                       <p className="text-2xl font-bold text-orange-600">
-                        {services.filter(s => s.status === 'scheduled').length}
+                        {services.filter(s => getEffectiveStatus(s) === 'scheduled').length}
                       </p>
                     </div>
                   </div>
@@ -442,7 +478,7 @@ export default function Services() {
                     <div>
                       <p className="text-sm font-medium text-muted-foreground">Missed</p>
                       <p className="text-2xl font-bold text-red-600">
-                        {services.filter(s => s.status === 'missed').length}
+                        {services.filter(s => getEffectiveStatus(s) === 'missed').length}
                       </p>
                     </div>
                   </div>
