@@ -999,14 +999,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       for (let index = 0; index < data.length; index++) {
         const row = data[index];
         try {
-          // Transform CSV row to match schema
+          // Transform CSV row to match schema - handle both camelCase and snake_case
           const clientData = {
             name: row.name,
-            addressText: row.address_text,
+            addressText: row.addressText || row.address_text,
             latitude: 0, // Will be updated by geocoding if needed
             longitude: 0,
             city: row.city || null,
-            contactPerson: row.contact_person || null,
+            contactPerson: row.contactPerson || row.contact_person || null,
             phone: row.phone || null,
           };
 
@@ -1054,14 +1054,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       for (let index = 0; index < data.length; index++) {
         const row = data[index];
         try {
-          // Transform CSV row to match schema
+          // Transform CSV row to match schema - handle both camelCase and snake_case
           const equipmentData = {
             name: row.name,
-            stockCode: row.stock_code,
+            stockCode: row.stockCode || row.stock_code,
             price: row.price ? parseFloat(row.price) : null,
             status: row.status || "in_warehouse",
             barcode: row.barcode || null,
-            qrCode: row.qr_code || null,
+            qrCode: row.qrCode || row.qr_code || null,
           };
 
           const validatedData = insertEquipmentSchema.parse(equipmentData);
@@ -1108,15 +1108,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       for (let index = 0; index < data.length; index++) {
         const row = data[index];
         try {
-          // Transform CSV row to match schema
+          // Transform CSV row to match schema - handle both camelCase and snake_case
           const consumableData = {
             name: row.name,
-            stockCode: row.stock_code,
+            stockCode: row.stockCode || row.stock_code,
             price: row.price ? parseFloat(row.price) : null,
-            minStockLevel: row.min_stock_level ? parseInt(row.min_stock_level) : 0,
-            currentStock: row.current_stock ? parseInt(row.current_stock) : 0,
+            minStockLevel: row.minStockLevel ? parseInt(row.minStockLevel) : (row.min_stock_level ? parseInt(row.min_stock_level) : 0),
+            currentStock: row.currentStock ? parseInt(row.currentStock) : (row.current_stock ? parseInt(row.current_stock) : 0),
             barcode: row.barcode || null,
-            qrCode: row.qr_code || null,
+            qrCode: row.qrCode || row.qr_code || null,
           };
 
           const validatedData = insertConsumableSchema.parse(consumableData);
