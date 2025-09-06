@@ -284,23 +284,22 @@ export default function Services() {
       in_progress: "bg-blue-100 border-blue-400 text-blue-800"
     };
     
-    // For service contracts, prioritize the actual status if completed
-    if (service.type === 'service_contract') {
-      if (status === 'completed') {
-        return (
-          <Badge className="bg-green-100 border-green-400 text-green-800">
-            COMPLETED
-          </Badge>
-        );
-      }
-      // Show completion count if any occurrences are completed but service isn't marked as completed
-      if (service.completedDates && (service.completedDates as string[]).length > 0) {
-        return (
-          <Badge className="bg-green-100 border-green-400 text-green-800">
-            {(service.completedDates as string[]).length} COMPLETED
-          </Badge>
-        );
-      }
+    // Always prioritize the actual status first
+    if (status === 'completed') {
+      return (
+        <Badge className="bg-green-100 border-green-400 text-green-800">
+          COMPLETED
+        </Badge>
+      );
+    }
+    
+    // For service contracts that aren't completed, show completion count if any occurrences are completed
+    if (service.type === 'service_contract' && service.completedDates && (service.completedDates as string[]).length > 0) {
+      return (
+        <Badge className="bg-green-100 border-green-400 text-green-800">
+          {(service.completedDates as string[]).length} COMPLETED
+        </Badge>
+      );
     }
     
     return (
