@@ -192,11 +192,28 @@ export default function ServiceCalendar({ services, onServiceClick, onServiceMov
 
     // Determine status: check completedDates for service contracts, otherwise use service status
     const isServiceContract = service.type === 'service_contract';
-    const hasRecurrence = service.recurrencePattern && 'interval' in (service.recurrencePattern as any);
+    const hasRecurrence = service.recurrencePattern && 
+      service.recurrencePattern !== null && 
+      typeof service.recurrencePattern === 'object' &&
+      (service.recurrencePattern as any).interval;
 
-    const effectiveStatus = (isServiceContract || hasRecurrence)
-      ? (isThisOccurrenceCompleted ? 'completed' : 'scheduled')
-      : service.status || 'scheduled';
+    // For recurring services or service contracts, check if this specific occurrence is completed
+    let effectiveStatus;
+    if (isServiceContract || hasRecurrence) {
+      if (isThisOccurrenceCompleted) {
+        effectiveStatus = 'completed';
+      } else {
+        // Check if the date is in the past to mark as missed
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const serviceDate = new Date(forDate || service.installationDate || new Date());
+        serviceDate.setHours(0, 0, 0, 0);
+
+        effectiveStatus = serviceDate < today ? 'missed' : 'scheduled';
+      }
+    } else {
+      effectiveStatus = service.status || 'scheduled';
+    }
 
     return (
       <div

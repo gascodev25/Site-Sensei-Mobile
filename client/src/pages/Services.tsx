@@ -295,17 +295,17 @@ export default function Services() {
       typeof service.recurrencePattern === 'object' &&
       (service.recurrencePattern as any).interval;
 
-    if (!isRecurring) {
+    const isServiceContract = service.type === 'service_contract';
+
+    if (!isRecurring && !isServiceContract) {
       return service.status;
     }
 
-    // For recurring services, check if the installation date (or provided date) is completed
+    // For recurring services or service contracts, check if the installation date (or provided date) is completed
     const dateToCheck = checkDate || (service.installationDate ? new Date(service.installationDate) : new Date());
     const dateString = dateToCheck.toISOString().split('T')[0]; // YYYY-MM-DD format
     const completedDates = (service.completedDates as string[]) || [];
-    const isDateCompleted = completedDates.some(completedDate => 
-      completedDate.split('T')[0] === dateString
-    );
+    const isDateCompleted = completedDates.includes(dateString);
     
     if (isDateCompleted) {
       return 'completed';
