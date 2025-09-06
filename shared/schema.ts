@@ -296,6 +296,19 @@ export const insertEquipmentTemplateSchema = createInsertSchema(equipmentTemplat
 
 export const insertTemplateConsumableSchema = createInsertSchema(templateConsumables);
 
+// Service Completion Schema
+export const serviceCompletionSchema = z.object({
+  equipmentItems: z.array(z.object({
+    id: z.number().int().positive(),
+    quantity: z.number().int().positive()
+  })).optional(),
+  consumableItems: z.array(z.object({
+    id: z.number().int().positive(),
+    quantity: z.number().int().positive()
+  })).optional(),
+  convertToContract: z.boolean().optional(),
+});
+
 // Types
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
@@ -329,4 +342,5 @@ export type TeamMember = typeof teamMembers.$inferSelect;
 export type InsertTeamMember = z.infer<typeof insertTeamMemberSchema>;
 export type ServiceTeam = typeof serviceTeams.$inferSelect;
 export type InsertServiceTeam = z.infer<typeof insertServiceTeamSchema>;
+export type ServiceCompletion = z.infer<typeof serviceCompletionSchema>;
 export type AuditLogEntry = typeof auditLog.$inferSelect;

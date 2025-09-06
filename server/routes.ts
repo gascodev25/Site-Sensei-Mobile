@@ -10,7 +10,8 @@ import {
   insertTeamMemberSchema, 
   insertServiceTeamSchema,
   insertEquipmentTemplateSchema,
-  insertTemplateConsumableSchema
+  insertTemplateConsumableSchema,
+  serviceCompletionSchema
 } from "@shared/schema";
 import { z } from "zod";
 
@@ -547,6 +548,79 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       console.error("Error updating service:", error);
       res.status(500).json({ message: "Failed to update service" });
+    }
+  });
+
+  // Complete service endpoint
+  app.post('/api/services/:id/complete', isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      
+      // Validate service ID
+      if (!id || id <= 0) {
+        return res.status(400).json({ message: "Invalid service ID" });
+      }
+      
+      // Validate request body
+      const validatedData = serviceCompletionSchema.parse(req.body);
+      const { equipmentItems, consumableItems, convertToContract } = validatedData;
+      
+      // Get the existing service
+      const existingService = await storage.getService(id);
+      if (!existingService) {
+        return res.status(404).json({ message: "Service not found" });
+      }
+      
+      // Check if service is already completed (idempotent operation)
+      if (existingService.status === 'completed') {
+        return res.json(existingService);
+      }
+
+      // Prepare update data
+      const updateData: any = {
+        status: 'completed',
+        completedAt: new Date(),
+      };
+
+      // If it's an installation and conversion is requested
+      if (existingService.type === 'installation' && convertToContract) {
+        updateData.type = 'service_contract';
+      }
+
+      // Update equipment and consumable items if provided
+      if (equipmentItems) {
+        updateData.equipmentItems = equipmentItems;
+      }
+      if (consumableItems) {
+        updateData.consumableItems = consumableItems;
+      }
+
+      // Update the service
+      const service = await storage.updateService(id, updateData);
+      
+      // Audit log
+      await storage.createAuditLog({
+        userId: req.user?.claims?.sub,
+        action: 'complete',
+        entityType: 'service',
+        entityId: service.id,
+        metadata: { 
+          convertedToContract: convertToContract,
+          equipmentItems: equipmentItems?.length || 0,
+          consumableItems: consumableItems?.length || 0
+        }
+      });
+      
+      res.json(service);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ 
+          message: "Validation error", 
+          errors: error.errors 
+        });
+      }
+      console.error("Error completing service:", error);
+      res.status(500).json({ message: "Failed to complete service" });
     }
   });
 
