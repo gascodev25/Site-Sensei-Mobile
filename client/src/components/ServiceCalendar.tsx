@@ -217,14 +217,8 @@ export default function ServiceCalendar({ services, onServiceClick, onServiceMov
     
     // For recurring services that are not completed on this date, show as scheduled
     return (
-      <Badge className={`text-xs ${statusColors[status as keyof typeof statusColors] || "bg-gray-100 text-gray-800 border-gray-300"}`}>
-        {status.replace('_', ' ').toUpperCase()}
-      </Badge>
-    );
-    
-    return (
-      <Badge className={`text-xs ${statusColors[status as keyof typeof statusColors] || "bg-gray-100 text-gray-800 border-gray-300"}`}>
-        {status.replace('_', ' ').toUpperCase()}
+      <Badge className="text-xs bg-blue-100 text-blue-800 border-blue-300">
+        SCHEDULED
       </Badge>
     );
   };

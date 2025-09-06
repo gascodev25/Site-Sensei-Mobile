@@ -286,8 +286,19 @@ export default function Services() {
       );
     }
     
-    // For service contracts (recurring), show the main service status
-    // Individual occurrences are handled separately in the calendar view
+    // For service contracts (recurring), check if any dates are completed
+    const hasCompletedDates = service.completedDates && 
+      Array.isArray(service.completedDates) && 
+      service.completedDates.length > 0;
+    
+    if (hasCompletedDates) {
+      const totalCompleted = (service.completedDates as string[]).length;
+      return (
+        <Badge className="bg-green-100 text-green-800">
+          {totalCompleted} COMPLETED
+        </Badge>
+      );
+    }
     
     return (
       <Badge className={statusColors[status as keyof typeof statusColors] || "bg-gray-100 text-gray-800"}>
