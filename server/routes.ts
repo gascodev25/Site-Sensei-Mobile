@@ -639,15 +639,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (isRecurring) {
         // For recurring services: Add to completedDates but keep service status as scheduled
         const currentCompletedDates = (existingService.completedDates as string[]) || [];
-        console.log(`Backend: Adding completion for service ${id}`, {
-          serviceId: id,
-          completionDate,
-          currentCompletedDates,
-          alreadyCompleted: currentCompletedDates.includes(completionDate)
-        });
         if (!currentCompletedDates.includes(completionDate)) {
           updateData.completedDates = [...currentCompletedDates, completionDate];
-          console.log(`Backend: Updated completedDates for service ${id}:`, updateData.completedDates);
         }
         // Don't change the main service status for recurring services
       } else {
@@ -684,68 +677,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Update equipment and consumable items if provided
-      // For service contracts: merge new items with existing template items
-      // For installations/one-off services: replace items entirely
       if (equipmentItems) {
-        if (existingService.type === 'service_contract' || updateData.type === 'service_contract') {
-          // Get existing equipment items from service
-          const existingServiceWithItems = await storage.getServiceWithStockItems(id);
-          const existingEquipmentItems = existingServiceWithItems?.equipmentItems || [];
-          
-          // Create a map of existing items by ID for easy lookup
-          const existingEquipmentMap = new Map(
-            existingEquipmentItems.map((item: any) => [item.id, item])
-          );
-          
-          // Merge new items with existing ones
-          const mergedEquipmentItems = [...existingEquipmentItems];
-          
-          for (const newItem of equipmentItems) {
-            const existingIndex = mergedEquipmentItems.findIndex((item: any) => item.id === newItem.id);
-            if (existingIndex >= 0) {
-              // Update existing item quantity (use the new quantity)
-              mergedEquipmentItems[existingIndex] = newItem;
-            } else {
-              // Add new item to template
-              mergedEquipmentItems.push(newItem);
-            }
-          }
-          
-          updateData.equipmentItems = mergedEquipmentItems;
-        } else {
-          updateData.equipmentItems = equipmentItems;
-        }
+        updateData.equipmentItems = equipmentItems;
       }
-      
       if (consumableItems) {
-        if (existingService.type === 'service_contract' || updateData.type === 'service_contract') {
-          // Get existing consumable items from service
-          const existingServiceWithItems = await storage.getServiceWithStockItems(id);
-          const existingConsumableItems = existingServiceWithItems?.consumableItems || [];
-          
-          // Create a map of existing items by ID for easy lookup
-          const existingConsumableMap = new Map(
-            existingConsumableItems.map((item: any) => [item.id, item])
-          );
-          
-          // Merge new items with existing ones
-          const mergedConsumableItems = [...existingConsumableItems];
-          
-          for (const newItem of consumableItems) {
-            const existingIndex = mergedConsumableItems.findIndex((item: any) => item.id === newItem.id);
-            if (existingIndex >= 0) {
-              // Update existing item quantity (use the new quantity)
-              mergedConsumableItems[existingIndex] = newItem;
-            } else {
-              // Add new item to template
-              mergedConsumableItems.push(newItem);
-            }
-          }
-          
-          updateData.consumableItems = mergedConsumableItems;
-        } else {
-          updateData.consumableItems = consumableItems;
-        }
+        updateData.consumableItems = consumableItems;
       }
 
       // Update the service
