@@ -20,6 +20,7 @@ export default function ServiceCalendar({ services, onServiceClick, onServiceMov
   const [selectedTeam, setSelectedTeam] = useState<string>('all');
   const [draggedService, setDraggedService] = useState<ServiceWithDetails | null>(null);
   const [draggedFromDate, setDraggedFromDate] = useState<Date | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
 
   // Get unique teams for filtering
   const teams = useMemo(() => {
@@ -165,6 +166,7 @@ export default function ServiceCalendar({ services, onServiceClick, onServiceMov
   const handleDragStart = (service: ServiceWithDetails, fromDate: Date) => {
     setDraggedService(service);
     setDraggedFromDate(fromDate);
+    setIsDragging(true);
   };
 
   const handleDrop = (date: Date) => {
@@ -172,6 +174,8 @@ export default function ServiceCalendar({ services, onServiceClick, onServiceMov
       onServiceMove(draggedService.id, date, draggedFromDate || undefined);
       setDraggedService(null);
       setDraggedFromDate(null);
+      // Reset dragging state after a small delay to prevent click events
+      setTimeout(() => setIsDragging(false), 0);
     }
   };
 
@@ -199,6 +203,10 @@ export default function ServiceCalendar({ services, onServiceClick, onServiceMov
         key={service.id}
         draggable
         onDragStart={() => handleDragStart(service, forDate || new Date())}
+        onDragEnd={() => {
+          // Reset dragging state if drag is cancelled or completed without drop
+          setTimeout(() => setIsDragging(false), 0);
+        }}
         onClick={(e) => {
           e.stopPropagation();
           onServiceClick?.(service);
@@ -274,7 +282,10 @@ export default function ServiceCalendar({ services, onServiceClick, onServiceMov
                 handleDrop(day);
               }}
               onDragOver={handleDragOver}
-              onClick={() => onDateClick?.(day)}
+              onClick={() => {
+                if (isDragging) return;
+                onDateClick?.(day);
+              }}
               data-testid={`calendar-day-${format(day, 'yyyy-MM-dd')}`}
             >
               <div className={`text-sm font-medium mb-1 ${isToday ? 'text-primary' : ''}`}>
@@ -322,7 +333,10 @@ export default function ServiceCalendar({ services, onServiceClick, onServiceMov
                   handleDrop(day);
                 }}
                 onDragOver={handleDragOver}
-                onClick={() => onDateClick?.(day)}
+                onClick={() => {
+                  if (isDragging) return;
+                  onDateClick?.(day);
+                }}
                 data-testid={`calendar-week-day-${format(day, 'yyyy-MM-dd')}`}
               >
                 <div className="space-y-2">
