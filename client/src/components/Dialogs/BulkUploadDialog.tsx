@@ -57,8 +57,8 @@ export default function BulkUploadDialog({
   const csvTemplates = {
     clients: [
       "name,addressText,city,contactPerson,phone",
-      "ABC Company,\"123 Main St, Johannesburg\",Johannesburg,John Smith,+27123456789",
-      "XYZ Corp,\"456 Oak Ave, Cape Town\",Cape Town,Jane Doe,+27987654321"
+      "ABC Company,123 Main St Johannesburg,Johannesburg,John Smith,+27123456789",
+      "XYZ Corp,456 Oak Ave Cape Town,Cape Town,Jane Doe,+27987654321"
     ].join("\n"),
     equipment: [
       "name,stockCode,price,status,barcode",
@@ -173,43 +173,73 @@ export default function BulkUploadDialog({
 
     try {
       // Transform data to handle numeric coercion and other type conversions
-      const transformedData = parseResult.data.map((row: any) => {
+      const transformedData = parseResult.data.map((row: any, index: number) => {
+        console.log(`Transforming row ${index + 1}:`, row);
         const transformedRow = { ...row };
+        
+        // Ensure all text fields are properly trimmed and not just whitespace
+        Object.keys(transformedRow).forEach(key => {
+          if (typeof transformedRow[key] === 'string') {
+            transformedRow[key] = transformedRow[key].trim();
+            // Convert empty strings to null for optional fields
+            if (transformedRow[key] === '' && key !== 'name' && key !== 'addressText' && key !== 'stockCode') {
+              transformedRow[key] = null;
+            }
+          }
+        });
         
         // Convert numeric fields for equipment and consumables
         if (entityType === "equipment" || entityType === "consumables") {
-          if (transformedRow.price !== undefined && transformedRow.price !== '') {
+          if (transformedRow.price !== undefined && transformedRow.price !== '' && transformedRow.price !== null) {
             transformedRow.price = parseFloat(transformedRow.price);
+          } else {
+            transformedRow.price = null;
           }
         }
         
         // Convert consumable-specific numeric fields
         if (entityType === "consumables") {
-          if (transformedRow.currentStock !== undefined && transformedRow.currentStock !== '') {
+          if (transformedRow.currentStock !== undefined && transformedRow.currentStock !== '' && transformedRow.currentStock !== null) {
             transformedRow.currentStock = parseInt(transformedRow.currentStock);
+          } else {
+            transformedRow.currentStock = 0;
           }
-          if (transformedRow.minStockLevel !== undefined && transformedRow.minStockLevel !== '') {
+          if (transformedRow.minStockLevel !== undefined && transformedRow.minStockLevel !== '' && transformedRow.minStockLevel !== null) {
             transformedRow.minStockLevel = parseInt(transformedRow.minStockLevel);
+          } else {
+            transformedRow.minStockLevel = 0;
           }
         }
         
+        console.log(`Transformed row ${index + 1} result:`, transformedRow);
         return transformedRow;
       });
+
+      console.log('Sending bulk upload request:', { data: transformedData });
 
       const response = await apiRequest("POST", `/api/bulk-upload/${entityType}`, {
         data: transformedData
       });
 
       const result = await response.json();
+      console.log('Bulk upload response:', result);
       setUploadResult(result);
       
-      toast({
-        title: "Upload completed",
-        description: `Successfully processed ${result.success} out of ${result.total} records`,
-      });
-
-      if (result.success > 0 && onSuccess) {
-        onSuccess();
+      if (result.success > 0) {
+        toast({
+          title: "Upload completed",
+          description: `Successfully processed ${result.success} out of ${result.total} records`,
+        });
+        
+        if (onSuccess) {
+          onSuccess();
+        }
+      } else {
+        toast({
+          title: "Upload completed with errors",
+          description: `${result.errors} errors occurred during upload. Check the details below.`,
+          variant: "destructive"
+        });
       }
     } catch (error: any) {
       console.error('Bulk upload error:', error);
@@ -227,8 +257,8 @@ export default function BulkUploadDialog({
           if (responseData.message) {
             errorMessage = responseData.message;
           }
-          if (responseData.errors && Array.isArray(responseData.errors)) {
-            errorMessage += `. Details: ${responseData.errors.map((e: any) => e.message || e).join(', ')}`;
+          if (responseData.errorDetails && Array.isArray(responseData.errorDetails)) {
+            errorMessage += `. Details: ${responseData.errorDetails.map((e: any) => `Row ${e.row}: ${e.error}`).join(', ')}`;
           }
         } catch (e) {
           // If we can't parse the response, use the original error
@@ -435,7 +465,7 @@ export default function BulkUploadDialog({
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-3 gap-4 text-center">
+                <div className="grid grid-cols-3 gap-4 text-center mb-4">
                   <div>
                     <p className="text-2xl font-bold text-green-600">{uploadResult.success}</p>
                     <p className="text-sm text-muted-foreground">Successful</p>
@@ -449,6 +479,32 @@ export default function BulkUploadDialog({
                     <p className="text-sm text-muted-foreground">Total</p>
                   </div>
                 </div>
+                
+                {uploadResult.errorDetails && Array.isArray(uploadResult.errorDetails) && uploadResult.errorDetails.length > 0 && (
+                  <div>
+                    <h4 className="font-medium mb-2 text-red-600">Error Details:</h4>
+                    <div className="space-y-2 max-h-40 overflow-y-auto">
+                      {uploadResult.errorDetails.slice(0, 10).map((error: any, index: number) => (
+                        <div key={index} className="flex items-start gap-2 p-2 bg-red-50 dark:bg-red-950 rounded text-sm border border-red-200 dark:border-red-800">
+                          <XCircle className="h-4 w-4 text-red-500 mt-0.5" />
+                          <div>
+                            <span className="font-medium">Row {error.row}:</span> {error.error}
+                            {error.data && (
+                              <div className="text-xs text-muted-foreground mt-1">
+                                Data: {JSON.stringify(error.data)}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                      {uploadResult.errorDetails.length > 10 && (
+                        <p className="text-sm text-muted-foreground p-2">
+                          ...and {uploadResult.errorDetails.length - 10} more errors.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
           )}

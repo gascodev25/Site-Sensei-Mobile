@@ -996,22 +996,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let errorCount = 0;
       const errors: any[] = [];
 
+      console.log('Processing bulk upload for clients, data:', JSON.stringify(data, null, 2));
+
       for (let index = 0; index < data.length; index++) {
         const row = data[index];
         try {
+          console.log(`Processing row ${index + 1}:`, row);
+
+          // Validate required fields first
+          if (!row.name || typeof row.name !== 'string' || row.name.trim() === '') {
+            throw new Error('Name is required and cannot be empty');
+          }
+
+          if (!row.addressText || typeof row.addressText !== 'string' || row.addressText.trim() === '') {
+            throw new Error('Address is required and cannot be empty');
+          }
+
           // Transform CSV row to match schema - handle both camelCase and snake_case
           const clientData = {
-            name: row.name,
-            addressText: row.addressText || row.address_text,
+            name: row.name.trim(),
+            addressText: row.addressText.trim(),
             latitude: 0, // Will be updated by geocoding if needed
             longitude: 0,
-            city: row.city || null,
-            contactPerson: row.contactPerson || row.contact_person || null,
-            phone: row.phone || null,
+            city: row.city && typeof row.city === 'string' ? row.city.trim() : null,
+            contactPerson: row.contactPerson && typeof row.contactPerson === 'string' ? row.contactPerson.trim() : null,
+            phone: row.phone && typeof row.phone === 'string' ? row.phone.trim() : null,
           };
 
+          console.log(`Transformed data for row ${index + 1}:`, clientData);
+
           const validatedData = insertClientSchema.parse(clientData);
-          await storage.createClient(validatedData);
+          const createdClient = await storage.createClient(validatedData);
+          console.log(`Successfully created client ${index + 1}:`, createdClient.id);
           successCount++;
 
           // Audit log for each client
@@ -1019,14 +1035,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
             userId: req.user?.claims?.sub,
             action: 'bulk_create',
             entityType: 'client',
-            entityId: null,
+            entityId: createdClient.id,
             metadata: { bulkUpload: true, clientName: row.name }
           });
         } catch (error: any) {
+          console.error(`Error processing row ${index + 1}:`, error);
           errorCount++;
-          errors.push({ row: index + 1, error: error.message });
+          errors.push({ 
+            row: index + 1, 
+            error: error.message || 'Unknown error',
+            data: row 
+          });
         }
       }
+
+      console.log(`Bulk upload completed: ${successCount} successful, ${errorCount} errors`);
 
       res.json({
         success: successCount,
