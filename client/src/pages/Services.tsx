@@ -271,23 +271,23 @@ export default function Services() {
   const getStatusBadge = (service: ServiceWithDetails) => {
     const status = service.status || 'scheduled';
     const statusColors = {
-      scheduled: "bg-blue-100 text-blue-800",
-      completed: "bg-green-100 text-green-800", 
-      missed: "bg-red-100 text-red-800",
-      in_progress: "bg-yellow-100 text-yellow-800"
+      scheduled: "bg-amber-100 border-amber-400 text-amber-800",
+      completed: "bg-green-100 border-green-400 text-green-800", 
+      missed: "bg-red-100 border-red-400 text-red-800",
+      in_progress: "bg-blue-100 border-blue-400 text-blue-800"
     };
     
     // For service contracts, show completion count if any occurrences are completed
     if (service.type === 'service_contract' && service.completedDates && (service.completedDates as string[]).length > 0) {
       return (
-        <Badge className="bg-green-100 text-green-800">
+        <Badge className="bg-green-100 border-green-400 text-green-800">
           {(service.completedDates as string[]).length} COMPLETED
         </Badge>
       );
     }
     
     return (
-      <Badge className={statusColors[status as keyof typeof statusColors] || "bg-gray-100 text-gray-800"}>
+      <Badge className={statusColors[status as keyof typeof statusColors] || "bg-gray-100 border-gray-400 text-gray-800"}>
         {status.replace('_', ' ').toUpperCase()}
       </Badge>
     );
