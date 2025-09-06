@@ -1002,11 +1002,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Transform CSV row to match schema
           const clientData = {
             name: row.name,
-            addressText: row.address_text,
+            addressText: row.addressText,
             latitude: 0, // Will be updated by geocoding if needed
             longitude: 0,
             city: row.city || null,
-            contactPerson: row.contact_person || null,
+            contactPerson: row.contactPerson || null,
             phone: row.phone || null,
           };
 
@@ -1057,11 +1057,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Transform CSV row to match schema
           const equipmentData = {
             name: row.name,
-            stockCode: row.stock_code,
+            stockCode: row.stockCode,
             price: row.price ? parseFloat(row.price) : null,
             status: row.status || "in_warehouse",
             barcode: row.barcode || null,
-            qrCode: row.qr_code || null,
+            qrCode: row.qrCode || null,
           };
 
           const validatedData = insertEquipmentSchema.parse(equipmentData);
@@ -1111,12 +1111,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Transform CSV row to match schema
           const consumableData = {
             name: row.name,
-            stockCode: row.stock_code,
+            stockCode: row.stockCode,
             price: row.price ? parseFloat(row.price) : null,
-            minStockLevel: row.min_stock_level ? parseInt(row.min_stock_level) : 0,
-            currentStock: row.current_stock ? parseInt(row.current_stock) : 0,
+            minStockLevel: row.minStockLevel ? parseInt(row.minStockLevel) : 0,
+            currentStock: row.currentStock ? parseInt(row.currentStock) : 0,
             barcode: row.barcode || null,
-            qrCode: row.qr_code || null,
+            qrCode: row.qrCode || null,
           };
 
           const validatedData = insertConsumableSchema.parse(consumableData);
