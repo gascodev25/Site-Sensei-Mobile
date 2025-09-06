@@ -77,14 +77,32 @@ export default function ServiceCompletionDialog({
 
   const completeServiceMutation = useMutation({
     mutationFn: async (data: CompletionFormData) => {
-      return await apiRequest("POST", `/api/services/${service?.id}/complete`, {
-        equipmentItems: data.equipmentItems,
-        consumableItems: data.consumableItems,
-        convertToContract: data.convertToContract,
-        serviceInterval: data.serviceInterval,
-        contractLengthMonths: data.contractLengthMonths,
+      const requestData: any = {
         completionDate: completionDate?.toISOString().split('T')[0] || new Date().toISOString().split('T')[0],
-      });
+      };
+
+      // Only include fields that have values to avoid validation errors
+      if (data.equipmentItems && data.equipmentItems.length > 0) {
+        requestData.equipmentItems = data.equipmentItems;
+      }
+      
+      if (data.consumableItems && data.consumableItems.length > 0) {
+        requestData.consumableItems = data.consumableItems;
+      }
+      
+      if (data.convertToContract) {
+        requestData.convertToContract = data.convertToContract;
+      }
+      
+      if (data.serviceInterval) {
+        requestData.serviceInterval = data.serviceInterval;
+      }
+      
+      if (data.contractLengthMonths) {
+        requestData.contractLengthMonths = data.contractLengthMonths;
+      }
+
+      return await apiRequest("POST", `/api/services/${service?.id}/complete`, requestData);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/services"] });

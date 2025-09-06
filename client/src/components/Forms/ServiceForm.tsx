@@ -576,7 +576,7 @@ export default function ServiceForm({ service, initialDate, onSuccess, onCancel,
               Delete
             </Button>
           )}
-          {isEditing && onComplete && service?.type === 'service_contract' && (
+          {isEditing && onComplete && (
             <Button
               type="button"
               onClick={onComplete}
