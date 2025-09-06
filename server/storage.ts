@@ -134,6 +134,8 @@ export interface IStorage {
 }
 
 export class DatabaseStorage implements IStorage {
+  private db = db;
+
   // User operations
   async getUser(id: string): Promise<User | null> {
     const result = await this.db
