@@ -129,24 +129,20 @@ export default function Services() {
       return await apiRequest("POST", `/api/services/${serviceId}/complete`, data);
     },
     onSuccess: async () => {
-      // Remove all service-related queries from cache
-      queryClient.removeQueries({ queryKey: ["/api/services"] });
-      queryClient.removeQueries({ queryKey: ["/api/dashboard/metrics"] });
-      
-      // Clear all query cache to force fresh data
+      // Clear all caches
       queryClient.clear();
       
       // Small delay to ensure server has processed the update
-      await new Promise(resolve => setTimeout(resolve, 300));
+      await new Promise(resolve => setTimeout(resolve, 500));
       
-      // Force fresh fetch of services data with no cache
+      // Force fresh fetch of services data
       await queryClient.fetchQuery({ 
         queryKey: ["/api/services"],
         staleTime: 0,
-        gcTime: 0 // Don't cache this result
+        gcTime: 0
       });
       
-      // Also refresh dashboard metrics
+      // Invalidate related queries
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard/metrics"] });
       
       setCompletionDialog({ open: false, service: null });
@@ -288,8 +284,8 @@ export default function Services() {
   const getStatusBadge = (service: ServiceWithDetails) => {
     const status = service.status || 'scheduled';
     
-    // Always prioritize the actual status first
-    if (status === 'completed') {
+    // Check for completed status first - this covers all completion scenarios
+    if (status === 'completed' || service.completedAt) {
       return (
         <Badge className="bg-green-100 border-green-400 text-green-800">
           COMPLETED
@@ -297,7 +293,7 @@ export default function Services() {
       );
     }
     
-    // For service contracts that aren't completed, show completion count if any occurrences are completed
+    // For service contracts, check if any dates have been completed
     if (service.type === 'service_contract' && service.completedDates && (service.completedDates as string[]).length > 0) {
       return (
         <Badge className="bg-green-100 border-green-400 text-green-800">
@@ -306,8 +302,8 @@ export default function Services() {
       );
     }
     
-    // For installations and other single services, check if they have been completed
-    if (service.completedAt || (service.completedDates && (service.completedDates as string[]).length > 0)) {
+    // For other service types, check completedDates array
+    if (service.completedDates && (service.completedDates as string[]).length > 0) {
       return (
         <Badge className="bg-green-100 border-green-400 text-green-800">
           COMPLETED
