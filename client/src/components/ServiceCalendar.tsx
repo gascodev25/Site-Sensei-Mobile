@@ -215,15 +215,12 @@ export default function ServiceCalendar({ services, onServiceClick, onServiceMov
       );
     }
     
-    // Show completion count for recurring services
-    const completedDates = service.completedDates as string[] || [];
-    if (completedDates.length > 0) {
-      return (
-        <Badge className="text-xs bg-green-100 text-green-800 border-green-300">
-          {completedDates.length} COMPLETED
-        </Badge>
-      );
-    }
+    // For recurring services that are not completed on this date, show as scheduled
+    return (
+      <Badge className={`text-xs ${statusColors[status as keyof typeof statusColors] || "bg-gray-100 text-gray-800 border-gray-300"}`}>
+        {status.replace('_', ' ').toUpperCase()}
+      </Badge>
+    );
     
     return (
       <Badge className={`text-xs ${statusColors[status as keyof typeof statusColors] || "bg-gray-100 text-gray-800 border-gray-300"}`}>

@@ -286,15 +286,8 @@ export default function Services() {
       );
     }
     
-    // For service contracts (recurring), show completion status
-    const completedDates = service.completedDates as string[] || [];
-    if (completedDates.length > 0) {
-      return (
-        <Badge className="bg-green-100 text-green-800">
-          {completedDates.length} COMPLETED
-        </Badge>
-      );
-    }
+    // For service contracts (recurring), show the main service status
+    // Individual occurrences are handled separately in the calendar view
     
     return (
       <Badge className={statusColors[status as keyof typeof statusColors] || "bg-gray-100 text-gray-800"}>
