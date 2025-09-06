@@ -194,6 +194,8 @@ export default function ServiceCalendar({ services, onServiceClick, onServiceMov
     const isServiceContract = service.type === 'service_contract';
     const hasRecurrence = service.recurrencePattern && 'interval' in (service.recurrencePattern as any);
 
+    // For non-recurring services (like installations), always use the main service status
+    // For recurring services, check if this specific date is completed
     const effectiveStatus = (isServiceContract || hasRecurrence)
       ? (isCompletedOnThisDate ? 'completed' : 'scheduled')
       : service.status || 'scheduled';
