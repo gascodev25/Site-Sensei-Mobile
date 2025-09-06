@@ -7,10 +7,11 @@ export type Role =
   | "team_member";
 
 export interface User {
-  roles: string;
+  roles: string | null;
 }
 
 export function hasRole(user: User, role: Role): boolean {
+  if (!user.roles) return false;
   return user.roles.split(",").includes(role);
 }
 

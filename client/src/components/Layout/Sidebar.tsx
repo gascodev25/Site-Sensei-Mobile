@@ -67,6 +67,7 @@ export default function Sidebar({ className }: SidebarProps) {
     // Debug logging
     console.log("Current user in sidebar:", user);
     console.log("User roles:", user?.roles);
+    console.log("User authenticated:", !!user);
     
     // Only show Users link if user has permission to manage users and user has roles
     if (user && user.roles && canCreateUser(user)) {
@@ -74,7 +75,11 @@ export default function Sidebar({ className }: SidebarProps) {
       return [...baseItems, navigationItems.find(item => item.title === "Users")!];
     }
     
-    console.log("User cannot create users - hiding Users menu");
+    console.log("User cannot create users - hiding Users menu", { 
+      hasUser: !!user, 
+      hasRoles: !!user?.roles,
+      userRoles: user?.roles 
+    });
     return baseItems;
   };
 
