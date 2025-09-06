@@ -1135,7 +1135,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const consumableData = {
             name: row.name,
             stockCode: row.stockCode || row.stock_code,
-            price: row.price ? parseFloat(row.price) : null,
+            price: row.price ? parseFloat(row.price).toString() : null,
             minStockLevel: row.minStockLevel ? parseInt(row.minStockLevel) : (row.min_stock_level ? parseInt(row.min_stock_level) : 0),
             currentStock: row.currentStock ? parseInt(row.currentStock) : (row.current_stock ? parseInt(row.current_stock) : 0),
             barcode: row.barcode || null,
