@@ -286,7 +286,7 @@ export default function Services() {
       );
     }
     
-    // For service contracts (recurring), show active status
+    // For service contracts (recurring), check if any dates are completed
     const hasCompletedDates = service.completedDates && 
       Array.isArray(service.completedDates) && 
       service.completedDates.length > 0;
@@ -294,8 +294,8 @@ export default function Services() {
     if (hasCompletedDates) {
       const totalCompleted = (service.completedDates as string[]).length;
       return (
-        <Badge className="bg-blue-100 text-blue-800">
-          ACTIVE ({totalCompleted} COMPLETED)
+        <Badge className="bg-green-100 text-green-800">
+          {totalCompleted} COMPLETED
         </Badge>
       );
     }
