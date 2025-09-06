@@ -1,5 +1,7 @@
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/hooks/useAuth";
+import { canCreateUser } from "@/lib/permissions";
 import { 
   LayoutDashboard, 
   Building2, 
@@ -15,12 +17,6 @@ import {
 interface SidebarProps {
   className?: string;
 }
-
-// Assume user object is available in the scope, for example, from a context or global state
-// In a real application, you would fetch or access this from your auth context
-const user = {
-  roles: ["super_user"] // Example role for testing
-};
 
 
 const navigationItems = [
@@ -58,6 +54,7 @@ const navigationItems = [
 
 export default function Sidebar({ className }: SidebarProps) {
   const [location] = useLocation();
+  const { user } = useAuth();
 
   return (
     <div className={cn("pb-12", className)}>
@@ -96,7 +93,7 @@ export default function Sidebar({ className }: SidebarProps) {
       </div>
 
       {/* Users section - only show for super_user or general_manager */}
-      {user && (user.roles?.includes("super_user") || user.roles?.includes("general_manager")) && (
+      {user && canCreateUser(user) && (
         <div className="px-3 py-2">
           <div className="space-y-1">
             <Link href="/users">
