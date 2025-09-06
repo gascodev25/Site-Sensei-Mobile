@@ -47,27 +47,27 @@ export default function BulkUploadDialog({
   } | null>(null);
   const { toast } = useToast();
 
-  // Define required fields for each entity type
+  // Define required fields for each entity type (using camelCase to match schema)
   const requiredFields = {
-    clients: ["name", "address_text"],
-    equipment: ["name", "stock_code"],
-    consumables: ["name", "stock_code"]
+    clients: ["name", "addressText"],
+    equipment: ["name", "stockCode"],
+    consumables: ["name", "stockCode"]
   };
 
-  // Define CSV templates
+  // Define CSV templates (using camelCase to match schema)
   const csvTemplates = {
     clients: [
-      "name,address_text,city,contact_person,phone",
+      "name,addressText,city,contactPerson,phone",
       "ABC Company,\"123 Main St, Johannesburg\",Johannesburg,John Smith,+27123456789",
       "XYZ Corp,\"456 Oak Ave, Cape Town\",Cape Town,Jane Doe,+27987654321"
     ].join("\n"),
     equipment: [
-      "name,stock_code,price,status,barcode",
+      "name,stockCode,price,status,barcode",
       "Hygiene Station,HST001,2500,in_warehouse,123456789",
       "Soap Dispenser,SD001,150,in_warehouse,987654321"
     ].join("\n"),
     consumables: [
-      "name,stock_code,price,current_stock,min_stock_level,barcode",
+      "name,stockCode,price,currentStock,minStockLevel,barcode",
       "Foam Soap 700ml,FS001,45,100,20,111222333",
       "Paper Towels,PT001,25,50,10,444555666"
     ].join("\n")
@@ -120,7 +120,7 @@ export default function BulkUploadDialog({
           errors.push({
             row: index + 1,
             field,
-            message: `${field.replace(/_/g, ' ')} is required`
+            message: `${field.replace(/([A-Z])/g, ' $1').toLowerCase()} is required`
           });
         }
       });
@@ -147,17 +147,17 @@ export default function BulkUploadDialog({
       }
 
       if (entityType === "consumables") {
-        if (row.current_stock && row.current_stock !== '' && isNaN(parseInt(row.current_stock))) {
+        if (row.currentStock && row.currentStock !== '' && isNaN(parseInt(row.currentStock))) {
           errors.push({
             row: index + 1,
-            field: 'current_stock',
+            field: 'currentStock',
             message: 'Current stock must be a valid number'
           });
         }
-        if (row.min_stock_level && row.min_stock_level !== '' && isNaN(parseInt(row.min_stock_level))) {
+        if (row.minStockLevel && row.minStockLevel !== '' && isNaN(parseInt(row.minStockLevel))) {
           errors.push({
             row: index + 1,
-            field: 'min_stock_level',
+            field: 'minStockLevel',
             message: 'Min stock level must be a valid number'
           });
         }
