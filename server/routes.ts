@@ -659,8 +659,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         updateData.consumableItems = consumableItems;
       }
 
-      // Update the service
-      const service = await storage.updateService(id, updateData);
+      // Update the service only if there are changes to make
+      let service;
+      if (Object.keys(updateData).length > 0) {
+        service = await storage.updateService(id, updateData);
+      } else {
+        // If no updates needed, just get the existing service
+        service = await storage.getService(id);
+        if (!service) {
+          return res.status(404).json({ message: "Service not found" });
+        }
+      }
       
       // Audit log
       await storage.createAuditLog({
