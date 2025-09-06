@@ -277,17 +277,15 @@ export default function Services() {
       in_progress: "bg-yellow-100 text-yellow-800"
     };
     
-    // For non-recurring services, use the main status
-    if (service.type !== 'service_contract') {
+    // For service contracts, show completion count if any occurrences are completed
+    if (service.type === 'service_contract' && service.completedDates && (service.completedDates as string[]).length > 0) {
       return (
-        <Badge className={statusColors[status as keyof typeof statusColors] || "bg-gray-100 text-gray-800"}>
-          {status.replace('_', ' ').toUpperCase()}
+        <Badge className="bg-green-100 text-green-800">
+          {(service.completedDates as string[]).length} COMPLETED
         </Badge>
       );
     }
     
-    // For service contracts (recurring), always show as SCHEDULED in list view
-    // Individual occurrences are handled in calendar view
     return (
       <Badge className={statusColors[status as keyof typeof statusColors] || "bg-gray-100 text-gray-800"}>
         {status.replace('_', ' ').toUpperCase()}

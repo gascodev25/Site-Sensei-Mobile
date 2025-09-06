@@ -51,7 +51,7 @@ export default function ServiceCalendar({ services, onServiceClick, onServiceMov
       // Fallback to status color if no team
       return getStatusColor(status || 'scheduled');
     }
-
+    
     const teamColors = {
       "Hygiene": "bg-blue-50 border-blue-200 text-blue-900",
       "Deep Clean": "bg-green-50 border-green-200 text-green-900", 
@@ -72,7 +72,7 @@ export default function ServiceCalendar({ services, onServiceClick, onServiceMov
 
     // Check if service has recurrence pattern
     const recurrencePattern = service.recurrencePattern as { interval?: string; end_date?: string } | null;
-
+    
     if (!recurrencePattern || !recurrencePattern.interval) {
       // Single occurrence service
       return [baseDate];
@@ -86,16 +86,16 @@ export default function ServiceCalendar({ services, onServiceClick, onServiceMov
 
     const intervalDays = parseInt(intervalMatch[1]);
     const instances: Date[] = [];
-
+    
     // Get excluded dates (dates to skip)
     const excludedDates = (service.excludedDates as string[]) || [];
     const excludedDateStrings = new Set(excludedDates.map(date => date.split('T')[0])); // Normalize to YYYY-MM-DD
-
+    
     // Generate instances ONLY forward from the installation date
     let currentDate = new Date(baseDate);
     while (currentDate <= endDate) {
       const currentDateString = currentDate.toISOString().split('T')[0]; // YYYY-MM-DD format
-
+      
       // Only add if the date is within our view range, on or after the installation date, and NOT excluded
       if (currentDate >= startDate && 
           currentDate >= baseDate && 
@@ -103,20 +103,20 @@ export default function ServiceCalendar({ services, onServiceClick, onServiceMov
         instances.push(new Date(currentDate));
       }
       currentDate = new Date(currentDate.getTime() + (intervalDays * 24 * 60 * 60 * 1000));
-
+      
       // Optional: respect end_date if specified in recurrence pattern
       if (recurrencePattern.end_date && currentDate > parseISO(recurrencePattern.end_date)) {
         break;
       }
     }
-
+    
     return instances.sort((a, b) => a.getTime() - b.getTime());
   };
 
   // Get services for a specific date (including recurring instances)
   const getServicesForDate = (date: Date) => {
     const servicesForDate: ServiceWithDetails[] = [];
-
+    
     filteredServices.forEach(service => {
       // For calendar view, we need to show recurring instances within a reasonable range
       const viewStart = view === 'month' 
@@ -124,7 +124,7 @@ export default function ServiceCalendar({ services, onServiceClick, onServiceMov
         : view === 'week' 
         ? startOfWeek(currentDate, { weekStartsOn: 1 })
         : currentDate;
-
+      
       const viewEnd = view === 'month' 
         ? endOfMonth(endOfWeek(endOfMonth(currentDate), { weekStartsOn: 1 }))
         : view === 'week' 
@@ -132,12 +132,12 @@ export default function ServiceCalendar({ services, onServiceClick, onServiceMov
         : currentDate;
 
       const instances = generateRecurringInstances(service, viewStart, viewEnd);
-
+      
       if (instances.some(instanceDate => isSameDay(instanceDate, date))) {
         servicesForDate.push(service);
       }
     });
-
+    
     return servicesForDate;
   };
 
@@ -183,65 +183,21 @@ export default function ServiceCalendar({ services, onServiceClick, onServiceMov
     e.preventDefault();
   };
 
-  // Get status badge using same logic as list view
-  const getStatusBadge = (service: ServiceWithDetails, forDate?: Date) => {
-    const currentDateStr = forDate?.toISOString().split('T')[0] || new Date().toISOString().split('T')[0];
-    const status = service.status || 'scheduled';
-    const statusColors = {
-      scheduled: "bg-blue-100 text-blue-800 border-blue-300",
-      completed: "bg-green-100 text-green-800 border-green-300", 
-      missed: "bg-red-100 text-red-800 border-red-300",
-      in_progress: "bg-yellow-100 text-yellow-800 border-yellow-300"
-    };
-
-    // For non-recurring services, use the main status
-    if (service.type !== 'service_contract') {
-      return (
-        <Badge className={`text-xs ${statusColors[status as keyof typeof statusColors] || "bg-gray-100 text-gray-800 border-gray-300"}`}>
-          {status.replace('_', ' ').toUpperCase()}
-        </Badge>
-      );
-    }
-
-    // For service contracts (recurring), check if this specific date is completed
-    const isCompletedOnThisDate = service.completedDates && 
-      (service.completedDates as string[]).includes(currentDateStr);
-
-    if (isCompletedOnThisDate) {
-      return (
-        <Badge className="text-xs bg-green-100 text-green-800 border-green-300">
-          COMPLETED
-        </Badge>
-      );
-    }
-
-    // For recurring services that are not completed on this date, don't show a badge
-    return null;
-  };
-
   // Render service item
   const renderServiceItem = (service: ServiceWithDetails, size: 'small' | 'large' = 'small', forDate?: Date) => {
-    const currentDateStr = forDate?.toISOString().split('T')[0] || new Date().toISOString().split('T')[0];
-    // Check if this specific date is completed for recurring services
-    const isCompletedOnThisDate = service.type === 'service_contract' && 
-      service.completedDates && 
-      (service.completedDates as string[]).includes(currentDateStr);
-
+    // Check if this specific occurrence is completed
+    const dateString = forDate?.toISOString().split('T')[0] || new Date().toISOString().split('T')[0];
+    const completedDates = (service.completedDates as string[]) || [];
+    const isThisOccurrenceCompleted = completedDates.includes(dateString);
+    
+    // Determine status: check completedDates for service contracts, otherwise use service status
     const isServiceContract = service.type === 'service_contract';
     const hasRecurrence = service.recurrencePattern && 'interval' in (service.recurrencePattern as any);
-
-    // For non-recurring services (like installations), always use the main service status
-    // For recurring services, check if this specific date is completed
+    
     const effectiveStatus = (isServiceContract || hasRecurrence)
-      ? (isCompletedOnThisDate ? 'completed' : 'scheduled')
+      ? (isThisOccurrenceCompleted ? 'completed' : 'scheduled')
       : service.status || 'scheduled';
-
-    const itemClass = `
-          p-2 mb-1 rounded text-xs cursor-pointer transition-all duration-200 
-          ${getTeamBackgroundColor(service.team?.name, effectiveStatus)} 
-          hover:shadow-md border-l-4
-        `;
-
+    
     return (
       <div
         key={service.id}
@@ -255,14 +211,14 @@ export default function ServiceCalendar({ services, onServiceClick, onServiceMov
           e.stopPropagation();
           onServiceClick?.(service);
         }}
-        className={itemClass}
+        className={`
+          ${getTeamBackgroundColor(service.team?.name, effectiveStatus)}
+          border rounded p-2 cursor-pointer hover:shadow-sm transition-shadow text-xs
+          ${size === 'large' ? 'mb-2' : 'mb-1'}
+        `}
         data-testid={`calendar-service-${service.id}`}
       >
-        <div className="font-medium">{service.client?.name}</div>
-        <div className="text-xs opacity-75">
-          {service.type?.replace('_', ' ')} - {service.team?.name || 'No Team'}
-        </div>
-
+        <div className="font-medium truncate">{service.client?.name || 'Unknown'}</div>
         {size === 'large' && (
           <>
             <div className="flex items-center text-xs mt-1 opacity-75">
@@ -283,17 +239,9 @@ export default function ServiceCalendar({ services, onServiceClick, onServiceMov
             )}
           </>
         )}
-        {getStatusBadge(service, forDate)}
-        <div className="text-xs font-medium mt-1">
-          Status: {(() => {
-            const currentDateStr = forDate?.toISOString().split('T')[0] || new Date().toISOString().split('T')[0];
-            const isCompletedOnThisDate = service.type === 'service_contract' && 
-              service.completedDates && 
-              (service.completedDates as string[]).includes(currentDateStr);
-            
-            return isCompletedOnThisDate ? 'COMPLETED' : (service.status || 'scheduled').replace('_', ' ').toUpperCase();
-          })()}
-        </div>
+        <Badge className={`mt-1 text-xs ${getStatusColor(effectiveStatus)}`}>
+          {effectiveStatus.replace('_', ' ').toUpperCase()}
+        </Badge>
       </div>
     );
   };
@@ -314,13 +262,13 @@ export default function ServiceCalendar({ services, onServiceClick, onServiceMov
             {day}
           </div>
         ))}
-
+        
         {/* Calendar days */}
         {days.map(day => {
           const dayServices = getServicesForDate(day);
           const isCurrentMonth = isSameMonth(day, currentDate);
           const isToday = isSameDay(day, new Date());
-
+          
           return (
             <div
               key={day.toISOString()}
@@ -369,7 +317,7 @@ export default function ServiceCalendar({ services, onServiceClick, onServiceMov
         {days.map(day => {
           const dayServices = getServicesForDate(day);
           const isToday = isSameDay(day, new Date());
-
+          
           return (
             <Card key={day.toISOString()} className={isToday ? 'ring-2 ring-primary' : ''}>
               <CardHeader className="p-3">

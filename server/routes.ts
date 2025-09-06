@@ -631,23 +631,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Prepare update data - handle recurring vs non-recurring services differently
       const updateData: any = {};
-      const isRecurring = (existingService.type === 'service_contract') || 
-                         (existingService.recurrencePattern && 
-                          typeof existingService.recurrencePattern === 'object' && 
-                          existingService.recurrencePattern !== null &&
-                          'interval' in existingService.recurrencePattern);
+      const isRecurring = existingService.recurrencePattern && 
+                         typeof existingService.recurrencePattern === 'object' && 
+                         existingService.recurrencePattern !== null &&
+                         'interval' in existingService.recurrencePattern;
 
       if (isRecurring) {
         // For recurring services: Add to completedDates but keep service status as scheduled
         const currentCompletedDates = (existingService.completedDates as string[]) || [];
         if (!currentCompletedDates.includes(completionDate)) {
           updateData.completedDates = [...currentCompletedDates, completionDate];
-        } else {
-          // If already completed for this date, just return the existing service
-          return res.json(existingService);
         }
-        // Keep the main service status as scheduled for recurring services
-        // Individual occurrences are tracked via completedDates array
+        // Don't change the main service status for recurring services
       } else {
         // For non-recurring services: Mark as completed normally
         updateData.status = 'completed';
@@ -689,14 +684,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         updateData.consumableItems = consumableItems;
       }
 
-      // Update the service only if there are changes to make
-      let service;
-      if (Object.keys(updateData).length > 0) {
-        service = await storage.updateService(id, updateData);
-      } else {
-        // No changes needed, return existing service
-        service = existingService;
-      }
+      // Update the service
+      const service = await storage.updateService(id, updateData);
       
       // Audit log
       await storage.createAuditLog({
