@@ -261,9 +261,11 @@ export default function Services() {
   });
 
   const getStatusBadge = (service: ServiceWithDetails) => {
-    // Check if this is a recurring service with completedDates
-    if (service.completedDates && Array.isArray(service.completedDates) && service.completedDates.length > 0) {
-      // For recurring services, show completed if there are any completed dates
+    // Check actual service status first
+    const status = service.status || 'scheduled';
+    
+    // If service is marked as completed, show completed badge
+    if (status === 'completed') {
       return (
         <Badge className="bg-green-100 border-green-400 text-green-800">
           COMPLETED
@@ -271,8 +273,17 @@ export default function Services() {
       );
     }
     
-    // For non-recurring services, use the actual status
-    const status = service.status || 'scheduled';
+    // Check if this is a recurring service with completedDates
+    if (service.completedDates && Array.isArray(service.completedDates) && service.completedDates.length > 0) {
+      // For recurring services with completed dates, show partial completion
+      return (
+        <Badge className="bg-green-100 border-green-400 text-green-800">
+          COMPLETED
+        </Badge>
+      );
+    }
+    
+    // For other statuses
     const statusColors = {
       scheduled: "bg-amber-100 border-amber-400 text-amber-800",
       completed: "bg-green-100 border-green-400 text-green-800", 
