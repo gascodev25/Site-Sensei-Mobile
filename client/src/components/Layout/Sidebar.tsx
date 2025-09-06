@@ -64,11 +64,17 @@ export default function Sidebar({ className }: SidebarProps) {
   const getVisibleNavigationItems = () => {
     const baseItems = navigationItems.filter(item => item.title !== "Users");
     
+    // Debug logging
+    console.log("Current user in sidebar:", user);
+    console.log("User roles:", user?.roles);
+    
     // Only show Users link if user has permission to manage users
-    if (user && canCreateUser(user)) {
+    if (user && user.roles && canCreateUser(user)) {
+      console.log("User can create users - showing Users menu");
       return [...baseItems, navigationItems.find(item => item.title === "Users")!];
     }
     
+    console.log("User cannot create users - hiding Users menu");
     return baseItems;
   };
 
