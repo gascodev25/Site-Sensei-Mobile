@@ -12,6 +12,7 @@ import Services from "@/pages/Services";
 import Inventory from "@/pages/Inventory";
 import Teams from "@/pages/Teams";
 import Reports from "@/pages/Reports";
+import Users from "@/pages/Users";
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -28,6 +29,7 @@ function Router() {
           <Route path="/inventory" component={Inventory} />
           <Route path="/teams" component={Teams} />
           <Route path="/reports" component={Reports} />
+          <Route path="/users" component={Users} />
         </>
       )}
       <Route component={NotFound} />

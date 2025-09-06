@@ -32,6 +32,7 @@ import {
   type InsertEquipmentTemplate,
   type EquipmentTemplateWithConsumables,
   type EquipmentWithConsumables,
+  roleChanges,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, or, sql, desc, asc, ilike, lt, gte, lte, inArray } from "drizzle-orm";
@@ -40,7 +41,16 @@ export interface IStorage {
   // User operations (required for Replit Auth)
   getUser(id: string): Promise<User | undefined>;
   upsertUser(user: UpsertUser): Promise<User>;
-  
+  getAllUsers(): Promise<User[]>;
+  updateUserRoles(userId: string, roles: string): Promise<User>;
+  createRoleChangeLog(data: {
+    userId: string;
+    oldRoles: string | null;
+    newRoles: string;
+    changedBy: string;
+    reason?: string;
+  }): Promise<void>;
+
   // Client operations
   getClients(): Promise<Client[]>;
   getClient(id: number): Promise<Client | undefined>;
@@ -48,7 +58,7 @@ export interface IStorage {
   updateClient(id: number, client: Partial<InsertClient>): Promise<Client>;
   deleteClient(id: number): Promise<void>;
   searchClients(query: string): Promise<Client[]>;
-  
+
   // Service operations
   getServices(): Promise<ServiceWithDetails[]>;
   getService(id: number): Promise<Service | undefined>;
@@ -56,7 +66,7 @@ export interface IStorage {
   updateService(id: number, service: Partial<InsertService>): Promise<Service>;
   deleteService(id: number): Promise<void>;
   searchServices(query: string): Promise<ServiceWithDetails[]>;
-  
+
   // Equipment operations
   getEquipment(): Promise<Equipment[]>;
   getEquipmentByStatus(status: string): Promise<Equipment[]>;
@@ -73,14 +83,14 @@ export interface IStorage {
   createEquipmentTemplate(template: InsertEquipmentTemplate, consumableIds: number[]): Promise<EquipmentTemplate>;
   updateEquipmentTemplate(id: number, template: Partial<InsertEquipmentTemplate>, consumableIds: number[]): Promise<EquipmentTemplate>;
   deleteEquipmentTemplate(id: number): Promise<void>;
-  
+
   // Consumables operations
   getConsumables(): Promise<Consumable[]>;
   getLowStockConsumables(): Promise<Consumable[]>;
   createConsumable(consumable: InsertConsumable): Promise<Consumable>;
   updateConsumable(id: number, consumable: Partial<InsertConsumable>): Promise<Consumable>;
   deleteConsumable(id: number): Promise<void>;
-  
+
   // Services operations
   getServices(): Promise<Service[]>;
   getServicesForDate(date: Date): Promise<Service[]>;
@@ -89,7 +99,7 @@ export interface IStorage {
   createService(service: InsertService): Promise<Service>;
   updateService(id: number, service: Partial<InsertService>): Promise<Service>;
   deleteService(id: number): Promise<void>;
-  
+
   // Team operations
   getTeamMembers(): Promise<TeamMember[]>;
   getServiceTeams(): Promise<ServiceTeam[]>;
@@ -101,7 +111,7 @@ export interface IStorage {
   deleteServiceTeam(id: number): Promise<void>;
   getTeamAssignments(): Promise<{ teamId: number; memberId: number; }[]>;
   updateTeamAssignments(teamId: number, memberIds: number[]): Promise<void>;
-  
+
   // Dashboard metrics
   getDashboardMetrics(): Promise<{
     servicesToday: number;
@@ -113,20 +123,25 @@ export interface IStorage {
     completionRate: number;
     monthlyRevenue: number;
   }>;
-  
+
   // Service stock assignment methods
   createServiceStockAssignment(assignment: any): Promise<any>;
   getServiceStockAssignments(serviceId: number): Promise<any[]>;
-  
+  getServiceWithStockItems(id: number): Promise<any | undefined>;
+
   // Audit logging
   createAuditLog(entry: Omit<AuditLogEntry, 'id' | 'timestamp'>): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
   // User operations
-  async getUser(id: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.id, id));
-    return user;
+  async getUser(id: string): Promise<User | null> {
+    const result = await this.db
+      .select()
+      .from(users)
+      .where(eq(users.id, id))
+      .limit(1);
+    return result[0] || null;
   }
 
   async upsertUser(userData: UpsertUser): Promise<User> {
@@ -142,6 +157,47 @@ export class DatabaseStorage implements IStorage {
       })
       .returning();
     return user;
+  }
+
+  async getAllUsers(): Promise<User[]> {
+    return await this.db
+      .select()
+      .from(users)
+      .orderBy(users.firstName, users.lastName, users.email);
+  }
+
+  async updateUserRoles(userId: string, roles: string): Promise<User> {
+    const result = await this.db
+      .update(users)
+      .set({
+        roles: roles,
+        updatedAt: new Date()
+      })
+      .where(eq(users.id, userId))
+      .returning();
+
+    if (result.length === 0) {
+      throw new Error('User not found');
+    }
+
+    return result[0];
+  }
+
+  async createRoleChangeLog(data: {
+    userId: string;
+    oldRoles: string | null;
+    newRoles: string;
+    changedBy: string;
+    reason?: string;
+  }): Promise<void> {
+    await this.db.insert(roleChanges).values({
+      userId: data.userId,
+      oldRoles: data.oldRoles,
+      newRoles: data.newRoles,
+      changedBy: data.changedBy,
+      reason: data.reason,
+      changedAt: new Date()
+    });
   }
 
   // Client operations
@@ -198,7 +254,7 @@ export class DatabaseStorage implements IStorage {
       .leftJoin(clients, eq(services.clientId, clients.id))
       .leftJoin(serviceTeams, eq(services.teamId, serviceTeams.id))
       .orderBy(desc(services.installationDate));
-    
+
     return results.map(row => ({
       ...row.service,
       client: row.client,
@@ -213,9 +269,9 @@ export class DatabaseStorage implements IStorage {
 
   async createService(service: InsertService): Promise<Service> {
     const { equipmentItems, consumableItems, ...serviceData } = service;
-    
+
     const [newService] = await db.insert(services).values(serviceData).returning();
-    
+
     // Create service stock associations
     if (equipmentItems && equipmentItems.length > 0) {
       const equipmentStockData = equipmentItems.map(item => ({
@@ -226,7 +282,7 @@ export class DatabaseStorage implements IStorage {
       }));
       await db.insert(serviceStockIssued).values(equipmentStockData);
     }
-    
+
     if (consumableItems && consumableItems.length > 0) {
       const consumableStockData = consumableItems.map(item => ({
         serviceId: newService.id,
@@ -236,7 +292,7 @@ export class DatabaseStorage implements IStorage {
       }));
       await db.insert(serviceStockIssued).values(consumableStockData);
     }
-    
+
     return newService;
   }
 
@@ -252,7 +308,7 @@ export class DatabaseStorage implements IStorage {
   async deleteService(id: number): Promise<void> {
     // First delete related stock issued records
     await db.delete(serviceStockIssued).where(eq(serviceStockIssued.serviceId, id));
-    
+
     // Then delete the service
     await db.delete(services).where(eq(services.id, id));
   }
@@ -275,7 +331,7 @@ export class DatabaseStorage implements IStorage {
         )
       )
       .orderBy(desc(services.installationDate));
-    
+
     return results.map(row => ({
       ...row.service,
       client: row.client,
@@ -296,7 +352,7 @@ export class DatabaseStorage implements IStorage {
     startOfDay.setHours(0, 0, 0, 0);
     const endOfDay = new Date(date);
     endOfDay.setHours(23, 59, 59, 999);
-    
+
     return await db
       .select()
       .from(services)
@@ -381,7 +437,7 @@ export class DatabaseStorage implements IStorage {
 
   async createEquipmentWithConsumables(equipmentData: InsertEquipment, consumableIds: number[]): Promise<Equipment> {
     const [newEquipment] = await db.insert(equipment).values(equipmentData).returning();
-    
+
     if (consumableIds.length > 0) {
       const equipmentConsumableData = consumableIds.map(consumableId => ({
         equipmentId: newEquipment.id,
@@ -389,14 +445,14 @@ export class DatabaseStorage implements IStorage {
       }));
       await db.insert(equipmentConsumables).values(equipmentConsumableData);
     }
-    
+
     return newEquipment;
   }
 
   async updateEquipmentConsumables(equipmentId: number, consumableIds: number[]): Promise<void> {
     // Delete existing relationships
     await db.delete(equipmentConsumables).where(eq(equipmentConsumables.equipmentId, equipmentId));
-    
+
     // Insert new relationships
     if (consumableIds.length > 0) {
       const equipmentConsumableData = consumableIds.map(consumableId => ({
@@ -436,7 +492,7 @@ export class DatabaseStorage implements IStorage {
 
   async createEquipmentTemplate(templateData: InsertEquipmentTemplate, consumableIds: number[]): Promise<EquipmentTemplate> {
     const [newTemplate] = await db.insert(equipmentTemplates).values(templateData).returning();
-    
+
     if (consumableIds.length > 0) {
       const templateConsumableData = consumableIds.map(consumableId => ({
         templateId: newTemplate.id,
@@ -445,7 +501,7 @@ export class DatabaseStorage implements IStorage {
       }));
       await db.insert(templateConsumables).values(templateConsumableData);
     }
-    
+
     return newTemplate;
   }
 
@@ -455,10 +511,10 @@ export class DatabaseStorage implements IStorage {
       .set(templateData)
       .where(eq(equipmentTemplates.id, id))
       .returning();
-    
+
     // Delete existing template-consumable associations
     await db.delete(templateConsumables).where(eq(templateConsumables.templateId, id));
-    
+
     // Create new associations if consumableIds provided
     if (consumableIds.length > 0) {
       const templateConsumableData = consumableIds.map(consumableId => ({
@@ -468,7 +524,7 @@ export class DatabaseStorage implements IStorage {
       }));
       await db.insert(templateConsumables).values(templateConsumableData);
     }
-    
+
     return updatedTemplate;
   }
 
@@ -563,7 +619,7 @@ export class DatabaseStorage implements IStorage {
   async updateTeamAssignments(teamId: number, memberIds: number[]): Promise<void> {
     // Remove existing assignments for this team
     await db.delete(teamAssignments).where(eq(teamAssignments.teamId, teamId));
-    
+
     // Add new assignments
     if (memberIds.length > 0) {
       const assignments = memberIds.map(memberId => ({
@@ -612,7 +668,7 @@ export class DatabaseStorage implements IStorage {
         .where(gte(services.installationDate, startOfMonth))
     ]);
 
-    const completionRate = totalThisMonthResult[0].count > 0 
+    const completionRate = totalThisMonthResult[0].count > 0
       ? Math.round((completedThisMonthResult[0].count / totalThisMonthResult[0].count) * 100)
       : 0;
 
@@ -667,7 +723,7 @@ export class DatabaseStorage implements IStorage {
       .map(item => item.equipment.templateId)
       .filter(templateId => templateId !== null);
     let templateConsumablesList: any[] = [];
-    
+
     if (templateIds.length > 0) {
       // Get consumables linked to those templates
       templateConsumablesList = await db
@@ -682,16 +738,16 @@ export class DatabaseStorage implements IStorage {
 
     // Combine directly assigned consumables with template consumables
     const allConsumables = [...consumableAssignments];
-    
+
     // Add template consumables that aren't already directly assigned
     templateConsumablesList.forEach(templateItem => {
       const alreadyAssigned = consumableAssignments.some(
         assigned => assigned.consumable.id === templateItem.consumable.id
       );
-      
+
       if (!alreadyAssigned) {
         allConsumables.push({
-          stockItem: { 
+          stockItem: {
             quantity: templateItem.templateConsumable.recommendedQuantity || 1,
             serviceId: id,
             consumableId: templateItem.consumable.id,
