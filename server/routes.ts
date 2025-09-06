@@ -31,6 +31,83 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // User management routes
+  app.get('/api/users', isAuthenticated, async (req: any, res) => {
+    try {
+      const currentUserId = req.user.claims.sub;
+      const currentUser = await storage.getUser(currentUserId);
+      
+      if (!currentUser) {
+        return res.status(401).json({ message: "User not found" });
+      }
+
+      // Check if user can create users (super_user or general_manager)
+      const userRoles = currentUser.roles ? currentUser.roles.split(',') : [];
+      const canManageUsers = userRoles.includes('super_user') || userRoles.includes('general_manager');
+      
+      if (!canManageUsers) {
+        return res.status(403).json({ message: "Access denied. Insufficient permissions." });
+      }
+
+      const users = await storage.getUsers();
+      res.json(users);
+    } catch (error) {
+      console.error("Error fetching users:", error);
+      res.status(500).json({ message: "Failed to fetch users" });
+    }
+  });
+
+  app.put('/api/users/:id/roles', isAuthenticated, async (req: any, res) => {
+    try {
+      const currentUserId = req.user.claims.sub;
+      const targetUserId = req.params.id;
+      const { roles } = req.body;
+
+      const currentUser = await storage.getUser(currentUserId);
+      
+      if (!currentUser) {
+        return res.status(401).json({ message: "User not found" });
+      }
+
+      // Check if user can create users (super_user or general_manager)
+      const userRoles = currentUser.roles ? currentUser.roles.split(',') : [];
+      const canManageUsers = userRoles.includes('super_user') || userRoles.includes('general_manager');
+      
+      if (!canManageUsers) {
+        return res.status(403).json({ message: "Access denied. Insufficient permissions." });
+      }
+
+      // Validate roles
+      const validRoles = ['super_user', 'general_manager', 'ops_manager', 'admin', 'warehouse_clerk', 'team_member'];
+      const roleArray = roles.split(',').filter((role: string) => role.trim());
+      
+      for (const role of roleArray) {
+        if (!validRoles.includes(role.trim())) {
+          return res.status(400).json({ message: `Invalid role: ${role}` });
+        }
+      }
+
+      const updatedUser = await storage.updateUserRoles(targetUserId, roles);
+      
+      // Audit log
+      await storage.createAuditLog({
+        userId: currentUserId,
+        action: 'update',
+        entityType: 'user',
+        entityId: targetUserId,
+        metadata: { 
+          newRoles: roles,
+          targetUserEmail: updatedUser.email 
+        }
+      });
+
+      res.json(updatedUser);
+    } catch (error) {
+      console.error("Error updating user roles:", error);
+      res.status(500).json({ message: "Failed to update user roles" });
+    }
+  });
+
   // Dashboard routes
   app.get('/api/dashboard/metrics', isAuthenticated, async (req, res) => {
     try {

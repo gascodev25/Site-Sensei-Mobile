@@ -8,7 +8,8 @@ import {
   Users, 
   BarChart3,
   Settings,
-  ChevronRight
+  ChevronRight,
+  Shield
 } from "lucide-react";
 
 interface SidebarProps {
@@ -45,6 +46,11 @@ const navigationItems = [
     title: "Reports",
     href: "/reports",
     icon: BarChart3,
+  },
+  {
+    title: "Users",
+    href: "/users",
+    icon: Shield,
   },
 ];
 
