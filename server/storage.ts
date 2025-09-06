@@ -12,6 +12,8 @@ import {
   equipmentTemplates,
   templateConsumables,
   equipmentConsumables,
+  locations,
+  stockMovements,
   type User,
   type UpsertUser,
   type Client,
@@ -32,6 +34,10 @@ import {
   type InsertEquipmentTemplate,
   type EquipmentTemplateWithConsumables,
   type EquipmentWithConsumables,
+  type Location,
+  type InsertLocation,
+  type StockMovement,
+  type InsertStockMovement,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, or, sql, desc, asc, ilike, lt, gte, lte, inArray } from "drizzle-orm";
@@ -120,6 +126,24 @@ export interface IStorage {
   
   // Audit logging
   createAuditLog(entry: Omit<AuditLogEntry, 'id' | 'timestamp'>): Promise<void>;
+  
+  // Warehouse operations
+  getLocations(): Promise<Location[]>;
+  getLocation(id: number): Promise<Location | undefined>;
+  createLocation(location: InsertLocation): Promise<Location>;
+  updateLocation(id: number, location: Partial<InsertLocation>): Promise<Location>;
+  deleteLocation(id: number): Promise<void>;
+  
+  // Stock movement operations
+  createStockMovement(movement: InsertStockMovement): Promise<StockMovement>;
+  getStockMovements(): Promise<StockMovement[]>;
+  getStockMovementsByItem(itemType: string, itemId: number): Promise<StockMovement[]>;
+  getStockMovementsByLocation(locationId: number): Promise<StockMovement[]>;
+  
+  // Stock balance operations
+  getConsumableStockByLocation(consumableId: number, locationId: number): Promise<number>;
+  getAllConsumableStock(consumableId: number): Promise<{ locationId: number; locationName: string; quantity: number }[]>;
+  getEquipmentLocation(equipmentId: number): Promise<{ locationId: number; locationName: string } | null>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -721,6 +745,176 @@ export class DatabaseStorage implements IStorage {
   // Audit logging
   async createAuditLog(entry: Omit<AuditLogEntry, 'id' | 'timestamp'>): Promise<void> {
     await db.insert(auditLog).values(entry);
+  }
+
+  // Warehouse operations
+  async getLocations(): Promise<Location[]> {
+    return await db.select().from(locations).orderBy(asc(locations.name));
+  }
+
+  async getLocation(id: number): Promise<Location | undefined> {
+    const [location] = await db.select().from(locations).where(eq(locations.id, id));
+    return location;
+  }
+
+  async createLocation(locationData: InsertLocation): Promise<Location> {
+    const [location] = await db.insert(locations).values(locationData).returning();
+    return location;
+  }
+
+  async updateLocation(id: number, locationData: Partial<InsertLocation>): Promise<Location> {
+    const [location] = await db
+      .update(locations)
+      .set(locationData)
+      .where(eq(locations.id, id))
+      .returning();
+    return location;
+  }
+
+  async deleteLocation(id: number): Promise<void> {
+    await db.delete(locations).where(eq(locations.id, id));
+  }
+
+  // Stock movement operations
+  async createStockMovement(movementData: InsertStockMovement): Promise<StockMovement> {
+    const [movement] = await db.insert(stockMovements).values(movementData).returning();
+    
+    // Create audit log entry for the movement
+    await this.createAuditLog({
+      userId: movementData.movedBy || null,
+      action: 'stock_movement',
+      entityType: 'stockMovements',
+      entityId: movement.id,
+      metadata: {
+        itemType: movementData.itemType,
+        itemId: movementData.itemId,
+        quantity: movementData.quantity,
+        reason: movementData.reason,
+        fromLocationId: movementData.fromLocationId,
+        toLocationId: movementData.toLocationId,
+      },
+    });
+    
+    return movement;
+  }
+
+  async getStockMovements(): Promise<StockMovement[]> {
+    return await db.select().from(stockMovements).orderBy(desc(stockMovements.movedAt));
+  }
+
+  async getStockMovementsByItem(itemType: string, itemId: number): Promise<StockMovement[]> {
+    return await db
+      .select()
+      .from(stockMovements)
+      .where(and(
+        eq(stockMovements.itemType, itemType),
+        eq(stockMovements.itemId, itemId)
+      ))
+      .orderBy(desc(stockMovements.movedAt));
+  }
+
+  async getStockMovementsByLocation(locationId: number): Promise<StockMovement[]> {
+    return await db
+      .select()
+      .from(stockMovements)
+      .where(or(
+        eq(stockMovements.fromLocationId, locationId),
+        eq(stockMovements.toLocationId, locationId)
+      ))
+      .orderBy(desc(stockMovements.movedAt));
+  }
+
+  // Stock balance operations (computed from movements)
+  async getConsumableStockByLocation(consumableId: number, locationId: number): Promise<number> {
+    // Calculate inbound movements (to this location)
+    const inboundResult = await db
+      .select({ total: sql<number>`COALESCE(SUM(${stockMovements.quantity}), 0)` })
+      .from(stockMovements)
+      .where(and(
+        eq(stockMovements.itemType, 'consumable'),
+        eq(stockMovements.itemId, consumableId),
+        eq(stockMovements.toLocationId, locationId)
+      ));
+
+    // Calculate outbound movements (from this location)
+    const outboundResult = await db
+      .select({ total: sql<number>`COALESCE(SUM(${stockMovements.quantity}), 0)` })
+      .from(stockMovements)
+      .where(and(
+        eq(stockMovements.itemType, 'consumable'),
+        eq(stockMovements.itemId, consumableId),
+        eq(stockMovements.fromLocationId, locationId)
+      ));
+
+    const inbound = inboundResult[0]?.total || 0;
+    const outbound = outboundResult[0]?.total || 0;
+    
+    return inbound - outbound;
+  }
+
+  async getAllConsumableStock(consumableId: number): Promise<{ locationId: number; locationName: string; quantity: number }[]> {
+    // Get all locations that have had movements for this consumable
+    const locationMovements = await db
+      .select({
+        locationId: sql<number>`CASE 
+          WHEN ${stockMovements.toLocationId} IS NOT NULL THEN ${stockMovements.toLocationId}
+          ELSE ${stockMovements.fromLocationId}
+        END`,
+      })
+      .from(stockMovements)
+      .where(and(
+        eq(stockMovements.itemType, 'consumable'),
+        eq(stockMovements.itemId, consumableId)
+      ))
+      .groupBy(sql`CASE 
+        WHEN ${stockMovements.toLocationId} IS NOT NULL THEN ${stockMovements.toLocationId}
+        ELSE ${stockMovements.fromLocationId}
+      END`);
+
+    const results = [];
+    
+    for (const locationMovement of locationMovements) {
+      const locationId = locationMovement.locationId;
+      if (locationId) {
+        const quantity = await this.getConsumableStockByLocation(consumableId, locationId);
+        const location = await this.getLocation(locationId);
+        
+        if (location && quantity > 0) {
+          results.push({
+            locationId,
+            locationName: location.name,
+            quantity,
+          });
+        }
+      }
+    }
+    
+    return results;
+  }
+
+  async getEquipmentLocation(equipmentId: number): Promise<{ locationId: number; locationName: string } | null> {
+    // Get the most recent movement for this equipment
+    const [lastMovement] = await db
+      .select()
+      .from(stockMovements)
+      .where(and(
+        eq(stockMovements.itemType, 'equipment'),
+        eq(stockMovements.itemId, equipmentId)
+      ))
+      .orderBy(desc(stockMovements.movedAt))
+      .limit(1);
+
+    if (lastMovement && lastMovement.toLocationId) {
+      const location = await this.getLocation(lastMovement.toLocationId);
+      if (location) {
+        return {
+          locationId: location.id,
+          locationName: location.name,
+        };
+      }
+    }
+    
+    return null;
   }
 }
 
