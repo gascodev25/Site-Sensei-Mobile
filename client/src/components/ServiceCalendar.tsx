@@ -9,7 +9,7 @@ import type { ServiceWithDetails } from "@shared/schema";
 
 interface ServiceCalendarProps {
   services: ServiceWithDetails[];
-  onServiceClick?: (service: ServiceWithDetails) => void;
+  onServiceClick?: (service: ServiceWithDetails, clickedDate?: Date) => void;
   onServiceMove?: (serviceId: number, newDate: Date, originalDate?: Date) => void;
   onDateClick?: (date: Date) => void;
 }
@@ -216,7 +216,7 @@ export default function ServiceCalendar({ services, onServiceClick, onServiceMov
         onClick={(e) => {
           e.stopPropagation();
           if (!isDragging) {
-            onServiceClick?.(service);
+            onServiceClick?.(service, displayDate);
           }
         }}
         className={`

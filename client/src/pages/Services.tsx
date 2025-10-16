@@ -22,6 +22,7 @@ export default function Services() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingService, setEditingService] = useState<ServiceWithDetails | null>(null);
   const [preSelectedDate, setPreSelectedDate] = useState<Date | null>(null);
+  const [selectedServiceDate, setSelectedServiceDate] = useState<Date | null>(null); // Track which date was clicked
   const [recurringMoveDialog, setRecurringMoveDialog] = useState<{
     open: boolean;
     service: ServiceWithDetails | null;
@@ -36,9 +37,11 @@ export default function Services() {
   const [completionDialog, setCompletionDialog] = useState<{
     open: boolean;
     service: ServiceWithDetails | null;
+    completionDate?: Date;
   }>({
     open: false,
     service: null,
+    completionDate: undefined,
   });
   const { toast } = useToast();
 
@@ -154,22 +157,26 @@ export default function Services() {
     }
   };
 
-  const handleServiceClick = (service: ServiceWithDetails) => {
+  const handleServiceClick = (service: ServiceWithDetails, clickedDate?: Date) => {
     setEditingService(service);
+    setSelectedServiceDate(clickedDate || null); // Store the clicked date
   };
 
   const handleServiceComplete = (service: ServiceWithDetails) => {
+    // Use the selected date from calendar, or today if completed from list view
+    const completionDate = selectedServiceDate || new Date();
+    
     if (service.type === 'installation') {
       // For installations, show completion dialog to update equipment/consumables
-      setCompletionDialog({ open: true, service });
+      setCompletionDialog({ open: true, service, completionDate });
     } else {
       // For all other services (recurring and non-recurring), use the completion endpoint
-      const today = new Date().toISOString().split('T')[0];
+      const dateString = completionDate.toISOString().split('T')[0];
       
       completeServiceMutation.mutate({
         serviceId: service.id,
         data: { 
-          completionDate: today 
+          completionDate: dateString 
         }
       });
     }
@@ -611,9 +618,10 @@ export default function Services() {
         <ServiceCompletionDialog
           open={completionDialog.open}
           onOpenChange={(open) => 
-            !open && setCompletionDialog({ open: false, service: null })
+            !open && setCompletionDialog({ open: false, service: null, completionDate: undefined })
           }
           service={completionDialog.service}
+          completionDate={completionDialog.completionDate}
           onComplete={() => {
             queryClient.invalidateQueries({ queryKey: ["/api/services"] });
             queryClient.invalidateQueries({ queryKey: ["/api/dashboard/metrics"] });
