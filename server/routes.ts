@@ -624,38 +624,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Service not found" });
       }
 
-      // Check if service is already completed (idempotent operation)
-      if (existingService.status === 'completed') {
-        return res.json(existingService);
-      }
-
-      // Prepare update data - handle recurring vs non-recurring services differently
+      // Initialize update data
       const updateData: any = {};
-      const isRecurring = existingService.recurrencePattern && 
-                         typeof existingService.recurrencePattern === 'object' && 
-                         existingService.recurrencePattern !== null &&
-                         'interval' in existingService.recurrencePattern;
-
-      if (isRecurring) {
-        // For recurring services: Add to completedDates but keep service status as scheduled
-        const currentCompletedDates = (existingService.completedDates as string[]) || [];
-        if (!currentCompletedDates.includes(completionDate)) {
-          updateData.completedDates = [...currentCompletedDates, completionDate];
-        }
-        // Explicitly keep the status as scheduled for recurring services
-        updateData.status = 'scheduled';
-      } else {
-        // For non-recurring services: Mark as completed normally
-        updateData.status = 'completed';
-        updateData.completedAt = new Date();
-      }
-
-      // If it's an installation and conversion is requested
+      
+      // Step 1: Determine if we're converting installation to contract
+      let willBeRecurring = false;
+      
       if (existingService.type === 'installation' && convertToContract) {
+        // Convert to service contract
         updateData.type = 'service_contract';
         updateData.contractLengthMonths = contractLengthMonths || 12;
 
-        // Set recurrence pattern based on service interval
+        // Set recurrence pattern if service interval provided
         if (serviceInterval) {
           const endDate = new Date(existingService.installationDate || new Date());
           endDate.setMonth(endDate.getMonth() + (contractLengthMonths || 12));
@@ -664,33 +644,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
             interval: serviceInterval,
             end_date: endDate.toISOString().split('T')[0]
           };
-
-          // Mark the installation date as completed in the new service contract
-          const installationDateString = existingService.installationDate 
-            ? new Date(existingService.installationDate).toISOString().split('T')[0]
-            : completionDate;
-
-          const currentCompletedDates = (existingService.completedDates as string[]) || [];
-          if (!currentCompletedDates.includes(installationDateString)) {
-            updateData.completedDates = [...currentCompletedDates, installationDateString];
-          }
+          
+          willBeRecurring = true;
         }
       }
+      
+      // Step 2: Check if service is or will be recurring
+      const currentlyRecurring = existingService.recurrencePattern && 
+                                 typeof existingService.recurrencePattern === 'object' && 
+                                 existingService.recurrencePattern !== null &&
+                                 'interval' in existingService.recurrencePattern;
+      
+      const isRecurringService = currentlyRecurring || willBeRecurring;
+      
+      // Step 3: Handle completion based on service type
+      if (isRecurringService) {
+        // For recurring services: Track completed dates, keep status as 'scheduled'
+        const currentCompletedDates = (existingService.completedDates as string[]) || [];
+        
+        // Add completion date if not already present
+        if (!currentCompletedDates.includes(completionDate)) {
+          updateData.completedDates = [...currentCompletedDates, completionDate];
+        } else {
+          // Date already completed - ensure completedDates is set (for idempotency)
+          updateData.completedDates = currentCompletedDates;
+        }
+        
+        // Always keep recurring services as 'scheduled' status
+        updateData.status = 'scheduled';
+        
+        // Don't set completedAt for recurring services
+      } else {
+        // For non-recurring services: Mark as completed
+        updateData.status = 'completed';
+        updateData.completedAt = new Date();
+      }
 
-      // Update equipment and consumable items if provided
+      // Step 4: Add equipment and consumable items if provided
       if (equipmentItems && equipmentItems.length > 0) {
         updateData.equipmentItems = equipmentItems;
       }
       if (consumableItems && consumableItems.length > 0) {
         updateData.consumableItems = consumableItems;
-      }
-
-      // Ensure we always have something to update - if no other changes, update completedAt
-      if (Object.keys(updateData).length === 0) {
-        updateData.completedAt = new Date();
-        if (!isRecurring) {
-          updateData.status = 'completed';
-        }
       }
 
       // Update the service
