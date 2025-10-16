@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { MapPin } from "lucide-react";
@@ -43,7 +43,7 @@ export default function AddressAutocomplete({
   const [isLoading, setIsLoading] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [inputValue, setInputValue] = useState(value);
-  const [blurTimeoutId, setBlurTimeoutId] = useState<NodeJS.Timeout | null>(null);
+  const blurTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const { toast } = useToast();
 
   const searchAddressMutation = useMutation({
@@ -98,10 +98,10 @@ export default function AddressAutocomplete({
     },
     onSuccess: (data) => {
       setSuggestions(data);
-      // Clear any pending blur timeout
-      if (blurTimeoutId) {
-        clearTimeout(blurTimeoutId);
-        setBlurTimeoutId(null);
+      // Clear any pending blur timeout using ref (always has current value)
+      if (blurTimeoutRef.current) {
+        clearTimeout(blurTimeoutRef.current);
+        blurTimeoutRef.current = null;
       }
       // Always show suggestions when we have results
       if (data.length > 0) {
@@ -235,21 +235,20 @@ export default function AddressAutocomplete({
           data-testid={testId}
           onBlur={() => {
             // Clear any existing timeout
-            if (blurTimeoutId) {
-              clearTimeout(blurTimeoutId);
+            if (blurTimeoutRef.current) {
+              clearTimeout(blurTimeoutRef.current);
             }
             // Delay hiding suggestions to allow click events to register
-            const timeoutId = setTimeout(() => {
+            blurTimeoutRef.current = setTimeout(() => {
               setShowSuggestions(false);
-              setBlurTimeoutId(null);
+              blurTimeoutRef.current = null;
             }, 500);
-            setBlurTimeoutId(timeoutId);
           }}
           onFocus={() => {
             // Clear any pending blur timeout
-            if (blurTimeoutId) {
-              clearTimeout(blurTimeoutId);
-              setBlurTimeoutId(null);
+            if (blurTimeoutRef.current) {
+              clearTimeout(blurTimeoutRef.current);
+              blurTimeoutRef.current = null;
             }
             if (suggestions.length > 0 && inputValue.trim().length >= 3) {
               setShowSuggestions(true);
