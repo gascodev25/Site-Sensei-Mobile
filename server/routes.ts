@@ -588,7 +588,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { equipmentItems, consumableItems, convertToContract, serviceInterval, contractLengthMonths } = validationResult.data;
 
       // Get the specific date for this completion (from request body or current date)
-      const completionDate = req.body.completionDate || new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
+      const completionDate = validationResult.data.completionDate || new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
 
       // Validate equipment IDs exist in database
       if (equipmentItems && equipmentItems.length > 0) {
