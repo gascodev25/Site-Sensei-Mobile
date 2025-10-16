@@ -98,16 +98,18 @@ export default function AddressAutocomplete({
     },
     onSuccess: (data) => {
       setSuggestions(data);
+      setIsLoading(false);
+      
       // Clear any pending blur timeout using ref (always has current value)
       if (blurTimeoutRef.current) {
         clearTimeout(blurTimeoutRef.current);
         blurTimeoutRef.current = null;
       }
-      // Always show suggestions when we have results
+      
+      // Always show suggestions when we have results, even if input isn't focused
       if (data.length > 0) {
         setShowSuggestions(true);
       }
-      setIsLoading(false);
     },
     onError: (error) => {
       console.error("Address search error:", error);
@@ -128,6 +130,9 @@ export default function AddressAutocomplete({
           return;
         }
 
+        // Clear old suggestions immediately when starting new search
+        setSuggestions([]);
+        
         timeoutId = setTimeout(() => {
           setIsLoading(true);
           searchAddressMutation.mutate(query);
@@ -238,11 +243,11 @@ export default function AddressAutocomplete({
             if (blurTimeoutRef.current) {
               clearTimeout(blurTimeoutRef.current);
             }
-            // Delay hiding suggestions to allow click events to register
+            // Longer delay to allow both click events and search results to appear
             blurTimeoutRef.current = setTimeout(() => {
               setShowSuggestions(false);
               blurTimeoutRef.current = null;
-            }, 500);
+            }, 800);
           }}
           onFocus={() => {
             // Clear any pending blur timeout
