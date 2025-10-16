@@ -51,7 +51,7 @@ export default function ServiceCalendar({ services, onServiceClick, onServiceMov
       // Fallback to status color if no team
       return getStatusColor(status || 'scheduled');
     }
-    
+
     const teamColors = {
       "Hygiene": "bg-blue-50 border-blue-200 text-blue-900",
       "Deep Clean": "bg-green-50 border-green-200 text-green-900", 
@@ -72,7 +72,7 @@ export default function ServiceCalendar({ services, onServiceClick, onServiceMov
 
     // Check if service has recurrence pattern
     const recurrencePattern = service.recurrencePattern as { interval?: string; end_date?: string } | null;
-    
+
     if (!recurrencePattern || !recurrencePattern.interval) {
       // Single occurrence service
       return [baseDate];
@@ -86,16 +86,16 @@ export default function ServiceCalendar({ services, onServiceClick, onServiceMov
 
     const intervalDays = parseInt(intervalMatch[1]);
     const instances: Date[] = [];
-    
+
     // Get excluded dates (dates to skip)
     const excludedDates = (service.excludedDates as string[]) || [];
     const excludedDateStrings = new Set(excludedDates.map(date => date.split('T')[0])); // Normalize to YYYY-MM-DD
-    
+
     // Generate instances ONLY forward from the installation date
     let currentDate = new Date(baseDate);
     while (currentDate <= endDate) {
       const currentDateString = currentDate.toISOString().split('T')[0]; // YYYY-MM-DD format
-      
+
       // Only add if the date is within our view range, on or after the installation date, and NOT excluded
       if (currentDate >= startDate && 
           currentDate >= baseDate && 
@@ -103,20 +103,20 @@ export default function ServiceCalendar({ services, onServiceClick, onServiceMov
         instances.push(new Date(currentDate));
       }
       currentDate = new Date(currentDate.getTime() + (intervalDays * 24 * 60 * 60 * 1000));
-      
+
       // Optional: respect end_date if specified in recurrence pattern
       if (recurrencePattern.end_date && currentDate > parseISO(recurrencePattern.end_date)) {
         break;
       }
     }
-    
+
     return instances.sort((a, b) => a.getTime() - b.getTime());
   };
 
   // Get services for a specific date (including recurring instances)
   const getServicesForDate = (date: Date) => {
     const servicesForDate: ServiceWithDetails[] = [];
-    
+
     filteredServices.forEach(service => {
       // For calendar view, we need to show recurring instances within a reasonable range
       const viewStart = view === 'month' 
@@ -124,7 +124,7 @@ export default function ServiceCalendar({ services, onServiceClick, onServiceMov
         : view === 'week' 
         ? startOfWeek(currentDate, { weekStartsOn: 1 })
         : currentDate;
-      
+
       const viewEnd = view === 'month' 
         ? endOfMonth(endOfWeek(endOfMonth(currentDate), { weekStartsOn: 1 }))
         : view === 'week' 
@@ -132,12 +132,12 @@ export default function ServiceCalendar({ services, onServiceClick, onServiceMov
         : currentDate;
 
       const instances = generateRecurringInstances(service, viewStart, viewEnd);
-      
+
       if (instances.some(instanceDate => isSameDay(instanceDate, date))) {
         servicesForDate.push(service);
       }
     });
-    
+
     return servicesForDate;
   };
 
@@ -183,37 +183,46 @@ export default function ServiceCalendar({ services, onServiceClick, onServiceMov
     e.preventDefault();
   };
 
-  // Render service item
-  const renderServiceItem = (service: ServiceWithDetails, size: 'small' | 'large' = 'small', forDate?: Date) => {
-    // Check if this specific occurrence is completed
-    const dateString = forDate?.toISOString().split('T')[0] || new Date().toISOString().split('T')[0];
-    const completedDates = (service.completedDates as string[]) || [];
-    const isThisOccurrenceCompleted = completedDates.includes(dateString);
-    
-    // Determine status: check completedDates for service contracts, otherwise use service status
-    const isServiceContract = service.type === 'service_contract';
-    const hasRecurrence = service.recurrencePattern && 'interval' in (service.recurrencePattern as any);
-    
-    const effectiveStatus = (isServiceContract || hasRecurrence)
-      ? (isThisOccurrenceCompleted ? 'completed' : 'scheduled')
-      : service.status || 'scheduled';
-    
+  // Helper function to get effective status for a service on a specific date
+  const getEffectiveStatus = (service: ServiceWithDetails, displayDate: Date): string => {
+    // For recurring services, check if this specific date is completed
+    const isRecurring = service.recurrencePattern && 
+                       typeof service.recurrencePattern === 'object' && 
+                       service.recurrencePattern !== null &&
+                       'interval' in service.recurrencePattern;
+
+    if (isRecurring && service.completedDates && Array.isArray(service.completedDates)) {
+      const dateString = format(displayDate, 'yyyy-MM-dd');
+      if (service.completedDates.includes(dateString)) {
+        return 'completed';
+      }
+    }
+
+    // For non-recurring services, just return the status
+    return service.status || 'scheduled';
+  };
+
+  // Render individual service item
+  const renderServiceItem = (service: ServiceWithDetails, size: 'small' | 'large' = 'small', displayDate: Date) => {
+    const effectiveStatus = getEffectiveStatus(service, displayDate);
+
     return (
       <div
-        key={service.id}
         draggable
-        onDragStart={() => handleDragStart(service, forDate || new Date())}
-        onDragEnd={() => {
-          // Reset dragging state if drag is cancelled or completed without drop
-          setTimeout(() => setIsDragging(false), 0);
+        onDragStart={(e) => {
+          e.stopPropagation();
+          handleDragStart(service, displayDate);
         }}
         onClick={(e) => {
           e.stopPropagation();
-          onServiceClick?.(service);
+          if (!isDragging) {
+            onServiceClick?.(service);
+          }
         }}
         className={`
+          p-2 rounded cursor-pointer transition-all
           ${getTeamBackgroundColor(service.team?.name, effectiveStatus)}
-          border rounded p-2 cursor-pointer hover:shadow-sm transition-shadow text-xs
+          hover:shadow-md hover:scale-105
           ${size === 'large' ? 'mb-2' : 'mb-1'}
         `}
         data-testid={`calendar-service-${service.id}`}
@@ -262,13 +271,13 @@ export default function ServiceCalendar({ services, onServiceClick, onServiceMov
             {day}
           </div>
         ))}
-        
+
         {/* Calendar days */}
         {days.map(day => {
           const dayServices = getServicesForDate(day);
           const isCurrentMonth = isSameMonth(day, currentDate);
           const isToday = isSameDay(day, new Date());
-          
+
           return (
             <div
               key={day.toISOString()}
@@ -317,7 +326,7 @@ export default function ServiceCalendar({ services, onServiceClick, onServiceMov
         {days.map(day => {
           const dayServices = getServicesForDate(day);
           const isToday = isSameDay(day, new Date());
-          
+
           return (
             <Card key={day.toISOString()} className={isToday ? 'ring-2 ring-primary' : ''}>
               <CardHeader className="p-3">
