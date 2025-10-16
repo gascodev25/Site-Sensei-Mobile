@@ -97,7 +97,10 @@ export default function AddressAutocomplete({
     },
     onSuccess: (data) => {
       setSuggestions(data);
-      setShowSuggestions(data.length > 0);
+      // Always show suggestions when we have results, regardless of focus state
+      if (data.length > 0) {
+        setShowSuggestions(true);
+      }
       setIsLoading(false);
     },
     onError: (error) => {
@@ -225,11 +228,11 @@ export default function AddressAutocomplete({
           placeholder={placeholder}
           data-testid={testId}
           onBlur={() => {
-            // Delay hiding suggestions to allow click events
-            setTimeout(() => setShowSuggestions(false), 200);
+            // Delay hiding suggestions to allow click events to register
+            setTimeout(() => setShowSuggestions(false), 500);
           }}
           onFocus={() => {
-            if (suggestions.length > 0) {
+            if (suggestions.length > 0 && inputValue.trim().length >= 3) {
               setShowSuggestions(true);
             }
           }}
@@ -238,7 +241,13 @@ export default function AddressAutocomplete({
       </div>
 
       {showSuggestions && (
-        <div className="absolute z-50 w-full mt-1 bg-background border border-border rounded-md shadow-lg max-h-60 overflow-y-auto">
+        <div 
+          className="absolute z-50 w-full mt-1 bg-background border border-border rounded-md shadow-lg max-h-60 overflow-y-auto"
+          onMouseDown={(e) => {
+            // Prevent input blur when clicking on suggestions
+            e.preventDefault();
+          }}
+        >
           {isLoading ? (
             <div className="p-3 text-sm text-muted-foreground">Searching...</div>
           ) : suggestions.length > 0 ? (
