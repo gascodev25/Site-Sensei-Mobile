@@ -77,8 +77,15 @@ export default function ServiceCompletionDialog({
 
   const completeServiceMutation = useMutation({
     mutationFn: async (data: CompletionFormData) => {
+      // Format date in local timezone to avoid timezone conversion issues
+      const dateToUse = completionDate || new Date();
+      const year = dateToUse.getFullYear();
+      const month = String(dateToUse.getMonth() + 1).padStart(2, '0');
+      const day = String(dateToUse.getDate()).padStart(2, '0');
+      const dateString = `${year}-${month}-${day}`;
+      
       const requestData: any = {
-        completionDate: completionDate?.toISOString().split('T')[0] || new Date().toISOString().split('T')[0],
+        completionDate: dateString,
       };
 
       // Only include fields that have values to avoid validation errors
