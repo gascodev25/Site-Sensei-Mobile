@@ -163,11 +163,30 @@ export default function Services() {
       // For installations, show completion dialog to update equipment/consumables
       setCompletionDialog({ open: true, service });
     } else {
-      // For regular services, just mark as completed
-      completeServiceMutation.mutate({
-        serviceId: service.id,
-        data: { status: 'completed' }
-      });
+      // For regular services, check if recurring
+      const isRecurring = service.recurrencePattern && 
+        typeof service.recurrencePattern === 'object' && 
+        service.recurrencePattern !== null &&
+        'interval' in service.recurrencePattern;
+
+      if (isRecurring) {
+        // For recurring services, add current date to completedDates
+        const today = new Date().toISOString().split('T')[0];
+        const currentCompletedDates = (service.completedDates as string[]) || [];
+        
+        if (!currentCompletedDates.includes(today)) {
+          updateServiceMutation.mutate({
+            serviceId: service.id,
+            data: { completedDates: [...currentCompletedDates, today] }
+          });
+        }
+      } else {
+        // For non-recurring services, mark as completed
+        completeServiceMutation.mutate({
+          serviceId: service.id,
+          data: { status: 'completed' }
+        });
+      }
     }
   };
 
