@@ -165,14 +165,21 @@ export default function Services() {
   const handleServiceComplete = (service: ServiceWithDetails) => {
     // Use the selected date from calendar, or today if completed from list view
     const completionDate = selectedServiceDate || new Date();
+    const dateString = completionDate.toISOString().split('T')[0];
+    
+    console.log('=== SERVICE COMPLETION DEBUG ===');
+    console.log('Service ID:', service.id);
+    console.log('Service Type:', service.type);
+    console.log('Selected Date:', selectedServiceDate);
+    console.log('Completion Date:', dateString);
+    console.log('Is Recurring:', !!service.recurrencePattern);
+    console.log('Current completedDates:', service.completedDates);
     
     if (service.type === 'installation') {
       // For installations, show completion dialog to update equipment/consumables
       setCompletionDialog({ open: true, service, completionDate });
     } else {
       // For all other services (recurring and non-recurring), use the completion endpoint
-      const dateString = completionDate.toISOString().split('T')[0];
-      
       completeServiceMutation.mutate({
         serviceId: service.id,
         data: { 
