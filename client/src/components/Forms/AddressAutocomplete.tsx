@@ -43,6 +43,7 @@ export default function AddressAutocomplete({
   const [isLoading, setIsLoading] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [inputValue, setInputValue] = useState(value);
+  const [blurTimeoutId, setBlurTimeoutId] = useState<NodeJS.Timeout | null>(null);
   const { toast } = useToast();
 
   const searchAddressMutation = useMutation({
@@ -97,7 +98,12 @@ export default function AddressAutocomplete({
     },
     onSuccess: (data) => {
       setSuggestions(data);
-      // Always show suggestions when we have results, regardless of focus state
+      // Clear any pending blur timeout
+      if (blurTimeoutId) {
+        clearTimeout(blurTimeoutId);
+        setBlurTimeoutId(null);
+      }
+      // Always show suggestions when we have results
       if (data.length > 0) {
         setShowSuggestions(true);
       }
@@ -228,10 +234,23 @@ export default function AddressAutocomplete({
           placeholder={placeholder}
           data-testid={testId}
           onBlur={() => {
+            // Clear any existing timeout
+            if (blurTimeoutId) {
+              clearTimeout(blurTimeoutId);
+            }
             // Delay hiding suggestions to allow click events to register
-            setTimeout(() => setShowSuggestions(false), 500);
+            const timeoutId = setTimeout(() => {
+              setShowSuggestions(false);
+              setBlurTimeoutId(null);
+            }, 500);
+            setBlurTimeoutId(timeoutId);
           }}
           onFocus={() => {
+            // Clear any pending blur timeout
+            if (blurTimeoutId) {
+              clearTimeout(blurTimeoutId);
+              setBlurTimeoutId(null);
+            }
             if (suggestions.length > 0 && inputValue.trim().length >= 3) {
               setShowSuggestions(true);
             }
