@@ -1,26 +1,20 @@
-
 import { useState, useCallback, useRef, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { MapPin } from "lucide-react";
+import { MapPin, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { useMutation } from "@tanstack/react-query";
 
 interface AddressSuggestion {
+  place_id: number;
   display_name: string;
   lat: string;
   lon: string;
-  name?: string;
-  extracted_house_number?: string;
-  original_query?: string;
   address?: {
     house_number?: string;
     road?: string;
     city?: string;
     town?: string;
     village?: string;
-    municipality?: string;
-    county?: string;
     suburb?: string;
     postcode?: string;
     state?: string;
@@ -45,9 +39,15 @@ export default function AddressAutocomplete({
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [inputValue, setInputValue] = useState(value);
   const containerRef = useRef<HTMLDivElement>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
   const { toast } = useToast();
 
-  // Click outside handler - close suggestions when clicking outside
+  // Sync external value changes
+  useEffect(() => {
+    setInputValue(value);
+  }, [value]);
+
+  // Click outside handler
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
@@ -61,183 +61,134 @@ export default function AddressAutocomplete({
     };
   }, []);
 
-  const searchAddressMutation = useMutation({
-    mutationFn: async (query: string) => {
-      // Extract house number if present
-      const houseNumberMatch = query.match(/^(\d+)\s+(.+)/);
-      const houseNumber = houseNumberMatch ? houseNumberMatch[1] : null;
-      const streetQuery = houseNumberMatch ? houseNumberMatch[2] : query;
-      
-      // Try multiple search strategies
-      const searchUrls = [
-        // First try the full address with structured search if house number exists
-        ...(houseNumber ? [
-          `https://nominatim.openstreetmap.org/search?format=json&housenumber=${encodeURIComponent(houseNumber)}&street=${encodeURIComponent(streetQuery)}&countrycodes=za&addressdetails=1&limit=3`
-        ] : []),
-        // Then try the full query
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&countrycodes=za&addressdetails=1&limit=5`,
-        // Finally try just the street name if house number was present
-        ...(houseNumber ? [
-          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(streetQuery)}&countrycodes=za&addressdetails=1&limit=3`
-        ] : [])
-      ];
+  // Search function with proper error handling
+  const searchAddress = async (query: string): Promise<AddressSuggestion[]> => {
+    // Cancel previous request if exists
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
 
-      let allResults: any[] = [];
-      
-      for (const url of searchUrls) {
-        try {
-          const response = await fetch(url);
-          if (response.ok) {
-            const data = await response.json();
-            if (data.length > 0) {
-              // Add house number info to results if we extracted one
-              const enrichedData = data.map((result: any) => ({
-                ...result,
-                extracted_house_number: houseNumber,
-                original_query: query
-              }));
-              allResults = [...allResults, ...enrichedData];
-            }
+    // Create new abort controller for this request
+    abortControllerRef.current = new AbortController();
+
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?` +
+        `format=json&` +
+        `q=${encodeURIComponent(query)}&` +
+        `countrycodes=za&` +
+        `addressdetails=1&` +
+        `limit=5`,
+        { 
+          signal: abortControllerRef.current.signal,
+          headers: {
+            'Accept': 'application/json',
           }
-        } catch (error) {
-          console.warn("Search failed for URL:", url, error);
         }
-      }
-      
-      // Remove duplicates based on place_id and limit results
-      const uniqueResults = allResults.filter((result, index, self) => 
-        index === self.findIndex(r => r.place_id === result.place_id)
-      ).slice(0, 5);
-      
-      return uniqueResults;
-    },
-    onSuccess: (data) => {
-      setSuggestions(data);
-      setIsLoading(false);
-      
-      // Always show suggestions when we have results
-      if (data.length > 0) {
-        setShowSuggestions(true);
-      }
-    },
-    onError: (error) => {
-      console.error("Address search error:", error);
-      setIsLoading(false);
-      setSuggestions([]);
-      setShowSuggestions(false);
-    },
-  });
+      );
 
-  const debounceSearch = useCallback(
+      if (!response.ok) {
+        throw new Error('Search failed');
+      }
+
+      const data = await response.json();
+      return data;
+    } catch (error: any) {
+      // Ignore abort errors
+      if (error.name === 'AbortError') {
+        return [];
+      }
+      throw error;
+    }
+  };
+
+  // Debounced search with proper async handling
+  const debouncedSearch = useCallback(
     (() => {
       let timeoutId: NodeJS.Timeout;
-      return (query: string) => {
+      
+      return async (query: string) => {
         clearTimeout(timeoutId);
         
+        // Reset if query too short
         if (query.trim().length < 3) {
           setSuggestions([]);
           setShowSuggestions(false);
+          setIsLoading(false);
           return;
         }
 
-        // Clear old suggestions immediately when starting new search
-        setSuggestions([]);
-        
-        timeoutId = setTimeout(() => {
+        timeoutId = setTimeout(async () => {
           setIsLoading(true);
-          searchAddressMutation.mutate(query);
-        }, 300);
+          setSuggestions([]);
+          
+          try {
+            const results = await searchAddress(query);
+            setSuggestions(results);
+            setShowSuggestions(results.length > 0);
+          } catch (error) {
+            console.error("Address search error:", error);
+            setSuggestions([]);
+            setShowSuggestions(false);
+          } finally {
+            setIsLoading(false);
+          }
+        }, 500); // 500ms debounce
       };
     })(),
-    [searchAddressMutation]
+    []
   );
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value;
     setInputValue(newValue);
-    debounceSearch(newValue);
+    debouncedSearch(newValue);
   };
 
   const handleSuggestionClick = async (suggestion: AddressSuggestion) => {
     const lat = parseFloat(suggestion.lat);
     const lng = parseFloat(suggestion.lon);
 
-    // Re-geocode to get precise coordinates and detailed address information
-    try {
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(suggestion.display_name)}&limit=1&addressdetails=1`
-      );
-      const data = await response.json();
+    // Extract address components
+    const city = suggestion.address?.city || 
+                suggestion.address?.town || 
+                suggestion.address?.village || 
+                suggestion.address?.suburb;
+    
+    const postcode = suggestion.address?.postcode;
 
-      if (data.length > 0) {
-        const result = data[0];
-        const preciseLat = parseFloat(result.lat);
-        const preciseLng = parseFloat(result.lon);
-        
-        // Extract city from multiple possible fields
-        const city = result.address?.city || 
-                    result.address?.town || 
-                    result.address?.village || 
-                    result.address?.municipality ||
-                    result.address?.county ||
-                    result.address?.suburb;
-        
-        const postcode = result.address?.postcode;
-
-        // Build the street address, preserving extracted house number if available
-        const streetAddress = (() => {
-          // If we have an extracted house number and no house number from API
-          if (suggestion.extracted_house_number && !result.address?.house_number) {
-            const road = result.address?.road;
-            return road ? `${suggestion.extracted_house_number} ${road}` : suggestion.original_query;
-          }
-          
-          // If API has house number, use it
-          if (result.address?.house_number && result.address?.road) {
-            return `${result.address.house_number} ${result.address.road}`;
-          }
-          
-          // Fallback to road only or original display name
-          return result.address?.road || suggestion.display_name;
-        })();
-
-        setInputValue(streetAddress || suggestion.display_name);
-        onAddressSelect(streetAddress || suggestion.display_name, preciseLat, preciseLng, city, postcode);
-        setShowSuggestions(false);
-        setSuggestions([]);
-      }
-    } catch (error) {
-      console.error("Re-geocoding error:", error);
-      // Fallback to original coordinates with basic city extraction
-      const city = suggestion.address?.city || suggestion.address?.town;
-      const postcode = suggestion.address?.postcode;
-      
-      // Build the street address, preserving extracted house number if available
-      const streetAddress = (() => {
-        // If we have an extracted house number, use the original query
-        if (suggestion.extracted_house_number) {
-          return suggestion.original_query;
-        }
-        
-        // Otherwise, extract just the street address from display_name
-        const parts = suggestion.display_name.split(',');
-        return parts[0] || suggestion.display_name;
-      })();
-      
-      setInputValue(streetAddress || suggestion.display_name);
-      onAddressSelect(streetAddress || suggestion.display_name, lat, lng, city, postcode);
-      setShowSuggestions(false);
-      setSuggestions([]);
+    // Build readable address
+    let streetAddress = '';
+    if (suggestion.address?.house_number && suggestion.address?.road) {
+      streetAddress = `${suggestion.address.house_number} ${suggestion.address.road}`;
+    } else if (suggestion.address?.road) {
+      streetAddress = suggestion.address.road;
+    } else {
+      // Fallback to first part of display name
+      const parts = suggestion.display_name.split(',');
+      streetAddress = parts[0].trim();
     }
+
+    setInputValue(streetAddress);
+    onAddressSelect(streetAddress, lat, lng, city, postcode);
+    setShowSuggestions(false);
+    setSuggestions([]);
   };
 
   const handleManualEntry = () => {
     toast({
       title: "Manual Address Entry",
-      description: "Please ensure the address is accurate and set the location on the map if needed.",
+      description: "Please ensure the address is accurate. You may need to set the location manually.",
     });
     setShowSuggestions(false);
-    onAddressSelect(inputValue, 0, 0); // Will need manual lat/lng setting
+    onAddressSelect(inputValue, 0, 0);
+  };
+
+  const handleInputFocus = () => {
+    // Show existing suggestions if we have them and query is long enough
+    if (suggestions.length > 0 && inputValue.trim().length >= 3) {
+      setShowSuggestions(true);
+    }
   };
 
   return (
@@ -246,66 +197,48 @@ export default function AddressAutocomplete({
         <Input
           value={inputValue}
           onChange={handleInputChange}
+          onFocus={handleInputFocus}
           placeholder={placeholder}
           data-testid={testId}
-          onFocus={() => {
-            // Show suggestions if we have results and input has enough characters
-            if (suggestions.length > 0 && inputValue.trim().length >= 3) {
-              setShowSuggestions(true);
-            }
-          }}
+          autoComplete="off"
         />
-        <MapPin className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+        {isLoading ? (
+          <Loader2 className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4 animate-spin" />
+        ) : (
+          <MapPin className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+        )}
       </div>
 
       {showSuggestions && (
         <div className="absolute z-50 w-full mt-1 bg-background border border-border rounded-md shadow-lg max-h-60 overflow-y-auto">
-          {isLoading ? (
-            <div className="p-3 text-sm text-muted-foreground">Searching...</div>
-          ) : suggestions.length > 0 ? (
+          {suggestions.length > 0 ? (
             <>
               {suggestions.map((suggestion, index) => {
-                // Create a display name that includes house number if available
-                const displayName = (() => {
-                  // If we have an extracted house number and this is a street-level result
-                  if (suggestion.extracted_house_number && !suggestion.address?.house_number) {
-                    const streetName = suggestion.address?.road || suggestion.name;
-                    if (streetName) {
-                      // Show house number + street + area info
-                      const areaInfo = [
-                        suggestion.address?.suburb,
-                        suggestion.address?.city || suggestion.address?.town,
-                        suggestion.address?.state
-                      ].filter(Boolean).join(', ');
-                      
-                      return `${suggestion.extracted_house_number} ${streetName}${areaInfo ? `, ${areaInfo}` : ''}`;
-                    }
-                  }
-                  
-                  // If the API returned a house number, use it
-                  if (suggestion.address?.house_number) {
-                    return suggestion.display_name;
-                  }
-                  
-                  // Default to the original display name
-                  return suggestion.display_name;
-                })();
+                // Create readable display name
+                let displayName = suggestion.display_name;
+                if (suggestion.address?.house_number && suggestion.address?.road) {
+                  const area = [
+                    suggestion.address?.suburb,
+                    suggestion.address?.city || suggestion.address?.town
+                  ].filter(Boolean).join(', ');
+                  displayName = `${suggestion.address.house_number} ${suggestion.address.road}${area ? `, ${area}` : ''}`;
+                }
 
                 return (
                   <button
-                    key={index}
+                    key={suggestion.place_id}
                     type="button"
-                    className="w-full p-3 text-left hover:bg-accent hover:text-accent-foreground border-b border-border last:border-b-0 text-sm"
+                    className="w-full p-3 text-left hover:bg-accent hover:text-accent-foreground border-b border-border last:border-b-0 text-sm transition-colors"
                     onClick={() => handleSuggestionClick(suggestion)}
                     data-testid={`suggestion-${index}`}
                   >
-                    <div className="flex items-start space-x-2">
+                    <div className="flex items-start gap-2">
                       <MapPin className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
-                      <div>
-                        <div className="font-medium">{displayName}</div>
-                        {suggestion.extracted_house_number && !suggestion.address?.house_number && (
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium truncate">{displayName}</div>
+                        {suggestion.address?.postcode && (
                           <div className="text-xs text-muted-foreground mt-1">
-                            House number preserved from your input
+                            {suggestion.address.postcode}
                           </div>
                         )}
                       </div>
@@ -313,7 +246,7 @@ export default function AddressAutocomplete({
                   </button>
                 );
               })}
-              <div className="p-2 border-t border-border">
+              <div className="p-2 border-t border-border bg-muted/50">
                 <Button
                   type="button"
                   variant="ghost"
@@ -322,24 +255,10 @@ export default function AddressAutocomplete({
                   className="w-full justify-start text-xs"
                   data-testid="button-manual-entry"
                 >
-                  Use "{inputValue}" as-is (manual entry)
+                  Use "{inputValue}" as entered
                 </Button>
               </div>
             </>
-          ) : inputValue.trim().length >= 3 ? (
-            <div className="p-3">
-              <div className="text-sm text-muted-foreground mb-2">No addresses found</div>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={handleManualEntry}
-                className="w-full justify-start text-xs"
-                data-testid="button-manual-entry-no-results"
-              >
-                Use "{inputValue}" as-is (manual entry)
-              </Button>
-            </div>
           ) : null}
         </div>
       )}
