@@ -1,4 +1,5 @@
-import { useState, useCallback, useRef } from "react";
+
+import { useState, useCallback, useRef, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { MapPin } from "lucide-react";
@@ -43,8 +44,22 @@ export default function AddressAutocomplete({
   const [isLoading, setIsLoading] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [inputValue, setInputValue] = useState(value);
-  const blurTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
+
+  // Click outside handler - close suggestions when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setShowSuggestions(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   const searchAddressMutation = useMutation({
     mutationFn: async (query: string) => {
@@ -100,13 +115,7 @@ export default function AddressAutocomplete({
       setSuggestions(data);
       setIsLoading(false);
       
-      // Clear any pending blur timeout using ref (always has current value)
-      if (blurTimeoutRef.current) {
-        clearTimeout(blurTimeoutRef.current);
-        blurTimeoutRef.current = null;
-      }
-      
-      // Always show suggestions when we have results, even if input isn't focused
+      // Always show suggestions when we have results
       if (data.length > 0) {
         setShowSuggestions(true);
       }
@@ -124,6 +133,7 @@ export default function AddressAutocomplete({
       let timeoutId: NodeJS.Timeout;
       return (query: string) => {
         clearTimeout(timeoutId);
+        
         if (query.trim().length < 3) {
           setSuggestions([]);
           setShowSuggestions(false);
@@ -231,30 +241,15 @@ export default function AddressAutocomplete({
   };
 
   return (
-    <div className="relative">
+    <div className="relative" ref={containerRef}>
       <div className="relative">
         <Input
           value={inputValue}
           onChange={handleInputChange}
           placeholder={placeholder}
           data-testid={testId}
-          onBlur={() => {
-            // Clear any existing timeout
-            if (blurTimeoutRef.current) {
-              clearTimeout(blurTimeoutRef.current);
-            }
-            // Longer delay to allow both click events and search results to appear
-            blurTimeoutRef.current = setTimeout(() => {
-              setShowSuggestions(false);
-              blurTimeoutRef.current = null;
-            }, 800);
-          }}
           onFocus={() => {
-            // Clear any pending blur timeout
-            if (blurTimeoutRef.current) {
-              clearTimeout(blurTimeoutRef.current);
-              blurTimeoutRef.current = null;
-            }
+            // Show suggestions if we have results and input has enough characters
             if (suggestions.length > 0 && inputValue.trim().length >= 3) {
               setShowSuggestions(true);
             }
@@ -264,13 +259,7 @@ export default function AddressAutocomplete({
       </div>
 
       {showSuggestions && (
-        <div 
-          className="absolute z-50 w-full mt-1 bg-background border border-border rounded-md shadow-lg max-h-60 overflow-y-auto"
-          onMouseDown={(e) => {
-            // Prevent input blur when clicking on suggestions
-            e.preventDefault();
-          }}
-        >
+        <div className="absolute z-50 w-full mt-1 bg-background border border-border rounded-md shadow-lg max-h-60 overflow-y-auto">
           {isLoading ? (
             <div className="p-3 text-sm text-muted-foreground">Searching...</div>
           ) : suggestions.length > 0 ? (
