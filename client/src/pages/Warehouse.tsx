@@ -7,6 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Package, AlertTriangle, TrendingUp, Download, RotateCcw } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import Header from "@/components/Layout/Header";
 
 export default function Warehouse() {
   const { toast } = useToast();
@@ -77,8 +78,10 @@ export default function Warehouse() {
   };
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
+    <>
+      <Header />
+      <div className="p-6 space-y-6">
+        <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight" data-testid="text-page-title">Warehouse Stock Control</h1>
           <p className="text-muted-foreground">Track equipment, consumables, and forecast stock requirements</p>
@@ -325,6 +328,7 @@ export default function Warehouse() {
           </Card>
         </TabsContent>
       </Tabs>
-    </div>
+      </div>
+    </>
   );
 }
