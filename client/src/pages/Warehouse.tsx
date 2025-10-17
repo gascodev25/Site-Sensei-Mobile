@@ -132,12 +132,48 @@ export default function Warehouse() {
       </div>
 
       {/* Tabs */}
-      <Tabs defaultValue="consumables" className="space-y-4">
+      <Tabs defaultValue="equipment" className="space-y-4">
         <TabsList>
+          <TabsTrigger value="equipment" data-testid="tab-equipment">Equipment</TabsTrigger>
           <TabsTrigger value="consumables" data-testid="tab-consumables">Consumables</TabsTrigger>
           <TabsTrigger value="forecast" data-testid="tab-forecast">Weekly Forecast</TabsTrigger>
           <TabsTrigger value="reports" data-testid="tab-reports">Reports</TabsTrigger>
         </TabsList>
+
+        {/* Equipment Tab */}
+        <TabsContent value="equipment" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Equipment Status</CardTitle>
+              <CardDescription>View all equipment grouped by status</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {isLoadingEquipment ? (
+                <div className="text-center py-8">Loading equipment...</div>
+              ) : (
+                <div className="space-y-6">
+                  {equipmentStatus?.map((statusGroup) => (
+                    <div key={statusGroup.status} className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-lg font-semibold capitalize">
+                          {statusGroup.status.replace('_', ' ')}
+                        </h3>
+                        <Badge variant="outline">
+                          {statusGroup.count} items
+                        </Badge>
+                      </div>
+                      <div className="text-sm text-muted-foreground">
+                        {statusGroup.status === 'in_warehouse' && 'Equipment available in warehouse'}
+                        {statusGroup.status === 'in_field' && 'Equipment deployed to client sites'}
+                        {statusGroup.status === 'issued' && 'Equipment issued to technicians'}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
 
         {/* Consumables Tab */}
         <TabsContent value="consumables" className="space-y-4">
