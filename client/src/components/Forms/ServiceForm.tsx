@@ -386,7 +386,7 @@ export default function ServiceForm({ service, initialDate, onSuccess, onCancel,
                 name="recurrencePattern"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Recurrence</FormLabel>
+                    <FormLabel>Service Interval</FormLabel>
                     <FormControl>
                       <Select 
                         value={
@@ -408,7 +408,7 @@ export default function ServiceForm({ service, initialDate, onSuccess, onCancel,
                         }}
                       >
                         <SelectTrigger data-testid="select-recurrence">
-                          <SelectValue placeholder="Select recurrence" />
+                          <SelectValue placeholder="Select service interval" />
                         </SelectTrigger>
                         <SelectContent>
                           {recurrenceIntervals.map((interval) => (
