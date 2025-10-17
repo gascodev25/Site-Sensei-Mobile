@@ -120,6 +120,24 @@ export interface IStorage {
   
   // Audit logging
   createAuditLog(entry: Omit<AuditLogEntry, 'id' | 'timestamp'>): Promise<void>;
+
+  // Warehouse operations
+  getEquipmentStatus(): Promise<{ status: string; count: number }[]>;
+  getConsumablesWithStockInfo(): Promise<Consumable[]>;
+  getWeeklyStockForecast(): Promise<{
+    week: string;
+    weekStart: string;
+    weekEnd: string;
+    consumables: {
+      id: number;
+      name: string;
+      stockCode: string;
+      requiredQuantity: number;
+      currentStock: number;
+      deficit: number;
+    }[];
+  }[]>;
+  returnStockItem(id: number): Promise<any>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -721,6 +739,241 @@ export class DatabaseStorage implements IStorage {
   // Audit logging
   async createAuditLog(entry: Omit<AuditLogEntry, 'id' | 'timestamp'>): Promise<void> {
     await db.insert(auditLog).values(entry);
+  }
+
+  // Warehouse operations
+  async getEquipmentStatus(): Promise<{ status: string; count: number }[]> {
+    const result = await db
+      .select({
+        status: equipment.status,
+        count: sql<number>`count(*)::int`,
+      })
+      .from(equipment)
+      .groupBy(equipment.status);
+    
+    return result;
+  }
+
+  async getConsumablesWithStockInfo(): Promise<Consumable[]> {
+    return await db.select().from(consumables).orderBy(asc(consumables.name));
+  }
+
+  async getWeeklyStockForecast(): Promise<{
+    week: string;
+    weekStart: string;
+    weekEnd: string;
+    consumables: {
+      id: number;
+      name: string;
+      stockCode: string;
+      requiredQuantity: number;
+      currentStock: number;
+      deficit: number;
+    }[];
+  }[]> {
+    const now = new Date();
+    const weeks = [];
+
+    // Calculate 4-week date range
+    const startDate = new Date(now);
+    startDate.setHours(0, 0, 0, 0);
+    const endDate = new Date(now);
+    endDate.setDate(now.getDate() + (4 * 7));
+    endDate.setHours(23, 59, 59, 999);
+
+    // Batch fetch: Get ALL services for the entire 4-week period at once
+    const allServices = await db
+      .select()
+      .from(services)
+      .where(
+        and(
+          gte(services.installationDate, startDate),
+          lte(services.installationDate, endDate),
+          eq(services.status, 'scheduled')
+        )
+      );
+
+    if (allServices.length === 0) {
+      // Return empty weeks if no services
+      for (let weekOffset = 0; weekOffset < 4; weekOffset++) {
+        const weekStart = new Date(now);
+        weekStart.setDate(now.getDate() + (weekOffset * 7));
+        weekStart.setHours(0, 0, 0, 0);
+        const weekEnd = new Date(weekStart);
+        weekEnd.setDate(weekStart.getDate() + 6);
+        weekEnd.setHours(23, 59, 59, 999);
+        
+        weeks.push({
+          week: `Week ${weekOffset + 1}`,
+          weekStart: weekStart.toISOString().split('T')[0],
+          weekEnd: weekEnd.toISOString().split('T')[0],
+          consumables: [],
+        });
+      }
+      return weeks;
+    }
+
+    const serviceIds = allServices.map(s => s.id);
+
+    // Batch fetch: Get ALL direct consumables for these services
+    const allDirectConsumables = await db
+      .select({
+        stockItem: serviceStockIssued,
+        consumable: consumables,
+      })
+      .from(serviceStockIssued)
+      .innerJoin(consumables, eq(serviceStockIssued.consumableId, consumables.id))
+      .where(inArray(serviceStockIssued.serviceId, serviceIds));
+
+    // Batch fetch: Get ALL equipment for these services
+    const allEquipmentItems = await db
+      .select({
+        stockItem: serviceStockIssued,
+        equipment: equipment,
+      })
+      .from(serviceStockIssued)
+      .innerJoin(equipment, eq(serviceStockIssued.equipmentId, equipment.id))
+      .where(inArray(serviceStockIssued.serviceId, serviceIds));
+
+    // Get unique template IDs
+    const templateIds = Array.from(new Set(
+      allEquipmentItems
+        .map(item => item.equipment.templateId)
+        .filter(id => id !== null) as number[]
+    ));
+
+    // Batch fetch: Get ALL template consumables for these templates
+    const allTemplateConsumables = templateIds.length > 0
+      ? await db
+          .select({
+            templateId: templateConsumables.templateId,
+            templateConsumable: templateConsumables,
+            consumable: consumables,
+          })
+          .from(templateConsumables)
+          .innerJoin(consumables, eq(templateConsumables.consumableId, consumables.id))
+          .where(inArray(templateConsumables.templateId, templateIds))
+      : [];
+
+    // Build lookup maps for efficient in-memory aggregation
+    const directConsumablesByService = new Map<number, typeof allDirectConsumables>();
+    allDirectConsumables.forEach(item => {
+      const serviceId = item.stockItem.serviceId;
+      if (!directConsumablesByService.has(serviceId)) {
+        directConsumablesByService.set(serviceId, []);
+      }
+      directConsumablesByService.get(serviceId)!.push(item);
+    });
+
+    const equipmentByService = new Map<number, typeof allEquipmentItems>();
+    allEquipmentItems.forEach(item => {
+      const serviceId = item.stockItem.serviceId;
+      if (!equipmentByService.has(serviceId)) {
+        equipmentByService.set(serviceId, []);
+      }
+      equipmentByService.get(serviceId)!.push(item);
+    });
+
+    const templateConsumablesByTemplate = new Map<number, typeof allTemplateConsumables>();
+    allTemplateConsumables.forEach(item => {
+      if (!templateConsumablesByTemplate.has(item.templateId)) {
+        templateConsumablesByTemplate.set(item.templateId, []);
+      }
+      templateConsumablesByTemplate.get(item.templateId)!.push(item);
+    });
+
+    // Get all consumables for current stock lookup
+    const allConsumablesMap = new Map<number, Consumable>();
+    const allConsumablesList = await db.select().from(consumables);
+    allConsumablesList.forEach(c => allConsumablesMap.set(c.id, c));
+
+    // Generate 4 weeks of forecasts using in-memory aggregation
+    for (let weekOffset = 0; weekOffset < 4; weekOffset++) {
+      const weekStart = new Date(now);
+      weekStart.setDate(now.getDate() + (weekOffset * 7));
+      weekStart.setHours(0, 0, 0, 0);
+      
+      const weekEnd = new Date(weekStart);
+      weekEnd.setDate(weekStart.getDate() + 6);
+      weekEnd.setHours(23, 59, 59, 999);
+
+      // Filter services for this week from pre-fetched data
+      const weekServices = allServices.filter(s => {
+        const serviceDate = new Date(s.installationDate!);
+        return serviceDate >= weekStart && serviceDate <= weekEnd;
+      });
+
+      // Calculate consumables needed for all services in this week (in-memory)
+      const consumableRequirements = new Map<number, { consumable: Consumable; quantity: number }>();
+
+      for (const service of weekServices) {
+        // Add directly assigned consumables
+        const directCons = directConsumablesByService.get(service.id) || [];
+        for (const item of directCons) {
+          const existing = consumableRequirements.get(item.consumable.id);
+          if (existing) {
+            existing.quantity += item.stockItem.quantity || 1;
+          } else {
+            consumableRequirements.set(item.consumable.id, {
+              consumable: item.consumable,
+              quantity: item.stockItem.quantity || 1,
+            });
+          }
+        }
+
+        // Add template consumables from equipment
+        const equipItems = equipmentByService.get(service.id) || [];
+        for (const equipItem of equipItems) {
+          if (equipItem.equipment.templateId) {
+            const templateCons = templateConsumablesByTemplate.get(equipItem.equipment.templateId) || [];
+            for (const tc of templateCons) {
+              const existing = consumableRequirements.get(tc.consumable.id);
+              const qty = tc.templateConsumable.recommendedQuantity || 1;
+              if (existing) {
+                existing.quantity += qty;
+              } else {
+                consumableRequirements.set(tc.consumable.id, {
+                  consumable: tc.consumable,
+                  quantity: qty,
+                });
+              }
+            }
+          }
+        }
+      }
+
+      // Format the week data
+      const weekConsumables = Array.from(consumableRequirements.values()).map(item => ({
+        id: item.consumable.id,
+        name: item.consumable.name,
+        stockCode: item.consumable.stockCode,
+        requiredQuantity: item.quantity,
+        currentStock: item.consumable.currentStock || 0,
+        deficit: Math.max(0, item.quantity - (item.consumable.currentStock || 0)),
+      }));
+
+      weeks.push({
+        week: `Week ${weekOffset + 1}`,
+        weekStart: weekStart.toISOString().split('T')[0],
+        weekEnd: weekEnd.toISOString().split('T')[0],
+        consumables: weekConsumables,
+      });
+    }
+
+    return weeks;
+  }
+
+  async returnStockItem(id: number): Promise<any> {
+    const [updated] = await db
+      .update(serviceStockIssued)
+      .set({ 
+        returned: true, 
+        returnedAt: new Date() 
+      })
+      .where(eq(serviceStockIssued.id, id))
+      .returning();
+    
+    return updated;
   }
 }
 

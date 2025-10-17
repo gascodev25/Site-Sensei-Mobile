@@ -1253,6 +1253,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Warehouse routes
+  app.get('/api/warehouse/equipment-status', isAuthenticated, async (req, res) => {
+    try {
+      const status = await storage.getEquipmentStatus();
+      res.json(status);
+    } catch (error) {
+      console.error("Error fetching equipment status:", error);
+      res.status(500).json({ message: "Failed to fetch equipment status" });
+    }
+  });
+
+  app.get('/api/warehouse/consumables', isAuthenticated, async (req, res) => {
+    try {
+      const consumables = await storage.getConsumablesWithStockInfo();
+      res.json(consumables);
+    } catch (error) {
+      console.error("Error fetching consumables:", error);
+      res.status(500).json({ message: "Failed to fetch consumables" });
+    }
+  });
+
+  app.get('/api/warehouse/weekly-forecast', isAuthenticated, async (req, res) => {
+    try {
+      const forecast = await storage.getWeeklyStockForecast();
+      res.json(forecast);
+    } catch (error) {
+      console.error("Error fetching weekly forecast:", error);
+      res.status(500).json({ message: "Failed to fetch weekly forecast" });
+    }
+  });
+
+  app.post('/api/warehouse/return-stock/:id', isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const result = await storage.returnStockItem(id);
+      
+      await storage.createAuditLog({
+        userId: req.user?.claims?.sub,
+        action: 'return_stock',
+        entityType: 'service_stock_issued',
+        entityId: id,
+        metadata: { returnedAt: new Date() }
+      });
+
+      res.json(result);
+    } catch (error) {
+      console.error("Error returning stock:", error);
+      res.status(500).json({ message: "Failed to return stock" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

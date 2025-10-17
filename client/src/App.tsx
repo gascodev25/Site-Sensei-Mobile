@@ -12,6 +12,7 @@ import Services from "@/pages/Services";
 import Inventory from "@/pages/Inventory";
 import Teams from "@/pages/Teams";
 import Reports from "@/pages/Reports";
+import Warehouse from "@/pages/Warehouse";
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -27,6 +28,7 @@ function Router() {
           <Route path="/services" component={Services} />
           <Route path="/inventory" component={Inventory} />
           <Route path="/teams" component={Teams} />
+          <Route path="/warehouse" component={Warehouse} />
           <Route path="/reports" component={Reports} />
         </>
       )}
