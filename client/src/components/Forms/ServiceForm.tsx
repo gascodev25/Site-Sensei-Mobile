@@ -176,20 +176,11 @@ export default function ServiceForm({ service, initialDate, onSuccess, onCancel,
       const originalPattern = service.recurrencePattern as { interval?: string } | null;
       const newPattern = data.recurrencePattern as { interval?: string } | null;
       
-      console.log('=== SERVICE FORM SUBMIT DEBUG ===');
-      console.log('Is Editing:', isEditing);
-      console.log('Original Interval:', originalPattern?.interval);
-      console.log('New Interval:', newPattern?.interval);
-      console.log('Initial Date:', initialDate);
-      console.log('Interval Changed:', originalPattern?.interval !== newPattern?.interval);
-      
       // If interval is changing and initialDate is set (from calendar click)
       if (originalPattern?.interval && 
           newPattern?.interval && 
           originalPattern.interval !== newPattern.interval &&
           initialDate) {
-        
-        console.log('Showing split confirmation dialog...');
         
         // Ask user if they want to split the series
         const shouldSplit = confirm(
@@ -200,14 +191,11 @@ export default function ServiceForm({ service, initialDate, onSuccess, onCancel,
         );
         
         if (shouldSplit) {
-          console.log('User chose to split series');
           // Format the split date
           const year = initialDate.getFullYear();
           const month = String(initialDate.getMonth() + 1).padStart(2, '0');
           const day = String(initialDate.getDate()).padStart(2, '0');
           const splitDate = `${year}-${month}-${day}`;
-          
-          console.log('Split date:', splitDate);
           
           splitServiceMutation.mutate({
             serviceId: service.id,
@@ -215,14 +203,11 @@ export default function ServiceForm({ service, initialDate, onSuccess, onCancel,
             newInterval: newPattern.interval
           });
           return;
-        } else {
-          console.log('User chose to update entire series');
         }
       }
     }
     
     // Normal create or update
-    console.log('Performing normal update/create');
     createServiceMutation.mutate(data);
   };
 

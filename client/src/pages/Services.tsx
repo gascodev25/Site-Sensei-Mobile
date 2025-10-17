@@ -518,7 +518,10 @@ export default function Services() {
                           <Button 
                             variant="ghost" 
                             size="sm"
-                            onClick={() => setEditingService(service)}
+                            onClick={() => {
+                              setSelectedServiceDate(null); // Clear any previously selected date
+                              setEditingService(service);
+                            }}
                             data-testid={`button-edit-${service.id}`}
                           >
                             <Edit className="h-4 w-4" />
@@ -582,7 +585,12 @@ export default function Services() {
         </Tabs>
 
         {/* Edit Service Dialog */}
-        <Dialog open={!!editingService} onOpenChange={(open) => !open && setEditingService(null)}>
+        <Dialog open={!!editingService} onOpenChange={(open) => {
+          if (!open) {
+            setEditingService(null);
+            setSelectedServiceDate(null);
+          }
+        }}>
           <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Edit Service</DialogTitle>
