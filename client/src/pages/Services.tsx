@@ -590,12 +590,15 @@ export default function Services() {
             {editingService && (
               <ServiceForm
                 service={editingService}
+                initialDate={selectedServiceDate}
                 onSuccess={() => {
                   setEditingService(null);
+                  setSelectedServiceDate(null);
                   setIsCreateOpen(false);
                 }}
                 onCancel={() => {
                   setEditingService(null);
+                  setSelectedServiceDate(null);
                   setIsCreateOpen(false);
                 }}
                 onDelete={() => handleDelete(editingService)}
