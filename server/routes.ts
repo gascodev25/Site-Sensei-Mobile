@@ -719,6 +719,83 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Split recurring service endpoint
+  app.post('/api/services/:id/split', isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { splitDate, newInterval } = req.body;
+
+      if (!splitDate || !newInterval) {
+        return res.status(400).json({ message: "Split date and new interval are required" });
+      }
+
+      // Get the original service
+      const originalService = await storage.getService(id);
+      if (!originalService) {
+        return res.status(404).json({ message: "Service not found" });
+      }
+
+      // Verify it's a recurring service
+      const recurrencePattern = originalService.recurrencePattern as { interval?: string; end_date?: string } | null;
+      if (!recurrencePattern || !recurrencePattern.interval) {
+        return res.status(400).json({ message: "Can only split recurring services" });
+      }
+
+      // Update original service to end one day before split date
+      const splitDateObj = new Date(splitDate);
+      const endDateObj = new Date(splitDateObj);
+      endDateObj.setDate(endDateObj.getDate() - 1);
+      
+      await storage.updateService(id, {
+        recurrencePattern: {
+          ...recurrencePattern,
+          end_date: endDateObj.toISOString().split('T')[0]
+        }
+      });
+
+      // Create new service from split date with new interval
+      const newServiceData: any = {
+        clientId: originalService.clientId,
+        type: originalService.type,
+        installationDate: new Date(splitDate),
+        teamId: originalService.teamId,
+        status: 'scheduled',
+        recurrencePattern: {
+          interval: newInterval,
+          end_date: recurrencePattern.end_date // Use original end date
+        },
+        contractLengthMonths: originalService.contractLengthMonths,
+        servicePriority: originalService.servicePriority,
+        estimatedDuration: originalService.estimatedDuration,
+        originalServiceId: id,
+        splitFromDate: splitDate,
+        completedDates: [], // New series starts fresh
+        excludedDates: []
+      };
+
+      const newService = await storage.createService(newServiceData);
+
+      // Audit log
+      await storage.createAuditLog({
+        userId: req.user?.claims?.sub,
+        action: 'split',
+        entityType: 'service',
+        entityId: id,
+        metadata: {
+          splitDate,
+          oldInterval: recurrencePattern.interval,
+          newInterval,
+          newServiceId: newService.id
+        }
+      });
+
+      res.json({ originalService: await storage.getService(id), newService });
+    } catch (error) {
+      console.error("Error splitting service:", error);
+      res.status(500).json({ message: "Failed to split service" });
+    }
+  });
+
   app.delete('/api/services/:id', isAuthenticated, async (req, res) => {
     try {
       const id = parseInt(req.params.id);

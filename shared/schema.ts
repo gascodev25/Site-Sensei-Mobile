@@ -135,6 +135,8 @@ export const services = pgTable("services", {
   teamId: integer("team_id").references(() => serviceTeams.id),
   status: varchar("status", { length: 20 }).default("scheduled"), // 'scheduled', 'completed', 'missed'
   recurrencePattern: jsonb("recurrence_pattern"), // { interval: '30d', end_date: '2026-01-01' }
+  originalServiceId: integer("original_service_id").references(() => services.id), // For tracking split series
+  splitFromDate: varchar("split_from_date", { length: 20 }), // ISO date string when this service was split from parent
   excludedDates: jsonb("excluded_dates").$type<string[]>().default([]), // Array of ISO date strings to skip
   completedDates: jsonb("completed_dates").$type<string[]>().default([]), // Array of ISO date strings for completed occurrences
   contractLengthMonths: integer("contract_length_months"),
