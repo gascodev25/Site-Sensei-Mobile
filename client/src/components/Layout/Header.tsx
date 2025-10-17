@@ -13,6 +13,7 @@ export default function Header() {
     { label: "Services", href: "/services", active: location === "/services" },
     { label: "Inventory", href: "/inventory", active: location === "/inventory" },
     { label: "Teams", href: "/teams", active: location === "/teams" },
+    { label: "Warehouse", href: "/warehouse", active: location === "/warehouse" },
     { label: "Reports", href: "/reports", active: location === "/reports" },
   ];
 
