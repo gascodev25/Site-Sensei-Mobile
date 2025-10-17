@@ -148,7 +148,66 @@ export default function ServiceForm({ service, initialDate, onSuccess, onCancel,
     },
   });
 
+  const splitServiceMutation = useMutation({
+    mutationFn: async ({ serviceId, splitDate, newInterval }: { serviceId: number; splitDate: string; newInterval: string }) => {
+      return await apiRequest("POST", `/api/services/${serviceId}/split`, { splitDate, newInterval });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/services"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/metrics"] });
+      toast({
+        title: "Success",
+        description: "Service series split successfully. New interval will apply from selected date forward.",
+      });
+      onSuccess();
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const onSubmit = (data: InsertService) => {
+    // Check if user is changing the interval of a recurring service
+    if (isEditing && service) {
+      const originalPattern = service.recurrencePattern as { interval?: string } | null;
+      const newPattern = data.recurrencePattern as { interval?: string } | null;
+      
+      // If interval is changing and initialDate is set (from calendar click)
+      if (originalPattern?.interval && 
+          newPattern?.interval && 
+          originalPattern.interval !== newPattern.interval &&
+          initialDate) {
+        
+        // Ask user if they want to split the series
+        const shouldSplit = confirm(
+          `You're changing the interval from ${originalPattern.interval} to ${newPattern.interval}.\n\n` +
+          `Would you like to:\n` +
+          `- YES: Apply new interval from ${format(initialDate, 'PPP')} forward only (recommended)\n` +
+          `- NO: Change interval for entire series (affects past dates)`
+        );
+        
+        if (shouldSplit) {
+          // Format the split date
+          const year = initialDate.getFullYear();
+          const month = String(initialDate.getMonth() + 1).padStart(2, '0');
+          const day = String(initialDate.getDate()).padStart(2, '0');
+          const splitDate = `${year}-${month}-${day}`;
+          
+          splitServiceMutation.mutate({
+            serviceId: service.id,
+            splitDate,
+            newInterval: newPattern.interval
+          });
+          return;
+        }
+      }
+    }
+    
+    // Normal create or update
     createServiceMutation.mutate(data);
   };
 
