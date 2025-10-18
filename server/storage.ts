@@ -782,14 +782,14 @@ export class DatabaseStorage implements IStorage {
     endDate.setHours(23, 59, 59, 999);
 
     // Batch fetch: Get ALL services for the entire 4-week period at once
+    // Include all services in date range, regardless of status
     const allServices = await db
       .select()
       .from(services)
       .where(
         and(
           gte(services.installationDate, startDate),
-          lte(services.installationDate, endDate),
-          eq(services.status, 'scheduled')
+          lte(services.installationDate, endDate)
         )
       );
 
