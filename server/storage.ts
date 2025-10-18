@@ -904,35 +904,60 @@ export class DatabaseStorage implements IStorage {
       // Filter services for this week from pre-fetched data
       const weekServices = allServices.filter(s => {
         const serviceDate = new Date(s.installationDate!);
-        if (serviceDate < weekStart || serviceDate > weekEnd) {
-          return false;
-        }
         
-        // For recurring services, check if this specific date is already completed
+        // For recurring services, we need to check if they have occurrences in this week
         const isRecurring = s.recurrencePattern && 
                            typeof s.recurrencePattern === 'object' && 
                            s.recurrencePattern !== null &&
                            'interval' in s.recurrencePattern;
         
-        if (isRecurring && s.completedDates && Array.isArray(s.completedDates)) {
-          // Check if any date in this week is in completedDates
-          const completedDatesSet = new Set(s.completedDates);
+        if (isRecurring) {
+          // Parse the interval (e.g., "7d" -> 7 days)
+          const pattern = s.recurrencePattern as { interval: string; end_date?: string };
+          const intervalMatch = pattern.interval.match(/^(\d+)d$/);
+          if (!intervalMatch) return false;
           
-          // Generate all dates for this recurring service in this week
-          for (let d = new Date(weekStart); d <= weekEnd; d.setDate(d.getDate() + 1)) {
-            const dateStr = d.toISOString().split('T')[0];
-            if (completedDatesSet.has(dateStr)) {
-              // This specific occurrence is completed, don't count it
-              continue;
-            }
-            // If we reach here, there's at least one non-completed occurrence
-            return true;
+          const intervalDays = parseInt(intervalMatch[1], 10);
+          
+          // Check if end_date has passed
+          if (pattern.end_date) {
+            const endDate = new Date(pattern.end_date);
+            if (weekStart > endDate) return false;
           }
-          // All occurrences in this week are completed
-          return false;
+          
+          // Generate occurrences in this week
+          const completedDatesSet = new Set((s.completedDates as string[]) || []);
+          let hasNonCompletedOccurrence = false;
+          
+          // Start from the service's installation date and step by interval
+          let currentDate = new Date(serviceDate);
+          const maxIterations = 1000; // Safety limit
+          let iterations = 0;
+          
+          while (currentDate <= weekEnd && iterations < maxIterations) {
+            iterations++;
+            
+            // If this occurrence falls within the week
+            if (currentDate >= weekStart && currentDate <= weekEnd) {
+              const dateStr = currentDate.toISOString().split('T')[0];
+              
+              // Check if this specific date is not completed
+              if (!completedDatesSet.has(dateStr)) {
+                hasNonCompletedOccurrence = true;
+                break;
+              }
+            }
+            
+            // Move to next occurrence
+            currentDate = new Date(currentDate);
+            currentDate.setDate(currentDate.getDate() + intervalDays);
+          }
+          
+          return hasNonCompletedOccurrence;
         }
         
-        return true;
+        // For non-recurring services, simple date check
+        return serviceDate >= weekStart && serviceDate <= weekEnd;
       });
 
       // Calculate consumables needed for all services in this week (in-memory)
