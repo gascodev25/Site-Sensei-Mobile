@@ -642,14 +642,16 @@ export default function Inventory() {
             </TabsList>
             
             <div className="flex space-x-2">
-              <Button 
-                variant="outline" 
-                onClick={() => setIsBulkUploadOpen(true)}
-                data-testid="button-bulk-upload"
-              >
-                <Upload className="h-4 w-4 mr-2" />
-                Bulk Upload
-              </Button>
+              {activeTab !== "templates" && (
+                <Button 
+                  variant="outline" 
+                  onClick={() => setIsBulkUploadOpen(true)}
+                  data-testid="button-bulk-upload"
+                >
+                  <Upload className="h-4 w-4 mr-2" />
+                  Bulk Upload
+                </Button>
+              )}
               
               {activeTab === "equipment" && (
                 <Dialog open={isCreateEquipmentOpen} onOpenChange={setIsCreateEquipmentOpen}>
