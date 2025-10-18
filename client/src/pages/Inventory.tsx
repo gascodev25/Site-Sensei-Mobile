@@ -45,7 +45,6 @@ export default function Inventory() {
 
   const { data: equipmentTemplates = [] } = useQuery<any[]>({
     queryKey: ["/api/equipment-templates"],
-    enabled: isCreateEquipmentOpen || editingEquipment !== null || activeTab === "templates" || activeTab === "equipment",
   });
 
   const { data: lowStockConsumables = [] } = useQuery<Consumable[]>({
