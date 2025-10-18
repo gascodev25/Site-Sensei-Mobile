@@ -633,7 +633,10 @@ export default function Inventory() {
         </div>
 
         {/* Inventory Tabs */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <Tabs value={activeTab} onValueChange={(value) => {
+          setActiveTab(value);
+          setIsBulkUploadOpen(false); // Close bulk upload dialog when switching tabs
+        }} className="w-full">
           <div className="flex items-center justify-between mb-6">
             <TabsList className="grid w-fit grid-cols-3">
               <TabsTrigger value="equipment">Equipment</TabsTrigger>

@@ -50,7 +50,8 @@ export default function BulkUploadDialog({
   const requiredFields = {
     clients: ["name", "addressText"],
     equipment: ["name", "stockCode"],
-    consumables: ["name", "stockCode"]
+    consumables: ["name", "stockCode"],
+    templates: ["name"]
   };
 
   // Define CSV templates (using camelCase to match schema)
@@ -69,6 +70,11 @@ export default function BulkUploadDialog({
       "name,stockCode,price,currentStock,minStockLevel,barcode",
       "Foam Soap 700ml,FS001,45,100,20,111222333",
       "Paper Towels,PT001,25,50,10,444555666"
+    ].join("\n"),
+    templates: [
+      "name,description",
+      "Hygiene Station Standard,Standard consumables for hygiene stations",
+      "Dispenser Setup,Common dispenser consumables"
     ].join("\n")
   };
 
@@ -307,8 +313,9 @@ export default function BulkUploadDialog({
   const entityDisplayName = {
     clients: "Clients",
     equipment: "Equipment",
-    consumables: "Consumables"
-  }[entityType];
+    consumables: "Consumables",
+    templates: "Templates"
+  }[entityType] || "Items";
 
   return (
     <Dialog open={open} onOpenChange={(open) => {
