@@ -6,6 +6,16 @@ This is a comprehensive warehouse and service management system designed specifi
 
 The system is built as a full-stack web application using modern technologies including React for the frontend, Express.js for the backend API, PostgreSQL with Drizzle ORM for data persistence, and comprehensive UI components for a professional user experience. All pricing is displayed in South African Rands (R) and the address search functionality is optimized for South African locations.
 
+## Recent Changes
+
+**Series Splitting for Equipment & Consumables (October 2025)**
+- Implemented series splitting capability for recurring services when equipment or consumables change
+- When editing a recurring service from the calendar, changes to equipment items, consumable items, or service intervals trigger a split confirmation dialog
+- Users can choose to apply changes from a specific date forward (creates new service series) or modify the entire series
+- The split operation maintains data integrity by ending the original series one day before the split date and creating a new series with updated stock assignments
+- Warehouse forecasting automatically updates after splits through cache invalidation
+- All stock assignments (equipment and consumables) are properly copied to the new service series
+
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.
