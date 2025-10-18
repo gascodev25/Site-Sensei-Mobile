@@ -17,6 +17,11 @@ export default function Warehouse() {
     queryKey: ['/api/warehouse/equipment-status'],
   });
 
+  // Fetch all equipment items
+  const { data: equipmentItems, isLoading: isLoadingEquipmentItems } = useQuery<any[]>({
+    queryKey: ['/api/equipment'],
+  });
+
   // Fetch consumables
   const { data: consumables, isLoading: isLoadingConsumables } = useQuery<any[]>({
     queryKey: ['/api/warehouse/consumables'],
@@ -144,31 +149,60 @@ export default function Warehouse() {
         <TabsContent value="equipment" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Equipment Status</CardTitle>
-              <CardDescription>View all equipment grouped by status</CardDescription>
+              <CardTitle>Equipment Inventory</CardTitle>
+              <CardDescription>View all equipment items by status</CardDescription>
             </CardHeader>
             <CardContent>
-              {isLoadingEquipment ? (
+              {isLoadingEquipmentItems ? (
                 <div className="text-center py-8">Loading equipment...</div>
               ) : (
                 <div className="space-y-6">
-                  {equipmentStatus?.map((statusGroup) => (
-                    <div key={statusGroup.status} className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <h3 className="text-lg font-semibold capitalize">
-                          {statusGroup.status.replace('_', ' ')}
-                        </h3>
-                        <Badge variant="outline">
-                          {statusGroup.count} items
-                        </Badge>
+                  {['in_warehouse', 'in_field', 'issued'].map((status) => {
+                    const items = equipmentItems?.filter(item => item.status === status) || [];
+                    if (items.length === 0) return null;
+                    
+                    return (
+                      <div key={status} className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <h3 className="text-lg font-semibold capitalize">
+                            {status.replace('_', ' ')}
+                          </h3>
+                          <Badge variant="outline">
+                            {items.length} items
+                          </Badge>
+                        </div>
+                        
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Name</TableHead>
+                              <TableHead>Stock Code</TableHead>
+                              <TableHead>Status</TableHead>
+                              <TableHead>Price (R)</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {items.map((equipment) => (
+                              <TableRow key={equipment.id} data-testid={`row-equipment-${equipment.id}`}>
+                                <TableCell className="font-medium">{equipment.name}</TableCell>
+                                <TableCell>{equipment.stockCode}</TableCell>
+                                <TableCell>
+                                  <Badge variant={
+                                    status === 'in_warehouse' ? 'secondary' : 
+                                    status === 'in_field' ? 'default' : 
+                                    'outline'
+                                  }>
+                                    {status.replace('_', ' ')}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell>R {parseFloat(equipment.price || '0').toFixed(2)}</TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
                       </div>
-                      <div className="text-sm text-muted-foreground">
-                        {statusGroup.status === 'in_warehouse' && 'Equipment available in warehouse'}
-                        {statusGroup.status === 'in_field' && 'Equipment deployed to client sites'}
-                        {statusGroup.status === 'issued' && 'Equipment issued to technicians'}
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </CardContent>
