@@ -25,7 +25,6 @@ import BulkUploadDialog from "@/components/Dialogs/BulkUploadDialog";
 export default function Inventory() {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState("equipment");
-  const [equipmentStatusFilter, setEquipmentStatusFilter] = useState("all");
   const [isCreateEquipmentOpen, setIsCreateEquipmentOpen] = useState(false);
   const [isCreateConsumableOpen, setIsCreateConsumableOpen] = useState(false);
   const [editingEquipment, setEditingEquipment] = useState<Equipment | null>(null);
@@ -532,17 +531,11 @@ export default function Inventory() {
     });
   };
 
-  const filteredEquipment = equipment.filter(item => {
-    const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.stockCode.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (item.status && item.status.toLowerCase().includes(searchQuery.toLowerCase()));
-    
-    const matchesStatus = equipmentStatusFilter === "all" || 
-      (equipmentStatusFilter === "in_warehouse" && item.status === "in_warehouse") ||
-      (equipmentStatusFilter === "in_field" && item.status === "in_field");
-    
-    return matchesSearch && matchesStatus;
-  });
+  const filteredEquipment = equipment.filter(item =>
+    item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    item.stockCode.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (item.status && item.status.toLowerCase().includes(searchQuery.toLowerCase()))
+  );
 
   const filteredConsumables = consumables.filter(item =>
     item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -1156,26 +1149,6 @@ export default function Inventory() {
 
           {/* Equipment Tab */}
           <TabsContent value="equipment">
-            {/* Equipment Status Filter */}
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center space-x-2">
-                <label className="text-sm font-medium">Filter by Status:</label>
-                <Select value={equipmentStatusFilter} onValueChange={setEquipmentStatusFilter}>
-                  <SelectTrigger className="w-[200px]" data-testid="select-equipment-status-filter">
-                    <SelectValue placeholder="All Equipment" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Equipment</SelectItem>
-                    <SelectItem value="in_warehouse">In Warehouse</SelectItem>
-                    <SelectItem value="in_field">In Field</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="text-sm text-muted-foreground">
-                Showing {filteredEquipment.length} of {equipment.length} items
-              </div>
-            </div>
-            
             {filteredEquipment.length === 0 ? (
               <Card>
                 <CardContent className="flex flex-col items-center justify-center py-12">
@@ -1211,12 +1184,6 @@ export default function Inventory() {
                             <Package className="h-3 w-3 mr-1" />
                             <span>Price: {formatPrice(equipmentItem.price)}</span>
                           </div>
-                          {equipmentItem.status === 'in_field' && equipmentItem.installedAtClientId && (
-                            <div className="flex items-center text-sm text-muted-foreground mt-1">
-                              <MapPin className="h-3 w-3 mr-1" />
-                              <span>Client: {clients.find(c => c.id === equipmentItem.installedAtClientId)?.name || 'Unknown'}</span>
-                            </div>
-                          )}
                           {equipmentItem.templateId && (
                             <div className="flex items-center text-sm text-muted-foreground mt-1">
                               <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs font-medium">

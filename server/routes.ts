@@ -691,18 +691,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Update the service
       const service = await storage.updateService(id, updateData);
 
-      // Step 5: Update equipment status for installations
-      // When an installation is completed, equipment moves to 'in_field' status
-      if (existingService.type === 'installation' && equipmentItems && equipmentItems.length > 0) {
-        for (const equipmentItem of equipmentItems) {
-          await storage.updateEquipment(equipmentItem.id, {
-            status: 'in_field',
-            installedAtClientId: existingService.clientId,
-            dateInstalled: new Date()
-          });
-        }
-      }
-
       // Audit log
       await storage.createAuditLog({
         userId: req.user?.claims?.sub,
@@ -714,8 +702,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           equipmentItems: equipmentItems?.length || 0,
           consumableItems: consumableItems?.length || 0,
           serviceInterval: serviceInterval,
-          contractLengthMonths: contractLengthMonths,
-          equipmentMovedToField: existingService.type === 'installation' && equipmentItems?.length > 0
+          contractLengthMonths: contractLengthMonths
         }
       });
 
@@ -806,32 +793,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
 
       const newService = await storage.createService(newServiceData);
-
-      // Handle equipment status changes when equipment assignments change
-      if (newEquipmentItems && newEquipmentItems.length >= 0) {
-        const originalEquipmentIds = (originalServiceWithStock?.equipmentItems || []).map((item: any) => item.id);
-        const newEquipmentIds = newEquipmentItems.map((item: any) => item.id);
-        
-        // Equipment removed: return to warehouse
-        const removedEquipmentIds = originalEquipmentIds.filter((id: number) => !newEquipmentIds.includes(id));
-        for (const equipmentId of removedEquipmentIds) {
-          await storage.updateEquipment(equipmentId, {
-            status: 'in_warehouse',
-            installedAtClientId: null,
-            dateInstalled: null
-          });
-        }
-        
-        // Equipment added: move to field
-        const addedEquipmentIds = newEquipmentIds.filter((id: number) => !originalEquipmentIds.includes(id));
-        for (const equipmentId of addedEquipmentIds) {
-          await storage.updateEquipment(equipmentId, {
-            status: 'in_field',
-            installedAtClientId: originalService.clientId,
-            dateInstalled: new Date()
-          });
-        }
-      }
 
       // Audit log
       await storage.createAuditLog({
