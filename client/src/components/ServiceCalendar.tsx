@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -22,11 +23,10 @@ export default function ServiceCalendar({ services, onServiceClick, onServiceMov
   const [draggedFromDate, setDraggedFromDate] = useState<Date | null>(null);
   const [isDragging, setIsDragging] = useState(false);
 
-  // Get unique teams for filtering
-  const teams = useMemo(() => {
-    const teamSet = new Set(services.map(s => s.team?.name).filter(Boolean));
-    return Array.from(teamSet);
-  }, [services]);
+  // Fetch all teams from API
+  const { data: allTeams = [] } = useQuery({
+    queryKey: ["/api/service-teams"],
+  });
 
   // Filter services by team
   const filteredServices = useMemo(() => {
@@ -429,8 +429,8 @@ export default function ServiceCalendar({ services, onServiceClick, onServiceMov
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Teams</SelectItem>
-              {teams.map(team => (
-                <SelectItem key={team} value={team || ''}>{team}</SelectItem>
+              {allTeams.map((team: any) => (
+                <SelectItem key={team.id} value={team.name}>{team.name}</SelectItem>
               ))}
             </SelectContent>
           </Select>
