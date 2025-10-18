@@ -60,6 +60,7 @@ export interface IStorage {
   // Equipment operations
   getEquipment(): Promise<Equipment[]>;
   getEquipmentByStatus(status: string): Promise<Equipment[]>;
+  getEquipmentWithClientInfo(): Promise<(Equipment & { client?: Client })[]>;
   getEquipmentWithConsumables(id: number): Promise<EquipmentWithConsumables | undefined>;
   createEquipment(equipment: InsertEquipment): Promise<Equipment>;
   updateEquipment(id: number, equipment: Partial<InsertEquipment>): Promise<Equipment>;
@@ -352,6 +353,22 @@ export class DatabaseStorage implements IStorage {
       .from(equipment)
       .where(eq(equipment.status, status))
       .orderBy(asc(equipment.name));
+  }
+
+  async getEquipmentWithClientInfo(): Promise<(Equipment & { client?: Client })[]> {
+    const result = await db
+      .select({
+        equipment: equipment,
+        client: clients,
+      })
+      .from(equipment)
+      .leftJoin(clients, eq(equipment.installedAtClientId, clients.id))
+      .orderBy(asc(equipment.name));
+
+    return result.map(row => ({
+      ...row.equipment,
+      client: row.client || undefined,
+    }));
   }
 
   async createEquipment(equipmentData: InsertEquipment): Promise<Equipment> {

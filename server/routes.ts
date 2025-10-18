@@ -146,9 +146,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Equipment routes
   app.get('/api/equipment', isAuthenticated, async (req, res) => {
     try {
-      const { status } = req.query;
+      const { status, withClientInfo } = req.query;
       let equipment;
-      if (status && typeof status === 'string') {
+      
+      if (withClientInfo === 'true') {
+        equipment = await storage.getEquipmentWithClientInfo();
+        if (status && typeof status === 'string') {
+          equipment = equipment.filter(e => e.status === status);
+        }
+      } else if (status && typeof status === 'string') {
         equipment = await storage.getEquipmentByStatus(status);
       } else {
         equipment = await storage.getEquipment();
@@ -680,7 +686,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
         updateData.completedAt = new Date();
       }
 
-      // Step 4: Add equipment and consumable items if provided
+      // Step 4: Handle equipment status changes
+      // Only process equipment status changes if equipment items are provided
+      if (equipmentItems && equipmentItems.length >= 0) {
+        // Get current equipment items for this service
+        const currentServiceWithStock = await storage.getServiceWithStockItems(id);
+        const currentEquipmentIds = (currentServiceWithStock?.equipmentItems || []).map((item: any) => item.id);
+        const newEquipmentIds = equipmentItems.map(item => item.id);
+        
+        // Equipment being removed from service (was in service, now not) - return to warehouse
+        const removedEquipmentIds = currentEquipmentIds.filter((eqId: number) => !newEquipmentIds.includes(eqId));
+        for (const equipmentId of removedEquipmentIds) {
+          await storage.updateEquipment(equipmentId, {
+            status: 'in_warehouse',
+            installedAtClientId: null,
+            dateInstalled: null
+          });
+        }
+        
+        // Equipment being added to service (wasn't in service, now is) - move to field
+        const addedEquipmentIds = newEquipmentIds.filter(eqId => !currentEquipmentIds.includes(eqId));
+        for (const equipmentId of addedEquipmentIds) {
+          // Use the client from the existing service for equipment being installed
+          await storage.updateEquipment(equipmentId, {
+            status: 'in_field',
+            installedAtClientId: existingService.clientId,
+            dateInstalled: new Date()
+          });
+        }
+      }
+      
+      // Step 5: Add equipment and consumable items if provided
       if (equipmentItems && equipmentItems.length > 0) {
         updateData.equipmentItems = equipmentItems;
       }

@@ -17,9 +17,14 @@ export default function Warehouse() {
     queryKey: ['/api/warehouse/equipment-status'],
   });
 
-  // Fetch all equipment items
+  // Fetch all equipment items with client info
   const { data: equipmentItems, isLoading: isLoadingEquipmentItems } = useQuery<any[]>({
-    queryKey: ['/api/equipment'],
+    queryKey: ['/api/equipment', { withClientInfo: true }],
+    queryFn: async () => {
+      const response = await fetch('/api/equipment?withClientInfo=true');
+      if (!response.ok) throw new Error('Failed to fetch equipment');
+      return response.json();
+    },
   });
 
   // Fetch consumables
@@ -150,60 +155,92 @@ export default function Warehouse() {
           <Card>
             <CardHeader>
               <CardTitle>Equipment Inventory</CardTitle>
-              <CardDescription>View all equipment items by status</CardDescription>
+              <CardDescription>View all equipment items by location</CardDescription>
             </CardHeader>
             <CardContent>
               {isLoadingEquipmentItems ? (
                 <div className="text-center py-8">Loading equipment...</div>
               ) : (
-                <div className="space-y-6">
-                  {['in_warehouse', 'in_field'].map((status) => {
-                    const items = equipmentItems?.filter(item => item.status === status) || [];
-                    if (items.length === 0) return null;
-                    
-                    return (
-                      <div key={status} className="space-y-3">
-                        <div className="flex items-center justify-between">
-                          <h3 className="text-lg font-semibold capitalize">
-                            {status.replace('_', ' ')}
-                          </h3>
-                          <Badge variant="outline">
-                            {items.length} items
-                          </Badge>
-                        </div>
-                        
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead>Name</TableHead>
-                              <TableHead>Stock Code</TableHead>
-                              <TableHead>Status</TableHead>
-                              <TableHead>Price (R)</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {items.map((equipment) => (
-                              <TableRow key={equipment.id} data-testid={`row-equipment-${equipment.id}`}>
-                                <TableCell className="font-medium">{equipment.name}</TableCell>
-                                <TableCell>{equipment.stockCode}</TableCell>
-                                <TableCell>
-                                  <Badge variant={
-                                    status === 'in_warehouse' ? 'secondary' : 
-                                    status === 'in_field' ? 'default' : 
-                                    'outline'
-                                  }>
-                                    {status.replace('_', ' ')}
-                                  </Badge>
-                                </TableCell>
-                                <TableCell>R {parseFloat(equipment.price || '0').toFixed(2)}</TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      </div>
-                    );
-                  })}
-                </div>
+                <Tabs defaultValue="warehouse" className="space-y-4">
+                  <TabsList>
+                    <TabsTrigger value="warehouse" data-testid="tab-warehouse">
+                      In Warehouse ({equipmentItems?.filter(e => e.status === 'in_warehouse').length || 0})
+                    </TabsTrigger>
+                    <TabsTrigger value="field" data-testid="tab-field">
+                      In Field ({equipmentItems?.filter(e => e.status === 'in_field').length || 0})
+                    </TabsTrigger>
+                  </TabsList>
+
+                  <TabsContent value="warehouse">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Name</TableHead>
+                          <TableHead>Stock Code</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Price (R)</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {equipmentItems?.filter(e => e.status === 'in_warehouse').map((equipment) => (
+                          <TableRow key={equipment.id} data-testid={`row-equipment-${equipment.id}`}>
+                            <TableCell className="font-medium">{equipment.name}</TableCell>
+                            <TableCell>{equipment.stockCode}</TableCell>
+                            <TableCell>
+                              <Badge variant="secondary">In Warehouse</Badge>
+                            </TableCell>
+                            <TableCell>R {parseFloat(equipment.price || '0').toFixed(2)}</TableCell>
+                          </TableRow>
+                        ))}
+                        {equipmentItems?.filter(e => e.status === 'in_warehouse').length === 0 && (
+                          <TableRow>
+                            <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
+                              No equipment in warehouse
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </TableBody>
+                    </Table>
+                  </TabsContent>
+
+                  <TabsContent value="field">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Name</TableHead>
+                          <TableHead>Stock Code</TableHead>
+                          <TableHead>Client</TableHead>
+                          <TableHead>Date Installed</TableHead>
+                          <TableHead>Price (R)</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {equipmentItems?.filter(e => e.status === 'in_field').map((equipment) => (
+                          <TableRow key={equipment.id} data-testid={`row-equipment-${equipment.id}`}>
+                            <TableCell className="font-medium">{equipment.name}</TableCell>
+                            <TableCell>{equipment.stockCode}</TableCell>
+                            <TableCell data-testid={`text-client-${equipment.id}`}>
+                              {equipment.client?.name || 'N/A'}
+                            </TableCell>
+                            <TableCell data-testid={`text-date-${equipment.id}`}>
+                              {equipment.dateInstalled 
+                                ? new Date(equipment.dateInstalled).toLocaleDateString() 
+                                : 'N/A'}
+                            </TableCell>
+                            <TableCell>R {parseFloat(equipment.price || '0').toFixed(2)}</TableCell>
+                          </TableRow>
+                        ))}
+                        {equipmentItems?.filter(e => e.status === 'in_field').length === 0 && (
+                          <TableRow>
+                            <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                              No equipment in field
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </TableBody>
+                    </Table>
+                  </TabsContent>
+                </Tabs>
               )}
             </CardContent>
           </Card>
