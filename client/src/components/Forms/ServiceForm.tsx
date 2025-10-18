@@ -149,15 +149,35 @@ export default function ServiceForm({ service, initialDate, onSuccess, onCancel,
   });
 
   const splitServiceMutation = useMutation({
-    mutationFn: async ({ serviceId, splitDate, newInterval }: { serviceId: number; splitDate: string; newInterval: string }) => {
-      return await apiRequest("POST", `/api/services/${serviceId}/split`, { splitDate, newInterval });
+    mutationFn: async ({ 
+      serviceId, 
+      splitDate, 
+      newInterval, 
+      newEquipmentItems, 
+      newConsumableItems 
+    }: { 
+      serviceId: number; 
+      splitDate: string; 
+      newInterval: string;
+      newEquipmentItems?: { id: number; quantity: number }[];
+      newConsumableItems?: { id: number; quantity: number }[];
+    }) => {
+      return await apiRequest("POST", `/api/services/${serviceId}/split`, { 
+        splitDate, 
+        newInterval,
+        newEquipmentItems,
+        newConsumableItems
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/services"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard/metrics"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/warehouse/equipment-status"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/warehouse/consumables"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/warehouse/weekly-forecast"] });
       toast({
         title: "Success",
-        description: "Service series split successfully. New interval will apply from selected date forward.",
+        description: "Service series split successfully. Changes will apply from selected date forward.",
       });
       onSuccess();
     },
@@ -171,23 +191,60 @@ export default function ServiceForm({ service, initialDate, onSuccess, onCancel,
   });
 
   const onSubmit = (data: InsertService) => {
-    // Check if user is changing the interval of a recurring service
-    if (isEditing && service) {
+    // Check if user is changing the interval, equipment, or consumables of a recurring service
+    if (isEditing && service && initialDate) {
       const originalPattern = service.recurrencePattern as { interval?: string } | null;
       const newPattern = data.recurrencePattern as { interval?: string } | null;
       
-      // If interval is changing and initialDate is set (from calendar click)
-      if (originalPattern?.interval && 
+      // Check for interval change
+      const intervalChanged = originalPattern?.interval && 
           newPattern?.interval && 
-          originalPattern.interval !== newPattern.interval &&
-          initialDate) {
+          originalPattern.interval !== newPattern.interval;
+      
+      // Check for equipment changes
+      const originalEquipment = serviceWithStock?.equipmentItems?.map((item: any) => ({
+        id: item.id,
+        quantity: item.quantity
+      })) || [];
+      
+      const newEquipment = data.equipmentItems || [];
+      
+      const equipmentChanged = JSON.stringify(
+        originalEquipment.sort((a, b) => a.id - b.id)
+      ) !== JSON.stringify(
+        newEquipment.sort((a, b) => a.id - b.id)
+      );
+      
+      // Check for consumable changes
+      const originalConsumables = serviceWithStock?.consumableItems?.map((item: any) => ({
+        id: item.id,
+        quantity: item.quantity
+      })) || [];
+      
+      const newConsumables = data.consumableItems || [];
+      
+      const consumablesChanged = JSON.stringify(
+        originalConsumables.sort((a, b) => a.id - b.id)
+      ) !== JSON.stringify(
+        newConsumables.sort((a, b) => a.id - b.id)
+      );
+      
+      // If anything changed and it's a recurring service with initialDate set
+      if (originalPattern?.interval && (intervalChanged || equipmentChanged || consumablesChanged)) {
+        // Build the change description
+        const changes = [];
+        if (intervalChanged) changes.push(`interval from ${originalPattern.interval} to ${newPattern?.interval}`);
+        if (equipmentChanged) changes.push('equipment items');
+        if (consumablesChanged) changes.push('consumable items');
+        
+        const changeDescription = changes.join(', ');
         
         // Ask user if they want to split the series
         const shouldSplit = confirm(
-          `You're changing the interval from ${originalPattern.interval} to ${newPattern.interval}.\n\n` +
+          `You're changing the ${changeDescription}.\n\n` +
           `Would you like to:\n` +
-          `- YES: Apply new interval from ${format(initialDate, 'PPP')} forward only (recommended)\n` +
-          `- NO: Change interval for entire series (affects past dates)`
+          `- YES: Apply changes from ${format(initialDate, 'PPP')} forward only (recommended)\n` +
+          `- NO: Change for entire series (affects past dates)`
         );
         
         if (shouldSplit) {
@@ -200,7 +257,9 @@ export default function ServiceForm({ service, initialDate, onSuccess, onCancel,
           splitServiceMutation.mutate({
             serviceId: service.id,
             splitDate,
-            newInterval: newPattern.interval
+            newInterval: newPattern?.interval || originalPattern.interval,
+            newEquipmentItems: equipmentChanged ? newEquipment : undefined,
+            newConsumableItems: consumablesChanged ? newConsumables : undefined
           });
           return;
         }

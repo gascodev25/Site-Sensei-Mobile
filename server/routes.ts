@@ -723,7 +723,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/services/:id/split', isAuthenticated, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      const { splitDate, newInterval } = req.body;
+      const { splitDate, newInterval, newEquipmentItems, newConsumableItems } = req.body;
 
       if (!splitDate || !newInterval) {
         return res.status(400).json({ message: "Split date and new interval are required" });
@@ -741,6 +741,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Can only split recurring services" });
       }
 
+      // Get original service's stock items (equipment and consumables)
+      const originalServiceWithStock = await storage.getServiceWithStockItems(id);
+      
+      // Determine which equipment and consumables to use for new service
+      // Use new items if provided, otherwise copy from original
+      const equipmentItems = newEquipmentItems || 
+        (originalServiceWithStock?.equipmentItems?.map((item: any) => ({
+          id: item.id,
+          quantity: item.quantity
+        })) || []);
+      
+      const consumableItems = newConsumableItems || 
+        (originalServiceWithStock?.consumableItems?.map((item: any) => ({
+          id: item.id,
+          quantity: item.quantity
+        })) || []);
+
       // Update original service to end one day before split date
       const splitDateObj = new Date(splitDate);
       const endDateObj = new Date(splitDateObj);
@@ -753,7 +770,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       });
 
-      // Create new service from split date with new interval
+      // Create new service from split date with new interval and stock items
       const newServiceData: any = {
         clientId: originalService.clientId,
         type: originalService.type,
@@ -770,7 +787,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         originalServiceId: id,
         splitFromDate: splitDate,
         completedDates: [], // New series starts fresh
-        excludedDates: []
+        excludedDates: [],
+        equipmentItems,
+        consumableItems
       };
 
       const newService = await storage.createService(newServiceData);
@@ -785,7 +804,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           splitDate,
           oldInterval: recurrencePattern.interval,
           newInterval,
-          newServiceId: newService.id
+          newServiceId: newService.id,
+          equipmentItemsChanged: !!newEquipmentItems,
+          consumableItemsChanged: !!newConsumableItems,
+          equipmentCount: equipmentItems.length,
+          consumableCount: consumableItems.length
         }
       });
 
