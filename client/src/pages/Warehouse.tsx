@@ -157,7 +157,7 @@ export default function Warehouse() {
                 <div className="text-center py-8">Loading equipment...</div>
               ) : (
                 <div className="space-y-6">
-                  {['in_warehouse', 'in_field', 'issued'].map((status) => {
+                  {['in_warehouse', 'in_field'].map((status) => {
                     const items = equipmentItems?.filter(item => item.status === status) || [];
                     if (items.length === 0) return null;
                     

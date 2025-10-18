@@ -732,8 +732,6 @@ export default function Inventory() {
                                   <SelectContent>
                                     <SelectItem value="in_warehouse">In Warehouse</SelectItem>
                                     <SelectItem value="in_field">In Field</SelectItem>
-                                    <SelectItem value="issued">Issued</SelectItem>
-                                    <SelectItem value="maintenance">Maintenance</SelectItem>
                                   </SelectContent>
                                 </Select>
                                 <FormMessage />
@@ -1271,8 +1269,6 @@ export default function Inventory() {
                                             <SelectContent>
                                               <SelectItem value="in_warehouse">In Warehouse</SelectItem>
                                               <SelectItem value="in_field">In Field</SelectItem>
-                                              <SelectItem value="issued">Issued</SelectItem>
-                                              <SelectItem value="maintenance">Maintenance</SelectItem>
                                             </SelectContent>
                                           </Select>
                                           <FormMessage />
