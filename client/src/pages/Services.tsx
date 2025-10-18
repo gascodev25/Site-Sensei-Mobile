@@ -10,14 +10,16 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Search, Edit, Trash2, Calendar, Clock, User, MapPin, List } from "lucide-react";
-import type { ServiceWithDetails } from "@shared/schema";
+import type { ServiceWithDetails, ServiceTeam } from "@shared/schema";
 import ServiceCalendar from "@/components/ServiceCalendar";
 import RecurringServiceMoveDialog from "@/components/Dialogs/RecurringServiceMoveDialog";
 import ServiceCompletionDialog from "@/components/Dialogs/ServiceCompletionDialog";
 
 export default function Services() {
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedTeamId, setSelectedTeamId] = useState<string>("all");
   const [activeTab, setActiveTab] = useState("list");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingService, setEditingService] = useState<ServiceWithDetails | null>(null);
@@ -58,6 +60,10 @@ export default function Services() {
 
   const { data: services = [], isLoading } = useQuery<ServiceWithDetails[]>({
     queryKey: ["/api/services"],
+  });
+
+  const { data: teams = [] } = useQuery<ServiceTeam[]>({
+    queryKey: ["/api/service-teams"],
   });
 
   const deleteServiceMutation = useMutation({
@@ -272,7 +278,7 @@ export default function Services() {
   // Client-side filtering like Clients and Inventory pages
   const filteredServices = services.filter(service => {
     const searchLower = searchQuery.toLowerCase();
-    return (
+    const matchesSearch = (
       (service.client?.name.toLowerCase().includes(searchLower)) ||
       (service.client?.addressText?.toLowerCase().includes(searchLower)) ||
       (service.type?.toLowerCase().includes(searchLower)) ||
@@ -281,6 +287,10 @@ export default function Services() {
       (service.team?.name.toLowerCase().includes(searchLower)) ||
       (service.client?.contactPerson?.toLowerCase().includes(searchLower))
     );
+    
+    const matchesTeam = selectedTeamId === "all" || service.teamId?.toString() === selectedTeamId;
+    
+    return matchesSearch && matchesTeam;
   });
 
   const getStatusBadge = (service: ServiceWithDetails) => {
@@ -400,17 +410,33 @@ export default function Services() {
               </TabsTrigger>
             </TabsList>
 
-            {/* Search - show on list view only */}
+            {/* Search and Filters - show on list view only */}
             {activeTab === "list" && (
-              <div className="relative max-w-md">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-                <Input
-                  placeholder="Search services by client, status, or type..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10"
-                  data-testid="input-search-services"
-                />
+              <div className="flex items-center gap-4">
+                <Select value={selectedTeamId} onValueChange={setSelectedTeamId}>
+                  <SelectTrigger className="w-[200px]" data-testid="select-team-filter">
+                    <SelectValue placeholder="All Teams" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Teams</SelectItem>
+                    {teams.map((team) => (
+                      <SelectItem key={team.id} value={team.id.toString()}>
+                        {team.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                
+                <div className="relative max-w-md">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                  <Input
+                    placeholder="Search services by client, status, or type..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-10"
+                    data-testid="input-search-services"
+                  />
+                </div>
               </div>
             )}
           </div>
