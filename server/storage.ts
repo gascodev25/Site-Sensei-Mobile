@@ -781,15 +781,19 @@ export class DatabaseStorage implements IStorage {
     endDate.setDate(now.getDate() + (4 * 7));
     endDate.setHours(23, 59, 59, 999);
 
-    // Batch fetch: Get ALL services for the entire 4-week period at once
-    // Include all services in date range, regardless of status
+    // Batch fetch: Get services for the entire 4-week period
+    // Only include 'scheduled' and 'missed' services
     const allServices = await db
       .select()
       .from(services)
       .where(
         and(
           gte(services.installationDate, startDate),
-          lte(services.installationDate, endDate)
+          lte(services.installationDate, endDate),
+          or(
+            eq(services.status, 'scheduled'),
+            eq(services.status, 'missed')
+          )
         )
       );
 
@@ -900,7 +904,35 @@ export class DatabaseStorage implements IStorage {
       // Filter services for this week from pre-fetched data
       const weekServices = allServices.filter(s => {
         const serviceDate = new Date(s.installationDate!);
-        return serviceDate >= weekStart && serviceDate <= weekEnd;
+        if (serviceDate < weekStart || serviceDate > weekEnd) {
+          return false;
+        }
+        
+        // For recurring services, check if this specific date is already completed
+        const isRecurring = s.recurrencePattern && 
+                           typeof s.recurrencePattern === 'object' && 
+                           s.recurrencePattern !== null &&
+                           'interval' in s.recurrencePattern;
+        
+        if (isRecurring && s.completedDates && Array.isArray(s.completedDates)) {
+          // Check if any date in this week is in completedDates
+          const completedDatesSet = new Set(s.completedDates);
+          
+          // Generate all dates for this recurring service in this week
+          for (let d = new Date(weekStart); d <= weekEnd; d.setDate(d.getDate() + 1)) {
+            const dateStr = d.toISOString().split('T')[0];
+            if (completedDatesSet.has(dateStr)) {
+              // This specific occurrence is completed, don't count it
+              continue;
+            }
+            // If we reach here, there's at least one non-completed occurrence
+            return true;
+          }
+          // All occurrences in this week are completed
+          return false;
+        }
+        
+        return true;
       });
 
       // Calculate consumables needed for all services in this week (in-memory)
