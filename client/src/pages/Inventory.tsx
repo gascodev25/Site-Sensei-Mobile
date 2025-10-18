@@ -14,7 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Plus, Search, Edit, Trash2, Package, AlertTriangle, MapPin, Calendar as CalendarIcon, Barcode, QrCode, Upload } from "lucide-react";
+import { Plus, Search, Edit, Trash2, Package, AlertTriangle, MapPin, Calendar, Barcode, QrCode, Upload } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import type { Equipment, Consumable, Client, InsertEquipment, InsertConsumable } from "@shared/schema";
