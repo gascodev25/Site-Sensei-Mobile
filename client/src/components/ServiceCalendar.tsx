@@ -423,7 +423,9 @@ export default function ServiceCalendar({ services, onServiceClick, onServiceMov
           {/* Team Filter */}
           <Select value={selectedTeam} onValueChange={setSelectedTeam}>
             <SelectTrigger className="w-[180px]" data-testid="select-team-filter">
-              <SelectValue placeholder="Filter by team" />
+              <SelectValue>
+                {selectedTeam === 'all' ? 'All Teams' : selectedTeam}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Teams</SelectItem>
