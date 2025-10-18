@@ -250,6 +250,7 @@ export default function Inventory() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/consumables"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/warehouse/consumables"] });
       toast({
         title: "Success",
         description: "Consumable created successfully",
@@ -281,6 +282,7 @@ export default function Inventory() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/consumables"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/warehouse/consumables"] });
       toast({
         title: "Success",
         description: "Consumable updated successfully",
@@ -303,6 +305,7 @@ export default function Inventory() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/consumables"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/warehouse/consumables"] });
       toast({
         title: "Success",
         description: "Consumable deleted successfully",
