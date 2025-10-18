@@ -704,15 +704,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         }
         
-        // Equipment being added to service (wasn't in service, now is) - move to field
-        const addedEquipmentIds = newEquipmentIds.filter(eqId => !currentEquipmentIds.includes(eqId));
-        for (const equipmentId of addedEquipmentIds) {
-          // Use the client from the existing service for equipment being installed
-          await storage.updateEquipment(equipmentId, {
-            status: 'in_field',
-            installedAtClientId: existingService.clientId,
-            dateInstalled: new Date()
-          });
+        // For non-recurring services (installations/one-time services), mark ALL equipment as in_field
+        // For recurring services, only mark newly added equipment as in_field
+        if (!isRecurringService) {
+          // Installation or one-time service: Update all equipment to in_field
+          for (const equipmentId of newEquipmentIds) {
+            await storage.updateEquipment(equipmentId, {
+              status: 'in_field',
+              installedAtClientId: existingService.clientId,
+              dateInstalled: new Date()
+            });
+          }
+        } else {
+          // Recurring service: Only update newly added equipment to in_field
+          const addedEquipmentIds = newEquipmentIds.filter(eqId => !currentEquipmentIds.includes(eqId));
+          for (const equipmentId of addedEquipmentIds) {
+            await storage.updateEquipment(equipmentId, {
+              status: 'in_field',
+              installedAtClientId: existingService.clientId,
+              dateInstalled: new Date()
+            });
+          }
         }
       }
       
