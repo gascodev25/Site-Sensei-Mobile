@@ -60,6 +60,8 @@ export const equipment = pgTable("equipment", {
   name: varchar("name", { length: 255 }).notNull(),
   stockCode: varchar("stock_code", { length: 50 }).notNull().unique(),
   price: decimal("price", { precision: 10, scale: 2 }),
+  minStockLevel: integer("min_stock_level").default(0),
+  currentStock: integer("current_stock").default(0),
   dateInstalled: timestamp("date_installed"),
   installedAtClientId: integer("installed_at_client_id").references(() => clients.id),
   templateId: integer("template_id").references(() => equipmentTemplates.id),

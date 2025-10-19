@@ -59,6 +59,8 @@ export default function Inventory() {
     name: z.string().min(1, "Equipment name is required"),
     stockCode: z.string().min(1, "Stock code is required"),
     price: z.string().optional(),
+    minStockLevel: z.string().optional(),
+    currentStock: z.string().optional(),
     status: z.string().default("in_warehouse"),
     barcode: z.string().optional(),
     qrCode: z.string().optional(),
@@ -91,6 +93,8 @@ export default function Inventory() {
       name: "",
       stockCode: "",
       price: "",
+      minStockLevel: "0",
+      currentStock: "0",
       status: "in_warehouse",
       barcode: "",
       qrCode: "",
@@ -154,6 +158,8 @@ export default function Inventory() {
         name: data.name,
         stockCode: data.stockCode,
         price: data.price || null,
+        minStockLevel: data.minStockLevel ? parseInt(data.minStockLevel) : 0,
+        currentStock: data.currentStock ? parseInt(data.currentStock) : 0,
         dateInstalled: null,
         installedAtClientId: null,
         status: data.status,
@@ -187,6 +193,8 @@ export default function Inventory() {
         name: data.name,
         stockCode: data.stockCode,
         price: data.price || null,
+        minStockLevel: data.minStockLevel ? parseInt(data.minStockLevel) : 0,
+        currentStock: data.currentStock ? parseInt(data.currentStock) : 0,
         status: data.status,
         barcode: data.barcode || null,
         qrCode: data.qrCode || null,
@@ -441,6 +449,8 @@ export default function Inventory() {
           name: equipmentItem.name,
           stockCode: equipmentItem.stockCode,
           price: equipmentItem.price || "",
+          minStockLevel: equipmentItem.minStockLevel?.toString() || "0",
+          currentStock: equipmentItem.currentStock?.toString() || "0",
           status: equipmentItem.status || "in_warehouse",
           barcode: equipmentItem.barcode || "",
           qrCode: equipmentItem.qrCode || "",
@@ -453,6 +463,8 @@ export default function Inventory() {
           name: equipmentItem.name,
           stockCode: equipmentItem.stockCode,
           price: equipmentItem.price || "",
+          minStockLevel: equipmentItem.minStockLevel?.toString() || "0",
+          currentStock: equipmentItem.currentStock?.toString() || "0",
           status: equipmentItem.status || "in_warehouse",
           barcode: equipmentItem.barcode || "",
           qrCode: equipmentItem.qrCode || "",
@@ -702,7 +714,7 @@ export default function Inventory() {
                           />
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                           <FormField
                             control={equipmentForm.control}
                             name="price"
@@ -723,6 +735,46 @@ export default function Inventory() {
                             )}
                           />
                           
+                          <FormField
+                            control={equipmentForm.control}
+                            name="currentStock"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Current Stock</FormLabel>
+                                <FormControl>
+                                  <Input 
+                                    type="number" 
+                                    placeholder="0" 
+                                    {...field} 
+                                    data-testid="input-equipment-current-stock" 
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            control={equipmentForm.control}
+                            name="minStockLevel"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Min Stock Level</FormLabel>
+                                <FormControl>
+                                  <Input 
+                                    type="number" 
+                                    placeholder="0" 
+                                    {...field} 
+                                    data-testid="input-equipment-min-stock" 
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
                           <FormField
                             control={equipmentForm.control}
                             name="status"
@@ -1238,7 +1290,7 @@ export default function Inventory() {
                                     />
                                   </div>
 
-                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                     <FormField
                                       control={equipmentForm.control}
                                       name="price"
@@ -1259,6 +1311,46 @@ export default function Inventory() {
                                       )}
                                     />
                                     
+                                    <FormField
+                                      control={equipmentForm.control}
+                                      name="currentStock"
+                                      render={({ field }) => (
+                                        <FormItem>
+                                          <FormLabel>Current Stock</FormLabel>
+                                          <FormControl>
+                                            <Input 
+                                              type="number" 
+                                              placeholder="0" 
+                                              {...field} 
+                                              data-testid="input-edit-equipment-current-stock" 
+                                            />
+                                          </FormControl>
+                                          <FormMessage />
+                                        </FormItem>
+                                      )}
+                                    />
+
+                                    <FormField
+                                      control={equipmentForm.control}
+                                      name="minStockLevel"
+                                      render={({ field }) => (
+                                        <FormItem>
+                                          <FormLabel>Min Stock Level</FormLabel>
+                                          <FormControl>
+                                            <Input 
+                                              type="number" 
+                                              placeholder="0" 
+                                              {...field} 
+                                              data-testid="input-edit-equipment-min-stock" 
+                                            />
+                                          </FormControl>
+                                          <FormMessage />
+                                        </FormItem>
+                                      )}
+                                    />
+                                  </div>
+
+                                  <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
                                     <FormField
                                       control={equipmentForm.control}
                                       name="status"
