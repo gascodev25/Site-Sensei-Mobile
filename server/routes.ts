@@ -818,6 +818,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       });
 
+      // Handle equipment status changes if equipment was modified
+      if (newEquipmentItems) {
+        const originalEquipmentIds = (originalServiceWithStock?.equipmentItems || []).map((item: any) => item.id);
+        const newEquipmentIds = newEquipmentItems.map((item: any) => item.id);
+        
+        // Equipment being removed (was in original service, not in new service) - return to warehouse
+        const removedEquipmentIds = originalEquipmentIds.filter((eqId: number) => !newEquipmentIds.includes(eqId));
+        for (const equipmentId of removedEquipmentIds) {
+          await storage.updateEquipment(equipmentId, {
+            status: 'in_warehouse',
+            installedAtClientId: null,
+            dateInstalled: null
+          });
+        }
+        
+        // Equipment being added (not in original service, in new service) - mark as in_field
+        const addedEquipmentIds = newEquipmentIds.filter((eqId: number) => !originalEquipmentIds.includes(eqId));
+        for (const equipmentId of addedEquipmentIds) {
+          await storage.updateEquipment(equipmentId, {
+            status: 'in_field',
+            installedAtClientId: originalService.clientId,
+            dateInstalled: new Date()
+          });
+        }
+      }
+
       // Create new service from split date with new interval and stock items
       const newServiceData: any = {
         clientId: originalService.clientId,
