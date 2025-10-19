@@ -171,6 +171,7 @@ export default function Inventory() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/equipment"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/warehouse/equipment-inventory"] });
       toast({
         title: "Success",
         description: "Equipment created successfully",
@@ -205,6 +206,7 @@ export default function Inventory() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/equipment"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/warehouse/equipment-inventory"] });
       toast({
         title: "Success",
         description: "Equipment updated successfully",
@@ -227,6 +229,7 @@ export default function Inventory() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/equipment"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/warehouse/equipment-inventory"] });
       toast({
         title: "Success",
         description: "Equipment deleted successfully",

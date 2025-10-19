@@ -141,6 +141,10 @@ export default function Services() {
       queryClient.invalidateQueries({ queryKey: ["/api/services"] });
       queryClient.refetchQueries({ queryKey: ["/api/services"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard/metrics"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/warehouse/equipment-inventory"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/warehouse/consumables"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/warehouse/weekly-forecast"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/equipment"] });
       setCompletionDialog({ open: false, service: null });
       setEditingService(null);
       toast({

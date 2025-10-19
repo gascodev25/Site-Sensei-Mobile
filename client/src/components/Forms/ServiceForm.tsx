@@ -172,9 +172,10 @@ export default function ServiceForm({ service, initialDate, onSuccess, onCancel,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/services"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard/metrics"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/warehouse/equipment-status"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/warehouse/equipment-inventory"] });
       queryClient.invalidateQueries({ queryKey: ["/api/warehouse/consumables"] });
       queryClient.invalidateQueries({ queryKey: ["/api/warehouse/weekly-forecast"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/equipment"] });
       toast({
         title: "Success",
         description: "Service series split successfully. Changes will apply from selected date forward.",
