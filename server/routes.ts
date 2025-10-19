@@ -688,7 +688,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Step 4: Handle equipment status changes
       // Only process equipment status changes if equipment items are provided
-      if (equipmentItems && equipmentItems.length >= 0) {
+      if (equipmentItems && equipmentItems.length > 0) {
         // Get current equipment items for this service
         const currentServiceWithStock = await storage.getServiceWithStockItems(id);
         const currentEquipmentIds = (currentServiceWithStock?.equipmentItems || []).map((item: any) => item.id);
@@ -704,10 +704,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         }
         
-        // For non-recurring services (installations/one-time services), mark ALL equipment as in_field
-        // For recurring services, only mark newly added equipment as in_field
-        if (!isRecurringService) {
-          // Installation or one-time service: Update all equipment to in_field
+        // For installations and first-time service contracts, mark ALL equipment as in_field
+        // For subsequent recurring service completions, equipment should already be in_field
+        if (existingService.type === 'installation' || (existingService.type === 'service_contract' && !currentEquipmentIds.length)) {
+          // Installation or initial service contract setup: Update all equipment to in_field
           for (const equipmentId of newEquipmentIds) {
             await storage.updateEquipment(equipmentId, {
               status: 'in_field',
