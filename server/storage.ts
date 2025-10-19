@@ -768,7 +768,75 @@ export class DatabaseStorage implements IStorage {
       .from(equipment)
       .groupBy(equipment.status);
     
-    return result;
+    return result.map(r => ({
+      status: r.status || 'unknown',
+      count: r.count
+    }));
+  }
+
+  async getEquipmentInventorySummary(): Promise<{
+    id: number;
+    name: string;
+    stockCode: string;
+    currentStock: number;
+    minStockLevel: number;
+    inFieldCount: number;
+    inWarehouseCount: number;
+    price: string | null;
+  }[]> {
+    const allEquipment = await db
+      .select()
+      .from(equipment)
+      .orderBy(asc(equipment.name));
+
+    // Group by stockCode to aggregate stock levels
+    const inventoryMap = new Map<string, {
+      id: number;
+      name: string;
+      stockCode: string;
+      currentStock: number;
+      minStockLevel: number;
+      inFieldCount: number;
+      issuedCount: number;
+      price: string | null;
+    }>();
+
+    for (const item of allEquipment) {
+      const key = item.stockCode;
+      
+      if (!inventoryMap.has(key)) {
+        inventoryMap.set(key, {
+          id: item.id,
+          name: item.name,
+          stockCode: item.stockCode,
+          currentStock: 0,
+          minStockLevel: 0,
+          inFieldCount: 0,
+          issuedCount: 0,
+          price: item.price,
+        });
+      }
+
+      const entry = inventoryMap.get(key)!;
+      
+      // Sum up total stock levels from all records with this stockCode
+      entry.currentStock += (item.currentStock || 0);
+      entry.minStockLevel += (item.minStockLevel || 0);
+      
+      // Count units by status
+      if (item.status === 'in_field') {
+        entry.inFieldCount++;
+      } else if (item.status === 'issued') {
+        entry.issuedCount++;
+      }
+    }
+
+    // Calculate in warehouse and convert to array
+    // In Warehouse = Total Stock - (In Field + Issued)
+    return Array.from(inventoryMap.values()).map(item => ({
+      ...item,
+      inWarehouseCount: Math.max(0, item.currentStock - item.inFieldCount - item.issuedCount),
+    }));
   }
 
   async getConsumablesWithStockInfo(): Promise<Consumable[]> {

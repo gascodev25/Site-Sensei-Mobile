@@ -12,9 +12,18 @@ import Header from "@/components/Layout/Header";
 export default function Warehouse() {
   const { toast } = useToast();
 
-  // Fetch equipment status
-  const { data: equipmentStatus, isLoading: isLoadingEquipment } = useQuery<{ status: string; count: number }[]>({
-    queryKey: ['/api/warehouse/equipment-status'],
+  // Fetch equipment inventory summary with stock calculations
+  const { data: equipmentInventory, isLoading: isLoadingEquipmentInventory } = useQuery<{
+    id: number;
+    name: string;
+    stockCode: string;
+    currentStock: number;
+    minStockLevel: number;
+    inFieldCount: number;
+    inWarehouseCount: number;
+    price: string | null;
+  }[]>({
+    queryKey: ['/api/warehouse/equipment-inventory'],
   });
 
   // Fetch all equipment items with client info
@@ -43,7 +52,7 @@ export default function Warehouse() {
       return await apiRequest(`/api/warehouse/return-stock/${id}`, 'POST');
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/warehouse/equipment-status'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/warehouse/equipment-inventory'] });
       queryClient.invalidateQueries({ queryKey: ['/api/warehouse/consumables'] });
       queryClient.invalidateQueries({ queryKey: ['/api/warehouse/weekly-forecast'] });
       toast({
@@ -60,12 +69,11 @@ export default function Warehouse() {
     },
   });
 
-  // Calculate totals for equipment
+  // Calculate totals for equipment using stock-level calculations
   const equipmentTotals = {
-    total: equipmentStatus?.reduce((sum, item) => sum + item.count, 0) || 0,
-    inWarehouse: equipmentStatus?.find(item => item.status === 'in_warehouse')?.count || 0,
-    inField: equipmentStatus?.find(item => item.status === 'in_field')?.count || 0,
-    issued: equipmentStatus?.find(item => item.status === 'issued')?.count || 0,
+    total: equipmentInventory?.reduce((sum, item) => sum + item.currentStock, 0) || 0,
+    inWarehouse: equipmentInventory?.reduce((sum, item) => sum + item.inWarehouseCount, 0) || 0,
+    inField: equipmentInventory?.reduce((sum, item) => sum + item.inFieldCount, 0) || 0,
   };
 
   // Calculate low stock items
@@ -155,7 +163,69 @@ export default function Warehouse() {
           <Card>
             <CardHeader>
               <CardTitle>Equipment Inventory</CardTitle>
-              <CardDescription>View all equipment items by location</CardDescription>
+              <CardDescription>Stock levels grouped by equipment type</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {isLoadingEquipmentInventory ? (
+                <div className="text-center py-8">Loading equipment inventory...</div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Stock Code</TableHead>
+                      <TableHead>Total Stock</TableHead>
+                      <TableHead>In Field</TableHead>
+                      <TableHead>In Warehouse</TableHead>
+                      <TableHead>Min Level</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Unit Price (R)</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {equipmentInventory?.map((item) => {
+                      const isLow = item.inWarehouseCount < item.minStockLevel;
+                      return (
+                        <TableRow key={item.id} data-testid={`row-equipment-${item.id}`}>
+                          <TableCell className="font-medium">{item.name}</TableCell>
+                          <TableCell>{item.stockCode}</TableCell>
+                          <TableCell data-testid={`text-total-stock-${item.id}`}>{item.currentStock}</TableCell>
+                          <TableCell data-testid={`text-in-field-${item.id}`}>{item.inFieldCount}</TableCell>
+                          <TableCell data-testid={`text-in-warehouse-${item.id}`} className="font-semibold">
+                            {item.inWarehouseCount}
+                          </TableCell>
+                          <TableCell>{item.minStockLevel}</TableCell>
+                          <TableCell>
+                            {isLow ? (
+                              <Badge variant="destructive" data-testid={`badge-low-${item.id}`}>
+                                <AlertTriangle className="h-3 w-3 mr-1" />
+                                Low Stock
+                              </Badge>
+                            ) : (
+                              <Badge variant="secondary" data-testid={`badge-ok-${item.id}`}>OK</Badge>
+                            )}
+                          </TableCell>
+                          <TableCell>R {parseFloat(item.price || '0').toFixed(2)}</TableCell>
+                        </TableRow>
+                      );
+                    })}
+                    {equipmentInventory?.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
+                          No equipment inventory found
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Equipment Details by Location</CardTitle>
+              <CardDescription>View individual equipment items by location</CardDescription>
             </CardHeader>
             <CardContent>
               {isLoadingEquipmentItems ? (
@@ -183,7 +253,7 @@ export default function Warehouse() {
                       </TableHeader>
                       <TableBody>
                         {equipmentItems?.filter(e => e.status === 'in_warehouse').map((equipment) => (
-                          <TableRow key={equipment.id} data-testid={`row-equipment-${equipment.id}`}>
+                          <TableRow key={equipment.id} data-testid={`row-equipment-detail-${equipment.id}`}>
                             <TableCell className="font-medium">{equipment.name}</TableCell>
                             <TableCell>{equipment.stockCode}</TableCell>
                             <TableCell>
@@ -216,7 +286,7 @@ export default function Warehouse() {
                       </TableHeader>
                       <TableBody>
                         {equipmentItems?.filter(e => e.status === 'in_field').map((equipment) => (
-                          <TableRow key={equipment.id} data-testid={`row-equipment-${equipment.id}`}>
+                          <TableRow key={equipment.id} data-testid={`row-equipment-detail-${equipment.id}`}>
                             <TableCell className="font-medium">{equipment.name}</TableCell>
                             <TableCell>{equipment.stockCode}</TableCell>
                             <TableCell data-testid={`text-client-${equipment.id}`}>
@@ -332,7 +402,7 @@ export default function Warehouse() {
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {week.consumables.map((item) => (
+                          {week.consumables.map((item: any) => (
                             <TableRow key={item.id} data-testid={`forecast-item-${week.week}-${item.id}`}>
                               <TableCell className="font-medium">{item.name}</TableCell>
                               <TableCell>{item.stockCode}</TableCell>
