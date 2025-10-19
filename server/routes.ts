@@ -870,6 +870,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete('/api/services/:id', isAuthenticated, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
+      
+      // Get service with stock items before deletion
+      const service = await storage.getServiceWithStockItems(id);
+      if (!service) {
+        return res.status(404).json({ message: "Service not found" });
+      }
+
+      console.log(`[DELETE SERVICE] Service ${id} has ${service.equipmentItems?.length || 0} equipment items`);
+
+      // Revert all equipment assigned to this service back to warehouse
+      if (service.equipmentItems && service.equipmentItems.length > 0) {
+        for (const item of service.equipmentItems) {
+          console.log(`[DELETE SERVICE] Reverting equipment ${item.id} (${item.equipment?.name}) to warehouse`);
+          await storage.updateEquipment(item.id, {
+            status: 'in_warehouse',
+            installedAtClientId: null,
+            dateInstalled: null
+          });
+        }
+      }
+
+      // Now delete the service
       await storage.deleteService(id);
 
       // Audit log
@@ -878,7 +900,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         action: 'delete',
         entityType: 'service',
         entityId: id,
-        metadata: {}
+        metadata: {
+          equipmentReverted: service.equipmentItems?.length || 0
+        }
       });
 
       res.status(204).send();
