@@ -8,6 +8,17 @@ The system is built as a full-stack web application using modern technologies in
 
 ## Recent Changes
 
+**Hybrid Authentication System with Username/Password (October 2025)**
+- Implemented custom username/password authentication as primary login method
+- Added bcrypt password hashing (12 rounds) for secure credential storage
+- Created hybrid authentication: Passport Local Strategy + Replit OAuth as fallback option
+- Built user management interface for superusers and managers to create/edit/delete users
+- Implemented three-tier role system: superuser (full access), manager (user management + features), user (feature access only)
+- Added bootstrap endpoint to create initial superuser account (gavin@gasco.digital / ChangeMe123!)
+- Fixed critical bug where OAuth users couldn't access protected routes by implementing getUserWithRoles helper
+- Both authentication methods share same session store and role-based access control system
+- Login page features username/password form with optional "Sign in with Replit" button
+
 **Series Splitting for Equipment & Consumables (October 2025)**
 - Implemented series splitting capability for recurring services when equipment or consumables change
 - When editing a recurring service from the calendar, changes to equipment items, consumable items, or service intervals trigger a split confirmation dialog
@@ -50,11 +61,16 @@ Preferred communication style: Simple, everyday language.
 - Role-based access control through user roles field
 
 **Authentication & Authorization**
-- Replit OAuth integration for seamless authentication
-- Session-based authentication with secure HTTP-only cookies
-- Role-based permissions system (super_user, general_manager, ops_manager, admin, warehouse_clerk, team_member)
-- Permission utilities for fine-grained access control
-- Automatic user provisioning from Replit identity provider
+- Hybrid authentication system: Passport Local Strategy (username/password) as primary method
+- Replit OAuth/OpenID Connect available as optional fallback authentication
+- Session-based authentication with secure HTTP-only cookies and PostgreSQL session storage
+- Bcrypt password hashing with 12 salt rounds for local authentication
+- Three-tier role system: superuser, manager, user
+- Role-based access control enforced on both frontend (UI conditionals) and backend (middleware)
+- getUserWithRoles helper ensures OAuth users load database roles for proper permission checks
+- User management interface for superusers/managers to create and manage user accounts
+- Bootstrap endpoint (/api/auth/bootstrap) for initial superuser creation
+- Permission utilities (requireRole, hasRole, getPermissions) for fine-grained access control
 
 **UI/UX Design System**
 - Brightpearl-inspired dashboard with clean, professional aesthetics
@@ -79,9 +95,11 @@ Preferred communication style: Simple, everyday language.
 - Drizzle Kit for database migrations and schema management
 
 **Authentication Services**
-- Replit OAuth/OpenID Connect for user authentication
+- Passport.js with Local Strategy for username/password authentication
+- Passport.js with OpenID Connect strategy for Replit OAuth (optional fallback)
+- Bcrypt for secure password hashing and verification
 - Connect-pg-simple for PostgreSQL session storage
-- Passport.js with OpenID Connect strategy
+- Express-session for session management with secure cookies
 
 **Frontend Libraries**
 - Radix UI primitives for accessible component foundations
