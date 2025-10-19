@@ -1516,6 +1516,12 @@ export default function Inventory() {
                     </CardHeader>
                     <CardContent>
                       <div className="space-y-2 text-sm">
+                        <div>
+                          <span className="font-medium">Current Stock:</span> {equipmentItem.currentStock || 0} units
+                        </div>
+                        <div>
+                          <span className="font-medium">Min Stock Level:</span> {equipmentItem.minStockLevel || 0} units
+                        </div>
                         {equipmentItem.dateInstalled && (
                           <div className="flex items-center">
                             <Calendar className="h-3 w-3 mr-1" />
