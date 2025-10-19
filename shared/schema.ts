@@ -32,6 +32,7 @@ export const users = pgTable("users", {
   firstName: varchar("first_name"),
   lastName: varchar("last_name"),
   profileImageUrl: varchar("profile_image_url"),
+  passwordHash: varchar("password_hash"), // bcrypt hash for local auth, null for OAuth users
   roles: text("roles").default("team_member"), // comma-separated roles
   roleAssignmentSource: varchar("role_assignment_source").default("manual"),
   createdAt: timestamp("created_at").defaultNow(),
@@ -248,6 +249,16 @@ export const teamMembersRelations = relations(teamMembers, ({ many }) => ({
 }));
 
 // Insert Schemas
+export const insertUserSchema = createInsertSchema(users).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  passwordHash: true, // Never accept passwordHash directly, use plain password
+}).extend({
+  password: z.string().min(12, "Password must be at least 12 characters").optional(),
+  email: z.string().email("Invalid email address"),
+});
+
 export const insertClientSchema = createInsertSchema(clients).omit({
   id: true,
   createdAt: true,
@@ -320,6 +331,7 @@ export const serviceCompletionSchema = z.object({
 // Types
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
+export type InsertUser = z.infer<typeof insertUserSchema>;
 export type Client = typeof clients.$inferSelect;
 export type InsertClient = z.infer<typeof insertClientSchema>;
 export type Equipment = typeof equipment.$inferSelect;

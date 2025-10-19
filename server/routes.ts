@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
+import { hashPassword } from "./localAuth";
 import { 
   insertClientSchema, 
   insertEquipmentSchema, 
@@ -11,7 +12,8 @@ import {
   insertServiceTeamSchema,
   insertEquipmentTemplateSchema,
   insertTemplateConsumableSchema,
-  serviceCompletionSchema
+  serviceCompletionSchema,
+  insertUserSchema
 } from "@shared/schema";
 import { z } from "zod";
 
@@ -19,15 +21,210 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
   await setupAuth(app);
 
+  // Bootstrap superuser endpoint (only works if no users exist yet)
+  app.post('/api/auth/bootstrap', async (req, res) => {
+    try {
+      // Check if any users exist
+      const existingUsers = await storage.getAllUsers();
+      if (existingUsers.length > 0) {
+        return res.status(400).json({ message: "System already bootstrapped" });
+      }
+
+      // Create superuser account
+      const passwordHash = await hashPassword("ChangeMe123!");
+      const superuser = await storage.createPasswordUser({
+        email: "gavin@gasco.digital",
+        passwordHash,
+        firstName: "Gavin",
+        lastName: "Green",
+        roles: "superuser",
+      });
+
+      res.status(201).json({ 
+        message: "Superuser account created successfully",
+        email: superuser.email,
+        temporaryPassword: "ChangeMe123!"
+      });
+    } catch (error) {
+      console.error("Error bootstrapping superuser:", error);
+      res.status(500).json({ message: "Failed to bootstrap system" });
+    }
+  });
+
   // Auth routes
   app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
-      res.json(user);
+      const user = req.user as any;
+      // For local auth users, req.user is already the User object
+      // For OAuth users, we need to get it from claims
+      if (user.claims) {
+        const userId = user.claims.sub;
+        const dbUser = await storage.getUser(userId);
+        res.json(dbUser);
+      } else {
+        // Local auth user
+        res.json({
+          id: user.id,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          roles: user.roles,
+        });
+      }
     } catch (error) {
       console.error("Error fetching user:", error);
       res.status(500).json({ message: "Failed to fetch user" });
+    }
+  });
+
+  // Helper to get user with roles from database
+  const getUserWithRoles = async (req: any) => {
+    const currentUser = req.user as any;
+    if (currentUser.claims) {
+      // OAuth user - fetch from database to get roles
+      const dbUser = await storage.getUser(currentUser.claims.sub);
+      return dbUser;
+    }
+    // Local user - already has all data
+    return currentUser;
+  };
+
+  // User Management routes (superuser and manager only)
+  app.get('/api/users', isAuthenticated, async (req, res) => {
+    try {
+      const user = await getUserWithRoles(req);
+      const userRoles = user?.roles || 'user';
+      
+      // Only superuser and manager can list users
+      if (!userRoles.includes('superuser') && !userRoles.includes('manager')) {
+        return res.status(403).json({ message: "Insufficient permissions" });
+      }
+
+      const users = await storage.getAllUsers();
+      // Don't send password hashes to frontend
+      const sanitizedUsers = users.map(u => ({
+        id: u.id,
+        email: u.email,
+        firstName: u.firstName,
+        lastName: u.lastName,
+        roles: u.roles,
+        createdAt: u.createdAt,
+      }));
+      res.json(sanitizedUsers);
+    } catch (error) {
+      console.error("Error fetching users:", error);
+      res.status(500).json({ message: "Failed to fetch users" });
+    }
+  });
+
+  app.post('/api/users', isAuthenticated, async (req, res) => {
+    try {
+      const user = await getUserWithRoles(req);
+      const userRoles = user?.roles || 'user';
+      
+      // Only superuser and manager can create users
+      if (!userRoles.includes('superuser') && !userRoles.includes('manager')) {
+        return res.status(403).json({ message: "Insufficient permissions" });
+      }
+
+      const userData = insertUserSchema.parse(req.body);
+      
+      if (!userData.password) {
+        return res.status(400).json({ message: "Password is required" });
+      }
+
+      // Hash the password
+      const passwordHash = await hashPassword(userData.password);
+      
+      const newUser = await storage.createPasswordUser({
+        email: userData.email,
+        passwordHash,
+        firstName: userData.firstName || '',
+        lastName: userData.lastName || '',
+        roles: userData.roles || 'user',
+      });
+
+      res.status(201).json({
+        id: newUser.id,
+        email: newUser.email,
+        firstName: newUser.firstName,
+        lastName: newUser.lastName,
+        roles: newUser.roles,
+      });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Validation error", errors: error.errors });
+      }
+      console.error("Error creating user:", error);
+      res.status(500).json({ message: "Failed to create user" });
+    }
+  });
+
+  app.put('/api/users/:id', isAuthenticated, async (req, res) => {
+    try {
+      const user = await getUserWithRoles(req);
+      const userRoles = user?.roles || 'user';
+      
+      // Only superuser and manager can update users
+      if (!userRoles.includes('superuser') && !userRoles.includes('manager')) {
+        return res.status(403).json({ message: "Insufficient permissions" });
+      }
+
+      const userId = req.params.id;
+      const updateData = insertUserSchema.partial().parse(req.body);
+      
+      const updates: any = {
+        firstName: updateData.firstName,
+        lastName: updateData.lastName,
+        roles: updateData.roles,
+      };
+
+      // If password is being changed, hash it
+      if (updateData.password) {
+        updates.passwordHash = await hashPassword(updateData.password);
+      }
+
+      const updatedUser = await storage.updateUser(userId, updates);
+
+      res.json({
+        id: updatedUser.id,
+        email: updatedUser.email,
+        firstName: updatedUser.firstName,
+        lastName: updatedUser.lastName,
+        roles: updatedUser.roles,
+      });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Validation error", errors: error.errors });
+      }
+      console.error("Error updating user:", error);
+      res.status(500).json({ message: "Failed to update user" });
+    }
+  });
+
+  app.delete('/api/users/:id', isAuthenticated, async (req, res) => {
+    try {
+      const user = await getUserWithRoles(req);
+      const userRoles = user?.roles || 'user';
+      const currentUserId = user?.id;
+      
+      // Only superuser can delete users
+      if (!userRoles.includes('superuser')) {
+        return res.status(403).json({ message: "Insufficient permissions" });
+      }
+
+      const userId = req.params.id;
+      
+      // Prevent deleting yourself
+      if (userId === currentUserId) {
+        return res.status(400).json({ message: "Cannot delete your own account" });
+      }
+
+      await storage.deleteUser(userId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting user:", error);
+      res.status(500).json({ message: "Failed to delete user" });
     }
   });
 

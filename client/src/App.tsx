@@ -5,7 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useAuth } from "@/hooks/useAuth";
 import NotFound from "@/pages/not-found";
-import Landing from "@/pages/Landing";
+import Login from "@/pages/Login";
 import Dashboard from "@/pages/Dashboard";
 import Clients from "@/pages/Clients";
 import Services from "@/pages/Services";
@@ -13,6 +13,7 @@ import Inventory from "@/pages/Inventory";
 import Teams from "@/pages/Teams";
 import Reports from "@/pages/Reports";
 import Warehouse from "@/pages/Warehouse";
+import Users from "@/pages/Users";
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -20,7 +21,7 @@ function Router() {
   return (
     <Switch>
       {isLoading || !isAuthenticated ? (
-        <Route path="/" component={Landing} />
+        <Route path="/" component={Login} />
       ) : (
         <>
           <Route path="/" component={Dashboard} />
@@ -30,6 +31,7 @@ function Router() {
           <Route path="/teams" component={Teams} />
           <Route path="/warehouse" component={Warehouse} />
           <Route path="/reports" component={Reports} />
+          <Route path="/users" component={Users} />
         </>
       )}
       <Route component={NotFound} />

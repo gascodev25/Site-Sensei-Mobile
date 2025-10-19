@@ -7,6 +7,8 @@ import type { Express, RequestHandler } from "express";
 import memoize from "memoizee";
 import connectPg from "connect-pg-simple";
 import { storage } from "./storage";
+import { setupLocalAuth } from "./localAuth";
+import type { User } from "@shared/schema";
 
 if (!process.env.REPLIT_DOMAINS) {
   throw new Error("Environment variable REPLIT_DOMAINS not provided");
@@ -98,10 +100,74 @@ export async function setupAuth(app: Express) {
     passport.use(strategy);
   }
 
-  passport.serializeUser((user: Express.User, cb) => cb(null, user));
-  passport.deserializeUser((user: Express.User, cb) => cb(null, user));
+  // Setup local authentication strategy
+  await setupLocalAuth();
 
-  app.get("/api/login", (req, res, next) => {
+  // Update serialization to handle both OAuth and local users
+  passport.serializeUser((user: Express.User, cb) => {
+    const userData = user as any;
+    // For OAuth users, we store the session data
+    // For local users, we store the user ID
+    if (userData.id) {
+      // Local user - store just the ID
+      cb(null, { type: 'local', id: userData.id });
+    } else {
+      // OAuth user - store the full session data
+      cb(null, { type: 'oauth', data: user });
+    }
+  });
+
+  passport.deserializeUser(async (serialized: any, cb) => {
+    try {
+      if (serialized && serialized.type === 'local') {
+        // Fetch local user from database
+        const user = await storage.getUser(serialized.id);
+        if (!user) {
+          return cb(null, false);
+        }
+        cb(null, user);
+      } else if (serialized && serialized.type === 'oauth') {
+        // OAuth user - return the stored session data
+        cb(null, serialized.data);
+      } else {
+        // Old session format or invalid - treat as OAuth for backwards compatibility
+        cb(null, serialized);
+      }
+    } catch (error) {
+      // If deserialization fails, log out the user
+      cb(null, false);
+    }
+  });
+
+  // Local username/password login
+  app.post("/api/login/local", (req, res, next) => {
+    passport.authenticate("local", (err: any, user: User | false, info: any) => {
+      if (err) {
+        return res.status(500).json({ message: "Internal server error" });
+      }
+      if (!user) {
+        return res.status(401).json({ message: info?.message || "Invalid credentials" });
+      }
+      req.login(user, (err) => {
+        if (err) {
+          return res.status(500).json({ message: "Login failed" });
+        }
+        return res.json({ 
+          success: true, 
+          user: {
+            id: user.id,
+            email: user.email,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            roles: user.roles,
+          }
+        });
+      });
+    })(req, res, next);
+  });
+
+  // Replit OAuth login
+  app.get("/api/login/replit", (req, res, next) => {
     passport.authenticate(`replitauth:${req.hostname}`, {
       prompt: "login consent",
       scope: ["openid", "email", "profile", "offline_access"],
@@ -111,29 +177,46 @@ export async function setupAuth(app: Express) {
   app.get("/api/callback", (req, res, next) => {
     passport.authenticate(`replitauth:${req.hostname}`, {
       successReturnToOrRedirect: "/",
-      failureRedirect: "/api/login",
+      failureRedirect: "/",
     })(req, res, next);
   });
 
-  app.get("/api/logout", (req, res) => {
+  // Universal logout
+  app.post("/api/logout", (req, res) => {
+    const user = req.user as any;
+    const isOAuthUser = user && user.access_token;
+    
     req.logout(() => {
-      res.redirect(
-        client.buildEndSessionUrl(config, {
-          client_id: process.env.REPL_ID!,
-          post_logout_redirect_uri: `${req.protocol}://${req.hostname}`,
-        }).href
-      );
+      if (isOAuthUser) {
+        // OAuth user - redirect to Replit logout
+        res.json({ 
+          redirectUrl: client.buildEndSessionUrl(config, {
+            client_id: process.env.REPL_ID!,
+            post_logout_redirect_uri: `${req.protocol}://${req.hostname}`,
+          }).href
+        });
+      } else {
+        // Local user - just confirm logout
+        res.json({ success: true });
+      }
     });
   });
 }
 
 export const isAuthenticated: RequestHandler = async (req, res, next) => {
-  const user = req.user as any;
-
-  if (!req.isAuthenticated() || !user.expires_at) {
+  if (!req.isAuthenticated()) {
     return res.status(401).json({ message: "Unauthorized" });
   }
 
+  const user = req.user as any;
+
+  // Local auth users don't have expires_at
+  if (!user.expires_at) {
+    // This is a local auth user, just check if authenticated
+    return next();
+  }
+
+  // OAuth user - check token expiration and refresh if needed
   const now = Math.floor(Date.now() / 1000);
   if (now <= user.expires_at) {
     return next();

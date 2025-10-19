@@ -39,7 +39,12 @@ import { eq, and, or, sql, desc, asc, ilike, lt, gte, lte, inArray } from "drizz
 export interface IStorage {
   // User operations (required for Replit Auth)
   getUser(id: string): Promise<User | undefined>;
+  getUserByEmail(email: string): Promise<User | undefined>;
+  getAllUsers(): Promise<User[]>;
   upsertUser(user: UpsertUser): Promise<User>;
+  createPasswordUser(userData: { email: string; passwordHash: string; firstName: string; lastName: string; roles: string }): Promise<User>;
+  updateUser(id: string, userData: Partial<{ firstName: string; lastName: string; roles: string; passwordHash: string }>): Promise<User>;
+  deleteUser(id: string): Promise<void>;
   
   // Client operations
   getClients(): Promise<Client[]>;
@@ -148,6 +153,15 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.email, email));
+    return user;
+  }
+
+  async getAllUsers(): Promise<User[]> {
+    return await db.select().from(users).orderBy(asc(users.email));
+  }
+
   async upsertUser(userData: UpsertUser): Promise<User> {
     const [user] = await db
       .insert(users)
@@ -161,6 +175,36 @@ export class DatabaseStorage implements IStorage {
       })
       .returning();
     return user;
+  }
+
+  async createPasswordUser(userData: { email: string; passwordHash: string; firstName: string; lastName: string; roles: string }): Promise<User> {
+    const [user] = await db
+      .insert(users)
+      .values({
+        email: userData.email,
+        passwordHash: userData.passwordHash,
+        firstName: userData.firstName,
+        lastName: userData.lastName,
+        roles: userData.roles,
+      })
+      .returning();
+    return user;
+  }
+
+  async updateUser(id: string, userData: Partial<{ firstName: string; lastName: string; roles: string; passwordHash: string }>): Promise<User> {
+    const [user] = await db
+      .update(users)
+      .set({
+        ...userData,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, id))
+      .returning();
+    return user;
+  }
+
+  async deleteUser(id: string): Promise<void> {
+    await db.delete(users).where(eq(users.id, id));
   }
 
   // Client operations

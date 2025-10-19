@@ -7,6 +7,9 @@ export default function Header() {
   const { user } = useAuth();
   const [location] = useLocation();
 
+  const userRoles = user?.roles || '';
+  const canManageUsers = userRoles.includes('superuser') || userRoles.includes('manager');
+
   const navItems = [
     { label: "Dashboard", href: "/", active: location === "/" },
     { label: "Clients", href: "/clients", active: location === "/clients" },
@@ -16,6 +19,11 @@ export default function Header() {
     { label: "Warehouse", href: "/warehouse", active: location === "/warehouse" },
     { label: "Reports", href: "/reports", active: location === "/reports" },
   ];
+
+  // Add Users link only for superuser and manager
+  if (canManageUsers) {
+    navItems.push({ label: "Users", href: "/users", active: location === "/users" });
+  }
 
   const getInitials = (firstName?: string, lastName?: string) => {
     const first = firstName?.[0] || '';
@@ -75,7 +83,22 @@ export default function Header() {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => window.location.href = "/api/logout"}
+              onClick={async () => {
+                try {
+                  const response = await fetch("/api/logout", { method: "POST" });
+                  const data = await response.json();
+                  if (data.redirectUrl) {
+                    // OAuth user - redirect to Replit logout
+                    window.location.href = data.redirectUrl;
+                  } else {
+                    // Local user - just reload to login page
+                    window.location.href = "/";
+                  }
+                } catch (error) {
+                  // Fallback
+                  window.location.href = "/";
+                }
+              }}
               className="text-white/70 hover:text-white hover:bg-white/10"
               data-testid="button-logout"
             >
