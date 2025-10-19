@@ -1173,7 +1173,6 @@ export default function Inventory() {
                         <div className="flex-1">
                           <div className="flex items-center space-x-2 mb-2">
                             <CardTitle className="text-lg">{equipmentItem.name}</CardTitle>
-                            {getStatusBadge(equipmentItem.status || 'in_warehouse')}
                           </div>
                           <div className="flex items-center text-sm text-muted-foreground mb-1">
                             <Barcode className="h-3 w-3 mr-1" />
