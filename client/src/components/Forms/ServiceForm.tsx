@@ -587,7 +587,7 @@ export default function ServiceForm({ service, initialDate, onSuccess, onCancel,
                               <Input
                                 type="number"
                                 min="1"
-                                value={selectedItem?.quantity || 1}
+                                value={field.value?.find(eq => eq.id === item.id)?.quantity || 1}
                                 onChange={(e) => {
                                   const newQty = parseInt(e.target.value) || 1;
                                   field.onChange(
@@ -654,7 +654,7 @@ export default function ServiceForm({ service, initialDate, onSuccess, onCancel,
                               <Input
                                 type="number"
                                 min="1"
-                                value={selectedItem?.quantity || 1}
+                                value={field.value?.find(con => con.id === item.id)?.quantity || 1}
                                 onChange={(e) => {
                                   const newQty = parseInt(e.target.value) || 1;
                                   field.onChange(
