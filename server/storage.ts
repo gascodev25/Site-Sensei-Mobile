@@ -34,7 +34,7 @@ import {
   type EquipmentWithConsumables,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, or, sql, desc, asc, ilike, lt, gte, lte, inArray } from "drizzle-orm";
+import { eq, and, or, sql, desc, asc, ilike, lt, gte, lte, inArray, isNull, isNotNull } from "drizzle-orm";
 
 export interface IStorage {
   // User operations (required for Replit Auth)
@@ -1171,14 +1171,27 @@ export class DatabaseStorage implements IStorage {
     endDate.setDate(now.getDate() + 28);
     endDate.setHours(23, 59, 59, 999);
 
-    // Batch fetch: Get services for the entire 28-day period
+    // Batch fetch: Get services that could have occurrences in the 28-day period
+    // For recurring services, we need ALL active recurring services (not just those starting in our range)
+    // For one-time services, we only need those scheduled within our range
     const allServices = await db
       .select()
       .from(services)
       .where(
         and(
-          gte(services.installationDate, startDate),
-          lte(services.installationDate, endDate),
+          or(
+            // One-time services scheduled in our date range
+            and(
+              isNull(services.recurrencePattern),
+              gte(services.installationDate, startDate),
+              lte(services.installationDate, endDate)
+            ),
+            // All recurring services that haven't ended yet
+            and(
+              isNotNull(services.recurrencePattern),
+              lte(services.installationDate, endDate) // Started on or before our forecast end
+            )
+          ),
           or(
             eq(services.status, 'scheduled'),
             eq(services.status, 'missed')
@@ -1309,24 +1322,38 @@ export class DatabaseStorage implements IStorage {
             if (dayDate > endDate) return false;
           }
           
-          // Check if service occurs on this specific day
-          const completedDatesSet = new Set((s.completedDates as string[]) || []);
-          let currentDate = new Date(serviceDate);
-          const maxIterations = 1000;
-          let iterations = 0;
+          // Determine the correct recurrence anchor
+          // Use the earliest completed date if available, otherwise use installation_date
+          const completedDatesArray = (s.completedDates as string[]) || [];
+          let anchorDate: Date;
           
-          while (currentDate <= dayEnd && iterations < maxIterations) {
-            iterations++;
-            
-            if (currentDate >= dayDate && currentDate <= dayEnd) {
-              const dateStr = currentDate.toISOString().split('T')[0];
-              if (!completedDatesSet.has(dateStr)) {
-                return true; // Service occurs on this day
-              }
-            }
-            
-            currentDate = new Date(currentDate);
-            currentDate.setDate(currentDate.getDate() + intervalDays);
+          if (completedDatesArray.length > 0) {
+            // Use earliest completed date as anchor (this is the true schedule base)
+            const sortedCompleted = completedDatesArray.sort();
+            anchorDate = new Date(sortedCompleted[0]);
+          } else {
+            // No completed dates yet, use installation_date
+            anchorDate = new Date(serviceDate);
+          }
+          
+          anchorDate.setHours(0, 0, 0, 0);
+          
+          // Check if service occurs on this specific day
+          const completedDatesSet = new Set(completedDatesArray);
+          
+          // Calculate if dayDate is a valid occurrence from the anchor
+          const daysSinceAnchor = Math.floor((dayDate.getTime() - anchorDate.getTime()) / (1000 * 60 * 60 * 24));
+          
+          if (daysSinceAnchor < 0) {
+            // Day is before the anchor, so no occurrence
+            return false;
+          }
+          
+          // Check if this day falls on a recurrence interval
+          if (daysSinceAnchor % intervalDays === 0) {
+            const dateStr = dayDate.toISOString().split('T')[0];
+            // Only include if not already completed
+            return !completedDatesSet.has(dateStr);
           }
           
           return false;
