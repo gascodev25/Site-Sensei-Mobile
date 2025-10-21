@@ -10,13 +10,14 @@ import { Calendar } from "@/components/ui/calendar";
 import { Package, AlertTriangle, TrendingUp, Download, RotateCcw, CalendarIcon } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { format } from "date-fns";
+import { format, addDays } from "date-fns";
 import { cn } from "@/lib/utils";
 import Header from "@/components/Layout/Header";
 
 export default function Warehouse() {
   const { toast } = useToast();
   const [forecastStartDate, setForecastStartDate] = useState<Date>(new Date());
+  const [forecastView, setForecastView] = useState<'daily' | 'weekly'>('weekly');
 
   // Fetch equipment inventory summary with stock calculations
   const { data: equipmentInventory, isLoading: isLoadingEquipmentInventory } = useQuery<{
@@ -296,79 +297,171 @@ export default function Warehouse() {
                   <CardTitle>4-Week Stock Forecast</CardTitle>
                   <CardDescription>Consumables required for upcoming scheduled services</CardDescription>
                 </div>
-                <Popover>
-                  <PopoverTrigger asChild>
+                <div className="flex items-center gap-2">
+                  <div className="flex border rounded-md">
                     <Button
-                      variant="outline"
-                      className={cn(
-                        "w-[240px] justify-start text-left font-normal",
-                        !forecastStartDate && "text-muted-foreground"
-                      )}
+                      variant={forecastView === 'weekly' ? 'default' : 'ghost'}
+                      size="sm"
+                      onClick={() => setForecastView('weekly')}
+                      className="rounded-r-none"
                     >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {forecastStartDate ? format(forecastStartDate, "PPP") : <span>Pick a date</span>}
+                      Weekly
                     </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="end">
-                    <Calendar
-                      mode="single"
-                      selected={forecastStartDate}
-                      onSelect={(date) => date && setForecastStartDate(date)}
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
+                    <Button
+                      variant={forecastView === 'daily' ? 'default' : 'ghost'}
+                      size="sm"
+                      onClick={() => setForecastView('daily')}
+                      className="rounded-l-none"
+                    >
+                      Daily
+                    </Button>
+                  </div>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "w-[240px] justify-start text-left font-normal",
+                          !forecastStartDate && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {forecastStartDate ? format(forecastStartDate, "PPP") : <span>Pick a date</span>}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="end">
+                      <Calendar
+                        mode="single"
+                        selected={forecastStartDate}
+                        onSelect={(date) => date && setForecastStartDate(date)}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
               </div>
             </CardHeader>
             <CardContent className="space-y-6">
               {isLoadingForecast ? (
                 <div className="text-center py-8">Loading forecast...</div>
               ) : weeklyForecast && weeklyForecast.length > 0 ? (
-                weeklyForecast.map((week) => (
-                  <div key={week.week} className="space-y-2" data-testid={`forecast-${week.week}`}>
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-lg font-semibold">
-                        {week.week} ({week.weekStart} to {week.weekEnd})
-                      </h3>
-                      <Badge variant="outline">
-                        {week.consumables.length} items needed
-                      </Badge>
-                    </div>
-                    
-                    {week.consumables.length > 0 ? (
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Consumable</TableHead>
-                            <TableHead>Stock Code</TableHead>
-                            <TableHead>Required</TableHead>
-                            <TableHead>Current Stock</TableHead>
-                            <TableHead>Deficit</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {week.consumables.map((item: any) => (
-                            <TableRow key={item.id} data-testid={`forecast-item-${week.week}-${item.id}`}>
-                              <TableCell className="font-medium">{item.name}</TableCell>
-                              <TableCell>{item.stockCode}</TableCell>
-                              <TableCell data-testid={`text-required-${week.week}-${item.id}`}>{item.requiredQuantity}</TableCell>
-                              <TableCell>{item.currentStock}</TableCell>
-                              <TableCell>
-                                {item.deficit > 0 ? (
-                                  <Badge variant="destructive">{item.deficit} short</Badge>
-                                ) : (
-                                  <Badge variant="secondary">OK</Badge>
-                                )}
-                              </TableCell>
+                forecastView === 'weekly' ? (
+                  // Weekly view
+                  weeklyForecast.map((week) => (
+                    <div key={week.week} className="space-y-2" data-testid={`forecast-${week.week}`}>
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-lg font-semibold">
+                          {week.week} ({week.weekStart} to {week.weekEnd})
+                        </h3>
+                        <Badge variant="outline">
+                          {week.consumables.length} items needed
+                        </Badge>
+                      </div>
+                      
+                      {week.consumables.length > 0 ? (
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Consumable</TableHead>
+                              <TableHead>Stock Code</TableHead>
+                              <TableHead>Required</TableHead>
+                              <TableHead>Current Stock</TableHead>
+                              <TableHead>Deficit</TableHead>
                             </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    ) : (
-                      <p className="text-sm text-muted-foreground">No services scheduled for this week</p>
-                    )}
-                  </div>
-                ))
+                          </TableHeader>
+                          <TableBody>
+                            {week.consumables.map((item: any) => (
+                              <TableRow key={item.id} data-testid={`forecast-item-${week.week}-${item.id}`}>
+                                <TableCell className="font-medium">{item.name}</TableCell>
+                                <TableCell>{item.stockCode}</TableCell>
+                                <TableCell data-testid={`text-required-${week.week}-${item.id}`}>{item.requiredQuantity}</TableCell>
+                                <TableCell>{item.currentStock}</TableCell>
+                                <TableCell>
+                                  {item.deficit > 0 ? (
+                                    <Badge variant="destructive">{item.deficit} short</Badge>
+                                  ) : (
+                                    <Badge variant="secondary">OK</Badge>
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">No services scheduled for this week</p>
+                      )}
+                    </div>
+                  ))
+                ) : (
+                  // Daily view - flatten weeks into days
+                  (() => {
+                    const dailyData = [];
+                    for (let dayOffset = 0; dayOffset < 28; dayOffset++) {
+                      const currentDay = new Date(forecastStartDate);
+                      currentDay.setDate(currentDay.getDate() + dayOffset);
+                      const dateStr = currentDay.toISOString().split('T')[0];
+                      
+                      // Find which week this day belongs to
+                      const weekIndex = Math.floor(dayOffset / 7);
+                      const week = weeklyForecast[weekIndex];
+                      
+                      // For daily view, we'll show a simple count of services/consumables for that day
+                      // This is a simplified view - you could enhance this with actual per-day data
+                      dailyData.push({
+                        date: dateStr,
+                        displayDate: format(currentDay, 'EEE, MMM d'),
+                        weekNumber: weekIndex + 1,
+                        consumables: week?.consumables || []
+                      });
+                    }
+                    
+                    return dailyData.map((day, index) => (
+                      <div key={day.date} className="space-y-2" data-testid={`forecast-day-${index}`}>
+                        <div className="flex items-center justify-between">
+                          <h3 className="text-lg font-semibold">
+                            {day.displayDate} <span className="text-sm text-muted-foreground">(Week {day.weekNumber})</span>
+                          </h3>
+                          <Badge variant="outline">
+                            {day.consumables.length} items needed
+                          </Badge>
+                        </div>
+                        
+                        {day.consumables.length > 0 ? (
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>Consumable</TableHead>
+                                <TableHead>Stock Code</TableHead>
+                                <TableHead>Required</TableHead>
+                                <TableHead>Current Stock</TableHead>
+                                <TableHead>Deficit</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {day.consumables.map((item: any) => (
+                                <TableRow key={item.id}>
+                                  <TableCell className="font-medium">{item.name}</TableCell>
+                                  <TableCell>{item.stockCode}</TableCell>
+                                  <TableCell>{Math.ceil(item.requiredQuantity / 7)}</TableCell>
+                                  <TableCell>{item.currentStock}</TableCell>
+                                  <TableCell>
+                                    {item.deficit > 0 ? (
+                                      <Badge variant="destructive">{Math.ceil(item.deficit / 7)} short</Badge>
+                                    ) : (
+                                      <Badge variant="secondary">OK</Badge>
+                                    )}
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        ) : (
+                          <p className="text-sm text-muted-foreground">No services scheduled for this day</p>
+                        )}
+                      </div>
+                    ));
+                  })()
+                )
               ) : (
                 <div className="text-center py-8 text-muted-foreground">No forecast data available</div>
               )}
