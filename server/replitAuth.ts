@@ -124,29 +124,22 @@ export async function setupAuth(app: Express) {
 
   passport.deserializeUser(async (serialized: any, cb) => {
     try {
-      console.log('[Deserialize] Serialized data:', JSON.stringify(serialized));
       if (serialized && serialized.type === 'local') {
         // Fetch local user from database
-        console.log('[Deserialize] Fetching local user with ID:', serialized.id);
         const user = await storage.getUser(serialized.id);
         if (!user) {
-          console.log('[Deserialize] User not found in database');
           return cb(null, false);
         }
-        console.log('[Deserialize] Local user found:', user.email);
         cb(null, user);
       } else if (serialized && serialized.type === 'oauth') {
         // OAuth user - return the stored session data
-        console.log('[Deserialize] OAuth user');
         cb(null, serialized.data);
       } else {
         // Old session format or invalid - treat as OAuth for backwards compatibility
-        console.log('[Deserialize] Old/unknown session format, treating as OAuth');
         cb(null, serialized);
       }
     } catch (error) {
       // If deserialization fails, log out the user
-      console.error('[Deserialize] Error during deserialization:', error);
       cb(null, false);
     }
   });
