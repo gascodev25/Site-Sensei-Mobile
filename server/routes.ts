@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
-import { hashPassword } from "./localAuth";
+import { setupLocalAuth, hashPassword } from "./localAuth";
 import { 
   insertClientSchema, 
   insertEquipmentSchema, 
@@ -20,6 +20,7 @@ import { z } from "zod";
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
   await setupAuth(app);
+  await setupLocalAuth();
 
   // Bootstrap superuser endpoint (can be called multiple times to ensure Gavin's account)
   app.post('/api/auth/bootstrap', async (req, res) => {
