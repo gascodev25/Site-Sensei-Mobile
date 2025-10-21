@@ -1359,8 +1359,10 @@ export class DatabaseStorage implements IStorage {
           return false;
         }
         
-        // For non-recurring services, simple date check
-        return serviceDate >= dayDate && serviceDate <= dayEnd;
+        // For non-recurring services, check if service date falls on this specific day
+        const serviceDateOnly = new Date(serviceDate);
+        serviceDateOnly.setHours(0, 0, 0, 0);
+        return serviceDateOnly.getTime() === dayDate.getTime();
       });
 
       // Calculate consumables needed for this specific day
