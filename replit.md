@@ -27,6 +27,15 @@ The system is built as a full-stack web application using modern technologies in
 - Warehouse forecasting automatically updates after splits through cache invalidation
 - All stock assignments (equipment and consumables) are properly copied to the new service series
 
+**Daily Stock Forecast with Timezone Support (October 2025)**
+- Implemented getDailyStockForecast() method providing accurate per-day consumable requirements for 28-day forecast period
+- Added /api/warehouse/daily-forecast endpoint returning date-specific consumable needs based on scheduled services
+- Fixed critical timezone issue: database stores UTC timestamps (timestamp without timezone), application converts to SAST (UTC+2) for correct date matching
+- Recurring services now use earliest completed_date as anchor point instead of installation_date for accurate schedule calculation
+- Query optimization: fetches all active recurring services (not just those starting in forecast period) to catch long-running recurring service occurrences
+- Daily view shows "No services scheduled" for days with zero requirements instead of misleading averages
+- Warehouse forecast supports both weekly aggregates and daily breakdowns for different planning needs
+
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.

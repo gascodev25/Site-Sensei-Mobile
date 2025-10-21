@@ -1291,6 +1291,9 @@ export class DatabaseStorage implements IStorage {
 
     const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
+    // South African timezone offset (SAST = UTC+2)
+    const SAST_OFFSET_HOURS = 2;
+    
     // Generate 28 days of forecasts
     for (let dayOffset = 0; dayOffset < 28; dayOffset++) {
       const dayDate = new Date(now);
@@ -1332,8 +1335,9 @@ export class DatabaseStorage implements IStorage {
             const sortedCompleted = completedDatesArray.sort();
             anchorDate = new Date(sortedCompleted[0]);
           } else {
-            // No completed dates yet, use installation_date
-            anchorDate = new Date(serviceDate);
+            // No completed dates yet, convert installation_date to SAST to get correct local date
+            const serviceDateSAST = new Date(serviceDate.getTime() + (SAST_OFFSET_HOURS * 60 * 60 * 1000));
+            anchorDate = new Date(serviceDateSAST.toISOString().split('T')[0]);
           }
           
           anchorDate.setHours(0, 0, 0, 0);
@@ -1360,9 +1364,12 @@ export class DatabaseStorage implements IStorage {
         }
         
         // For non-recurring services, check if service date falls on this specific day
-        const serviceDateOnly = new Date(serviceDate);
-        serviceDateOnly.setHours(0, 0, 0, 0);
-        return serviceDateOnly.getTime() === dayDate.getTime();
+        // Convert UTC time to SAST (UTC+2) to get the correct local date
+        const serviceDateSAST = new Date(serviceDate.getTime() + (SAST_OFFSET_HOURS * 60 * 60 * 1000));
+        const serviceLocalDate = serviceDateSAST.toISOString().split('T')[0];
+        const dayLocalDate = dayDate.toISOString().split('T')[0];
+        
+        return serviceLocalDate === dayLocalDate;
       });
 
       // Calculate consumables needed for this specific day
