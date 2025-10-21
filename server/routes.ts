@@ -1606,7 +1606,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/warehouse/weekly-forecast', async (req, res) => {
     try {
       const startDate = req.query.startDate as string | undefined;
-      const forecast = await storage.getWeeklyStockForecast(startDate);
+      const teamId = req.query.teamId ? parseInt(req.query.teamId as string) : undefined;
+      const forecast = await storage.getWeeklyStockForecast(startDate, teamId);
       res.json(forecast);
     } catch (error) {
       console.error('Error fetching weekly forecast:', error);
@@ -1617,7 +1618,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/warehouse/daily-forecast', async (req, res) => {
     try {
       const startDate = req.query.startDate as string | undefined;
-      const forecast = await storage.getDailyStockForecast(startDate);
+      const teamId = req.query.teamId ? parseInt(req.query.teamId as string) : undefined;
+      const forecast = await storage.getDailyStockForecast(startDate, teamId);
       res.json(forecast);
     } catch (error) {
       console.error('Error fetching daily forecast:', error);

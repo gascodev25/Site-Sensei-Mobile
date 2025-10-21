@@ -18,6 +18,7 @@ export default function Warehouse() {
   const { toast } = useToast();
   const [forecastStartDate, setForecastStartDate] = useState<Date>(new Date());
   const [forecastView, setForecastView] = useState<'daily' | 'weekly'>('weekly');
+  const [selectedTeamId, setSelectedTeamId] = useState<number | null>(null);
 
   // Fetch equipment inventory summary with stock calculations
   const { data: equipmentInventory, isLoading: isLoadingEquipmentInventory } = useQuery<{
@@ -48,22 +49,39 @@ export default function Warehouse() {
     queryKey: ['/api/warehouse/consumables'],
   });
 
-  // Fetch weekly forecast with selected start date
+  // Fetch service teams for filter
+  const { data: serviceTeams } = useQuery<any[]>({
+    queryKey: ['/api/service-teams'],
+  });
+
+  // Fetch weekly forecast with selected start date and team filter
   const { data: weeklyForecast, isLoading: isLoadingForecast } = useQuery<any[]>({
-    queryKey: ['/api/warehouse/weekly-forecast', forecastStartDate.toISOString().split('T')[0]],
+    queryKey: ['/api/warehouse/weekly-forecast', forecastStartDate.toISOString().split('T')[0], selectedTeamId],
     queryFn: async () => {
-      const response = await fetch(`/api/warehouse/weekly-forecast?startDate=${forecastStartDate.toISOString().split('T')[0]}`);
+      const params = new URLSearchParams({
+        startDate: forecastStartDate.toISOString().split('T')[0]
+      });
+      if (selectedTeamId) {
+        params.append('teamId', selectedTeamId.toString());
+      }
+      const response = await fetch(`/api/warehouse/weekly-forecast?${params}`);
       if (!response.ok) throw new Error('Failed to fetch forecast');
       return response.json();
     },
     enabled: forecastView === 'weekly',
   });
 
-  // Fetch daily forecast with selected start date
+  // Fetch daily forecast with selected start date and team filter
   const { data: dailyForecast, isLoading: isLoadingDailyForecast } = useQuery<any[]>({
-    queryKey: ['/api/warehouse/daily-forecast', forecastStartDate.toISOString().split('T')[0]],
+    queryKey: ['/api/warehouse/daily-forecast', forecastStartDate.toISOString().split('T')[0], selectedTeamId],
     queryFn: async () => {
-      const response = await fetch(`/api/warehouse/daily-forecast?startDate=${forecastStartDate.toISOString().split('T')[0]}`);
+      const params = new URLSearchParams({
+        startDate: forecastStartDate.toISOString().split('T')[0]
+      });
+      if (selectedTeamId) {
+        params.append('teamId', selectedTeamId.toString());
+      }
+      const response = await fetch(`/api/warehouse/daily-forecast?${params}`);
       if (!response.ok) throw new Error('Failed to fetch daily forecast');
       return response.json();
     },
@@ -328,6 +346,18 @@ export default function Warehouse() {
                       Daily
                     </Button>
                   </div>
+                  <select
+                    value={selectedTeamId || ''}
+                    onChange={(e) => setSelectedTeamId(e.target.value ? parseInt(e.target.value) : null)}
+                    className="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  >
+                    <option value="">All Teams</option>
+                    {serviceTeams?.map((team) => (
+                      <option key={team.id} value={team.id}>
+                        {team.name}
+                      </option>
+                    ))}
+                  </select>
                   <Popover>
                     <PopoverTrigger asChild>
                       <Button

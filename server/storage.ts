@@ -887,7 +887,7 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(consumables).orderBy(asc(consumables.name));
   }
 
-  async getWeeklyStockForecast(customStartDate?: string): Promise<{
+  async getWeeklyStockForecast(customStartDate?: string, teamId?: number): Promise<{
     week: string;
     weekStart: string;
     weekEnd: string;
@@ -912,19 +912,24 @@ export class DatabaseStorage implements IStorage {
 
     // Batch fetch: Get services for the entire 4-week period
     // Only include 'scheduled' and 'missed' services
+    // Filter by team if teamId provided
+    const whereConditions = [
+      gte(services.installationDate, startDate),
+      lte(services.installationDate, endDate),
+      or(
+        eq(services.status, 'scheduled'),
+        eq(services.status, 'missed')
+      )
+    ];
+
+    if (teamId) {
+      whereConditions.push(eq(services.teamId, teamId));
+    }
+
     const allServices = await db
       .select()
       .from(services)
-      .where(
-        and(
-          gte(services.installationDate, startDate),
-          lte(services.installationDate, endDate),
-          or(
-            eq(services.status, 'scheduled'),
-            eq(services.status, 'missed')
-          )
-        )
-      );
+      .where(and(...whereConditions));
 
     if (allServices.length === 0) {
       // Return empty weeks if no services
@@ -1149,7 +1154,7 @@ export class DatabaseStorage implements IStorage {
     return weeks;
   }
 
-  async getDailyStockForecast(customStartDate?: string): Promise<{
+  async getDailyStockForecast(customStartDate?: string, teamId?: number): Promise<{
     date: string;
     dayOfWeek: string;
     consumables: {
@@ -1174,30 +1179,34 @@ export class DatabaseStorage implements IStorage {
     // Batch fetch: Get services that could have occurrences in the 28-day period
     // For recurring services, we need ALL active recurring services (not just those starting in our range)
     // For one-time services, we only need those scheduled within our range
+    const whereConditions = [
+      or(
+        // One-time services scheduled in our date range
+        and(
+          isNull(services.recurrencePattern),
+          gte(services.installationDate, startDate),
+          lte(services.installationDate, endDate)
+        ),
+        // All recurring services that haven't ended yet
+        and(
+          isNotNull(services.recurrencePattern),
+          lte(services.installationDate, endDate) // Started on or before our forecast end
+        )
+      ),
+      or(
+        eq(services.status, 'scheduled'),
+        eq(services.status, 'missed')
+      )
+    ];
+
+    if (teamId) {
+      whereConditions.push(eq(services.teamId, teamId));
+    }
+
     const allServices = await db
       .select()
       .from(services)
-      .where(
-        and(
-          or(
-            // One-time services scheduled in our date range
-            and(
-              isNull(services.recurrencePattern),
-              gte(services.installationDate, startDate),
-              lte(services.installationDate, endDate)
-            ),
-            // All recurring services that haven't ended yet
-            and(
-              isNotNull(services.recurrencePattern),
-              lte(services.installationDate, endDate) // Started on or before our forecast end
-            )
-          ),
-          or(
-            eq(services.status, 'scheduled'),
-            eq(services.status, 'missed')
-          )
-        )
-      );
+      .where(and(...whereConditions));
 
     if (allServices.length === 0) {
       // Return empty days if no services
