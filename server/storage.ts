@@ -162,19 +162,33 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(users).orderBy(asc(users.email));
   }
 
-  async upsertUser(userData: UpsertUser): Promise<User> {
-    const [user] = await db
+  async upsertUser(user: UpsertUser): Promise<User> {
+    const updateData: any = {
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      profileImageUrl: user.profileImageUrl,
+      updatedAt: new Date(),
+    };
+
+    // Only update roles if provided (for OAuth superuser assignment)
+    if (user.roles !== undefined) {
+      updateData.roles = user.roles;
+    }
+
+    const [upsertedUser] = await db
       .insert(users)
-      .values(userData)
+      .values({
+        id: user.id,
+        ...updateData,
+      })
       .onConflictDoUpdate({
         target: users.id,
-        set: {
-          ...userData,
-          updatedAt: new Date(),
-        },
+        set: updateData,
       })
       .returning();
-    return user;
+
+    return upsertedUser;
   }
 
   async createPasswordUser(userData: { email: string; passwordHash: string; firstName: string; lastName: string; roles: string }): Promise<User> {
@@ -691,7 +705,7 @@ export class DatabaseStorage implements IStorage {
         .where(gte(services.installationDate, startOfMonth))
     ]);
 
-    const completionRate = totalThisMonthResult[0].count > 0 
+    const completionRate = totalThisMonthResult[0].count > 0
       ? Math.round((completedThisMonthResult[0].count / totalThisMonthResult[0].count) * 100)
       : 0;
 
@@ -770,7 +784,7 @@ export class DatabaseStorage implements IStorage {
 
       if (!alreadyAssigned) {
         allConsumables.push({
-          stockItem: { 
+          stockItem: {
             quantity: templateItem.templateConsumable.recommendedQuantity || 1,
             serviceId: id,
             consumableId: templateItem.consumable.id,
@@ -1040,8 +1054,8 @@ export class DatabaseStorage implements IStorage {
         const serviceDate = new Date(s.installationDate!);
 
         // For recurring services, we need to check if they have occurrences in this week
-        const isRecurring = s.recurrencePattern && 
-                           typeof s.recurrencePattern === 'object' && 
+        const isRecurring = s.recurrencePattern &&
+                           typeof s.recurrencePattern === 'object' &&
                            s.recurrencePattern !== null &&
                            'interval' in s.recurrencePattern;
 
@@ -1298,8 +1312,6 @@ export class DatabaseStorage implements IStorage {
     const allConsumablesMap = new Map<number, Consumable>();
     allConsumablesList.forEach(c => allConsumablesMap.set(c.id, c));
 
-    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-
     // South African timezone offset (SAST = UTC+2)
     const SAST_OFFSET_HOURS = 2;
 
@@ -1316,8 +1328,8 @@ export class DatabaseStorage implements IStorage {
       const dayServices = allServices.filter(s => {
         const serviceDate = new Date(s.installationDate!);
 
-        const isRecurring = s.recurrencePattern && 
-                           typeof s.recurrencePattern === 'object' && 
+        const isRecurring = s.recurrencePattern &&
+                           typeof s.recurrencePattern === 'object' &&
                            s.recurrencePattern !== null &&
                            'interval' in s.recurrencePattern;
 
@@ -1443,9 +1455,9 @@ export class DatabaseStorage implements IStorage {
   async returnStockItem(id: number): Promise<any> {
     const [updated] = await db
       .update(serviceStockIssued)
-      .set({ 
-        returned: true, 
-        returnedAt: new Date() 
+      .set({
+        returned: true,
+        returnedAt: new Date()
       })
       .where(eq(serviceStockIssued.id, id))
       .returning();

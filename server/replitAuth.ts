@@ -60,12 +60,16 @@ function updateUserSession(
 async function upsertUser(
   claims: any,
 ) {
+  // Check if this is Gavin Green's OAuth account and assign superuser role
+  const roles = claims["email"] === "gavin@gasco.digital" ? "superuser" : undefined;
+  
   await storage.upsertUser({
     id: claims["sub"],
     email: claims["email"],
     firstName: claims["first_name"],
     lastName: claims["last_name"],
     profileImageUrl: claims["profile_image_url"],
+    roles,
   });
 }
 

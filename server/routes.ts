@@ -21,19 +21,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
   await setupAuth(app);
 
-  // Bootstrap superuser endpoint (only works if no users exist yet)
+  // Bootstrap superuser endpoint (can be called multiple times to ensure Gavin's account)
   app.post('/api/auth/bootstrap', async (req, res) => {
     try {
-      // Check if any users exist
-      const existingUsers = await storage.getAllUsers();
-      if (existingUsers.length > 0) {
-        return res.status(400).json({ message: "System already bootstrapped" });
+      const email = "gavin@gasco.digital";
+      
+      // Check if Gavin already exists
+      const existingUser = await storage.getUserByEmail(email);
+      
+      if (existingUser) {
+        // Update existing user to ensure superuser role and correct password
+        const passwordHash = await hashPassword("ChangeMe123!");
+        await storage.updateUser(existingUser.id, {
+          firstName: "Gavin",
+          lastName: "Green",
+          roles: "superuser",
+          passwordHash,
+        });
+        
+        return res.status(200).json({ 
+          message: "Superuser account updated successfully",
+          email: email,
+          temporaryPassword: "ChangeMe123!"
+        });
       }
 
-      // Create superuser account
+      // Create new superuser account
       const passwordHash = await hashPassword("ChangeMe123!");
       const superuser = await storage.createPasswordUser({
-        email: "gavin@gasco.digital",
+        email: email,
         passwordHash,
         firstName: "Gavin",
         lastName: "Green",
