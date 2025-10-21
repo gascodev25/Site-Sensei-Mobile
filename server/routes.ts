@@ -1614,6 +1614,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get('/api/warehouse/daily-forecast', async (req, res) => {
+    try {
+      const startDate = req.query.startDate as string | undefined;
+      const forecast = await storage.getDailyStockForecast(startDate);
+      res.json(forecast);
+    } catch (error) {
+      console.error('Error fetching daily forecast:', error);
+      res.status(500).json({ message: 'Failed to fetch daily forecast' });
+    }
+  });
+
   app.post('/api/warehouse/return-stock/:id', isAuthenticated, async (req, res) => {
     try {
       const id = parseInt(req.params.id);

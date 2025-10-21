@@ -1149,6 +1149,252 @@ export class DatabaseStorage implements IStorage {
     return weeks;
   }
 
+  async getDailyStockForecast(customStartDate?: string): Promise<{
+    date: string;
+    dayOfWeek: string;
+    consumables: {
+      id: number;
+      name: string;
+      stockCode: string;
+      requiredQuantity: number;
+      currentStock: number;
+      deficit: number;
+    }[];
+  }[]> {
+    const now = customStartDate ? new Date(customStartDate) : new Date();
+    const days = [];
+
+    // Calculate 28-day date range
+    const startDate = new Date(now);
+    startDate.setHours(0, 0, 0, 0);
+    const endDate = new Date(now);
+    endDate.setDate(now.getDate() + 28);
+    endDate.setHours(23, 59, 59, 999);
+
+    // Batch fetch: Get services for the entire 28-day period
+    const allServices = await db
+      .select()
+      .from(services)
+      .where(
+        and(
+          gte(services.installationDate, startDate),
+          lte(services.installationDate, endDate),
+          or(
+            eq(services.status, 'scheduled'),
+            eq(services.status, 'missed')
+          )
+        )
+      );
+
+    if (allServices.length === 0) {
+      // Return empty days if no services
+      for (let dayOffset = 0; dayOffset < 28; dayOffset++) {
+        const dayDate = new Date(now);
+        dayDate.setDate(now.getDate() + dayOffset);
+        
+        const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        
+        days.push({
+          date: dayDate.toISOString().split('T')[0],
+          dayOfWeek: dayNames[dayDate.getDay()],
+          consumables: [],
+        });
+      }
+      return days;
+    }
+
+    const serviceIds = allServices.map(s => s.id);
+
+    // Batch fetch: Get ALL direct consumables for these services
+    const allDirectConsumables = await db
+      .select({
+        stockItem: serviceStockIssued,
+        consumable: consumables,
+      })
+      .from(serviceStockIssued)
+      .innerJoin(consumables, eq(serviceStockIssued.consumableId, consumables.id))
+      .where(inArray(serviceStockIssued.serviceId, serviceIds));
+
+    // Batch fetch: Get ALL equipment for these services
+    const allEquipmentItems = await db
+      .select({
+        stockItem: serviceStockIssued,
+        equipment: equipment,
+      })
+      .from(serviceStockIssued)
+      .innerJoin(equipment, eq(serviceStockIssued.equipmentId, equipment.id))
+      .where(inArray(serviceStockIssued.serviceId, serviceIds));
+
+    // Get unique template IDs
+    const templateIds = Array.from(new Set(
+      allEquipmentItems
+        .map(item => item.equipment.templateId)
+        .filter(id => id !== null) as number[]
+    ));
+
+    // Batch fetch: Get ALL template consumables
+    const allTemplateConsumables = templateIds.length > 0
+      ? await db
+          .select({
+            templateId: templateConsumables.templateId,
+            templateConsumable: templateConsumables,
+            consumable: consumables,
+          })
+          .from(templateConsumables)
+          .innerJoin(consumables, eq(templateConsumables.consumableId, consumables.id))
+          .where(inArray(templateConsumables.templateId, templateIds))
+      : [];
+
+    // Build lookup maps
+    const directConsumablesByService = new Map<number, typeof allDirectConsumables>();
+    allDirectConsumables.forEach(item => {
+      const serviceId = item.stockItem.serviceId;
+      if (!directConsumablesByService.has(serviceId)) {
+        directConsumablesByService.set(serviceId, []);
+      }
+      directConsumablesByService.get(serviceId)!.push(item);
+    });
+
+    const equipmentByService = new Map<number, typeof allEquipmentItems>();
+    allEquipmentItems.forEach(item => {
+      const serviceId = item.stockItem.serviceId;
+      if (!equipmentByService.has(serviceId)) {
+        equipmentByService.set(serviceId, []);
+      }
+      equipmentByService.get(serviceId)!.push(item);
+    });
+
+    const templateConsumablesByTemplate = new Map<number, typeof allTemplateConsumables>();
+    allTemplateConsumables.forEach(item => {
+      if (!templateConsumablesByTemplate.has(item.templateId)) {
+        templateConsumablesByTemplate.set(item.templateId, []);
+      }
+      templateConsumablesByTemplate.get(item.templateId)!.push(item);
+    });
+
+    const allConsumablesList = await db.select().from(consumables);
+    const allConsumablesMap = new Map<number, Consumable>();
+    allConsumablesList.forEach(c => allConsumablesMap.set(c.id, c));
+
+    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+    // Generate 28 days of forecasts
+    for (let dayOffset = 0; dayOffset < 28; dayOffset++) {
+      const dayDate = new Date(now);
+      dayDate.setDate(now.getDate() + dayOffset);
+      dayDate.setHours(0, 0, 0, 0);
+      
+      const dayEnd = new Date(dayDate);
+      dayEnd.setHours(23, 59, 59, 999);
+
+      // Filter services for this specific day
+      const dayServices = allServices.filter(s => {
+        const serviceDate = new Date(s.installationDate!);
+        
+        const isRecurring = s.recurrencePattern && 
+                           typeof s.recurrencePattern === 'object' && 
+                           s.recurrencePattern !== null &&
+                           'interval' in s.recurrencePattern;
+        
+        if (isRecurring) {
+          const pattern = s.recurrencePattern as { interval: string; end_date?: string };
+          const intervalMatch = pattern.interval.match(/^(\d+)d$/);
+          if (!intervalMatch) return false;
+          
+          const intervalDays = parseInt(intervalMatch[1], 10);
+          
+          // Check if end_date has passed
+          if (pattern.end_date) {
+            const endDate = new Date(pattern.end_date);
+            if (dayDate > endDate) return false;
+          }
+          
+          // Check if service occurs on this specific day
+          const completedDatesSet = new Set((s.completedDates as string[]) || []);
+          let currentDate = new Date(serviceDate);
+          const maxIterations = 1000;
+          let iterations = 0;
+          
+          while (currentDate <= dayEnd && iterations < maxIterations) {
+            iterations++;
+            
+            if (currentDate >= dayDate && currentDate <= dayEnd) {
+              const dateStr = currentDate.toISOString().split('T')[0];
+              if (!completedDatesSet.has(dateStr)) {
+                return true; // Service occurs on this day
+              }
+            }
+            
+            currentDate = new Date(currentDate);
+            currentDate.setDate(currentDate.getDate() + intervalDays);
+          }
+          
+          return false;
+        }
+        
+        // For non-recurring services, simple date check
+        return serviceDate >= dayDate && serviceDate <= dayEnd;
+      });
+
+      // Calculate consumables needed for this specific day
+      const consumableRequirements = new Map<number, { consumable: Consumable; quantity: number }>();
+
+      for (const service of dayServices) {
+        // Add directly assigned consumables
+        const directCons = directConsumablesByService.get(service.id) || [];
+        for (const item of directCons) {
+          const existing = consumableRequirements.get(item.consumable.id);
+          if (existing) {
+            existing.quantity += item.stockItem.quantity || 1;
+          } else {
+            consumableRequirements.set(item.consumable.id, {
+              consumable: item.consumable,
+              quantity: item.stockItem.quantity || 1,
+            });
+          }
+        }
+
+        // Add template consumables from equipment
+        const equipItems = equipmentByService.get(service.id) || [];
+        for (const equipItem of equipItems) {
+          if (equipItem.equipment.templateId) {
+            const templateCons = templateConsumablesByTemplate.get(equipItem.equipment.templateId) || [];
+            for (const tc of templateCons) {
+              const existing = consumableRequirements.get(tc.consumable.id);
+              const qty = tc.templateConsumable.recommendedQuantity || 1;
+              if (existing) {
+                existing.quantity += qty;
+              } else {
+                consumableRequirements.set(tc.consumable.id, {
+                  consumable: tc.consumable,
+                  quantity: qty,
+                });
+              }
+            }
+          }
+        }
+      }
+
+      // Format the day data
+      const dayConsumables = Array.from(consumableRequirements.values()).map(item => ({
+        id: item.consumable.id,
+        name: item.consumable.name,
+        stockCode: item.consumable.stockCode,
+        requiredQuantity: item.quantity,
+        currentStock: item.consumable.currentStock || 0,
+        deficit: Math.max(0, item.quantity - (item.consumable.currentStock || 0)),
+      }));
+
+      days.push({
+        date: dayDate.toISOString().split('T')[0],
+        dayOfWeek: dayNames[dayDate.getDay()],
+        consumables: dayConsumables,
+      });
+    }
+
+    return days;
+  }
+
   async returnStockItem(id: number): Promise<any> {
     const [updated] = await db
       .update(serviceStockIssued)
