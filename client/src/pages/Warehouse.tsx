@@ -377,6 +377,7 @@ export default function Warehouse() {
                         selected={forecastStartDate}
                         onSelect={(date) => date && setForecastStartDate(date)}
                         initialFocus
+                        weekStartsOn={1}
                       />
                     </PopoverContent>
                   </Popover>
