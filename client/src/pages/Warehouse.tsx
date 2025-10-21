@@ -58,6 +58,16 @@ export default function Warehouse() {
     },
   });
 
+  // Fetch daily forecast with selected start date
+  const { data: dailyForecast, isLoading: isLoadingDailyForecast } = useQuery<any[]>({
+    queryKey: ['/api/warehouse/daily-forecast', forecastStartDate.toISOString().split('T')[0]],
+    queryFn: async () => {
+      const response = await fetch(`/api/warehouse/daily-forecast?startDate=${forecastStartDate.toISOString().split('T')[0]}`);
+      if (!response.ok) throw new Error('Failed to fetch forecast');
+      return response.json();
+    },
+  });
+
   // Return stock mutation
   const returnStockMutation = useMutation({
     mutationFn: async (id: number) => {
@@ -342,10 +352,9 @@ export default function Warehouse() {
               </div>
             </CardHeader>
             <CardContent className="space-y-6">
-              {isLoadingForecast ? (
+              {(forecastView === 'weekly' ? isLoadingForecast : isLoadingDailyForecast) ? (
                 <div className="text-center py-8">Loading forecast...</div>
-              ) : weeklyForecast && weeklyForecast.length > 0 ? (
-                forecastView === 'weekly' ? (
+              ) : forecastView === 'weekly' && weeklyForecast && weeklyForecast.length > 0 ? (
                   // Weekly view
                   weeklyForecast.map((week) => (
                     <div key={week.week} className="space-y-2" data-testid={`forecast-${week.week}`}>
@@ -392,76 +401,57 @@ export default function Warehouse() {
                       )}
                     </div>
                   ))
-                ) : (
-                  // Daily view - flatten weeks into days
-                  (() => {
-                    const dailyData = [];
-                    for (let dayOffset = 0; dayOffset < 28; dayOffset++) {
-                      const currentDay = new Date(forecastStartDate);
-                      currentDay.setDate(currentDay.getDate() + dayOffset);
-                      const dateStr = currentDay.toISOString().split('T')[0];
-                      
-                      // Find which week this day belongs to
-                      const weekIndex = Math.floor(dayOffset / 7);
-                      const week = weeklyForecast[weekIndex];
-                      
-                      // For daily view, we'll show a simple count of services/consumables for that day
-                      // This is a simplified view - you could enhance this with actual per-day data
-                      dailyData.push({
-                        date: dateStr,
-                        displayDate: format(currentDay, 'EEE, MMM d'),
-                        weekNumber: weekIndex + 1,
-                        consumables: week?.consumables || []
-                      });
-                    }
-                    
-                    return dailyData.map((day, index) => (
-                      <div key={day.date} className="space-y-2" data-testid={`forecast-day-${index}`}>
-                        <div className="flex items-center justify-between">
-                          <h3 className="text-lg font-semibold">
-                            {day.displayDate} <span className="text-sm text-muted-foreground">(Week {day.weekNumber})</span>
-                          </h3>
-                          <Badge variant="outline">
-                            {day.consumables.length} items needed
-                          </Badge>
-                        </div>
-                        
-                        {day.consumables.length > 0 ? (
-                          <Table>
-                            <TableHeader>
-                              <TableRow>
-                                <TableHead>Consumable</TableHead>
-                                <TableHead>Stock Code</TableHead>
-                                <TableHead>Required</TableHead>
-                                <TableHead>Current Stock</TableHead>
-                                <TableHead>Deficit</TableHead>
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                              {day.consumables.map((item: any) => (
-                                <TableRow key={item.id}>
-                                  <TableCell className="font-medium">{item.name}</TableCell>
-                                  <TableCell>{item.stockCode}</TableCell>
-                                  <TableCell>{Math.ceil(item.requiredQuantity / 7)}</TableCell>
-                                  <TableCell>{item.currentStock}</TableCell>
-                                  <TableCell>
-                                    {item.deficit > 0 ? (
-                                      <Badge variant="destructive">{Math.ceil(item.deficit / 7)} short</Badge>
-                                    ) : (
-                                      <Badge variant="secondary">OK</Badge>
-                                    )}
-                                  </TableCell>
-                                </TableRow>
-                              ))}
-                            </TableBody>
-                          </Table>
-                        ) : (
-                          <p className="text-sm text-muted-foreground">No services scheduled for this day</p>
-                        )}
-                      </div>
-                    ));
-                  })()
                 )
+              ) : forecastView === 'daily' && dailyForecast && dailyForecast.length > 0 ? (
+                // Daily view - use actual daily forecast data
+                dailyForecast.map((day: any, index: number) => {
+                  const weekNumber = Math.floor(index / 7) + 1;
+                  return (
+                    <div key={day.date} className="space-y-2" data-testid={`forecast-day-${index}`}>
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-lg font-semibold">
+                          {day.displayDate} <span className="text-sm text-muted-foreground">(Week {weekNumber})</span>
+                        </h3>
+                        <Badge variant="outline">
+                          {day.consumables.length} items needed
+                        </Badge>
+                      </div>
+                      
+                      {day.consumables.length > 0 ? (
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Consumable</TableHead>
+                              <TableHead>Stock Code</TableHead>
+                              <TableHead>Required</TableHead>
+                              <TableHead>Current Stock</TableHead>
+                              <TableHead>Deficit</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {day.consumables.map((item: any) => (
+                              <TableRow key={item.id}>
+                                <TableCell className="font-medium">{item.name}</TableCell>
+                                <TableCell>{item.stockCode}</TableCell>
+                                <TableCell>{item.requiredQuantity}</TableCell>
+                                <TableCell>{item.currentStock}</TableCell>
+                                <TableCell>
+                                  {item.deficit > 0 ? (
+                                    <Badge variant="destructive">{item.deficit} short</Badge>
+                                  ) : (
+                                    <Badge variant="secondary">OK</Badge>
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">No services scheduled for this day</p>
+                      )}
+                    </div>
+                  );
+                })
               ) : (
                 <div className="text-center py-8 text-muted-foreground">No forecast data available</div>
               )}
