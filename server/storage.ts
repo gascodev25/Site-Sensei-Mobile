@@ -887,7 +887,7 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(consumables).orderBy(asc(consumables.name));
   }
 
-  async getWeeklyStockForecast(): Promise<{
+  async getWeeklyStockForecast(customStartDate?: string): Promise<{
     week: string;
     weekStart: string;
     weekEnd: string;
@@ -900,7 +900,7 @@ export class DatabaseStorage implements IStorage {
       deficit: number;
     }[];
   }[]> {
-    const now = new Date();
+    const now = customStartDate ? new Date(customStartDate) : new Date();
     const weeks = [];
 
     // Calculate 4-week date range

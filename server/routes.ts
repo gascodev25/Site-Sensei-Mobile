@@ -94,7 +94,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const user = await getUserWithRoles(req);
       const userRoles = user?.roles || 'user';
-      
+
       // Only superuser and manager can list users
       if (!userRoles.includes('superuser') && !userRoles.includes('manager')) {
         return res.status(403).json({ message: "Insufficient permissions" });
@@ -121,21 +121,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const user = await getUserWithRoles(req);
       const userRoles = user?.roles || 'user';
-      
+
       // Only superuser and manager can create users
       if (!userRoles.includes('superuser') && !userRoles.includes('manager')) {
         return res.status(403).json({ message: "Insufficient permissions" });
       }
 
       const userData = insertUserSchema.parse(req.body);
-      
+
       if (!userData.password) {
         return res.status(400).json({ message: "Password is required" });
       }
 
       // Hash the password
       const passwordHash = await hashPassword(userData.password);
-      
+
       const newUser = await storage.createPasswordUser({
         email: userData.email,
         passwordHash,
@@ -164,7 +164,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const user = await getUserWithRoles(req);
       const userRoles = user?.roles || 'user';
-      
+
       // Only superuser and manager can update users
       if (!userRoles.includes('superuser') && !userRoles.includes('manager')) {
         return res.status(403).json({ message: "Insufficient permissions" });
@@ -172,7 +172,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const userId = req.params.id;
       const updateData = insertUserSchema.partial().parse(req.body);
-      
+
       const updates: any = {
         firstName: updateData.firstName,
         lastName: updateData.lastName,
@@ -207,14 +207,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const user = await getUserWithRoles(req);
       const userRoles = user?.roles || 'user';
       const currentUserId = user?.id;
-      
+
       // Only superuser can delete users
       if (!userRoles.includes('superuser')) {
         return res.status(403).json({ message: "Insufficient permissions" });
       }
 
       const userId = req.params.id;
-      
+
       // Prevent deleting yourself
       if (userId === currentUserId) {
         return res.status(400).json({ message: "Cannot delete your own account" });
@@ -345,7 +345,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { status, withClientInfo } = req.query;
       let equipment;
-      
+
       if (withClientInfo === 'true') {
         equipment = await storage.getEquipmentWithClientInfo();
         if (status && typeof status === 'string') {
@@ -829,10 +829,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Initialize update data
       const updateData: any = {};
-      
+
       // Step 1: Determine if we're converting installation to contract
       let willBeRecurring = false;
-      
+
       if (existingService.type === 'installation' && convertToContract) {
         // Convert to service contract
         updateData.type = 'service_contract';
@@ -847,24 +847,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
             interval: serviceInterval,
             end_date: endDate.toISOString().split('T')[0]
           };
-          
+
           willBeRecurring = true;
         }
       }
-      
+
       // Step 2: Check if service is or will be recurring
       const currentlyRecurring = existingService.recurrencePattern && 
                                  typeof existingService.recurrencePattern === 'object' && 
                                  existingService.recurrencePattern !== null &&
                                  'interval' in existingService.recurrencePattern;
-      
+
       const isRecurringService = currentlyRecurring || willBeRecurring;
-      
+
       // Step 3: Handle completion based on service type
       if (isRecurringService) {
         // For recurring services: Track completed dates, keep status as 'scheduled'
         const currentCompletedDates = (existingService.completedDates as string[]) || [];
-        
+
         // Add completion date if not already present
         if (!currentCompletedDates.includes(completionDate)) {
           updateData.completedDates = [...currentCompletedDates, completionDate];
@@ -872,10 +872,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Date already completed - ensure completedDates is set (for idempotency)
           updateData.completedDates = currentCompletedDates;
         }
-        
+
         // Always keep recurring services as 'scheduled' status
         updateData.status = 'scheduled';
-        
+
         // Don't set completedAt for recurring services
       } else {
         // For non-recurring services: Mark as completed
@@ -890,7 +890,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const currentServiceWithStock = await storage.getServiceWithStockItems(id);
         const currentEquipmentIds = (currentServiceWithStock?.equipmentItems || []).map((item: any) => item.id);
         const newEquipmentIds = equipmentItems.map(item => item.id);
-        
+
         // Equipment being removed from service (was in service, now not) - return to warehouse
         const removedEquipmentIds = currentEquipmentIds.filter((eqId: number) => !newEquipmentIds.includes(eqId));
         for (const equipmentId of removedEquipmentIds) {
@@ -900,7 +900,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             dateInstalled: null
           });
         }
-        
+
         // For installations and first-time service contracts, mark ALL equipment as in_field
         // For subsequent recurring service completions, equipment should already be in_field
         if (existingService.type === 'installation' || (existingService.type === 'service_contract' && !currentEquipmentIds.length)) {
@@ -924,7 +924,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
       }
-      
+
       // Step 5: Add equipment and consumable items if provided
       if (equipmentItems && equipmentItems.length > 0) {
         updateData.equipmentItems = equipmentItems;
@@ -988,7 +988,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Get original service's stock items (equipment and consumables)
       const originalServiceWithStock = await storage.getServiceWithStockItems(id);
-      
+
       // Determine which equipment and consumables to use for new service
       // Use new items if provided, otherwise copy from original
       const equipmentItems = newEquipmentItems || 
@@ -996,7 +996,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           id: item.id,
           quantity: item.quantity
         })) || []);
-      
+
       const consumableItems = newConsumableItems || 
         (originalServiceWithStock?.consumableItems?.map((item: any) => ({
           id: item.id,
@@ -1007,7 +1007,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const splitDateObj = new Date(splitDate);
       const endDateObj = new Date(splitDateObj);
       endDateObj.setDate(endDateObj.getDate() - 1);
-      
+
       await storage.updateService(id, {
         recurrencePattern: {
           ...recurrencePattern,
@@ -1019,7 +1019,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (newEquipmentItems) {
         const originalEquipmentIds = (originalServiceWithStock?.equipmentItems || []).map((item: any) => item.id);
         const newEquipmentIds = newEquipmentItems.map((item: any) => item.id);
-        
+
         // Equipment being removed (was in original service, not in new service) - return to warehouse
         const removedEquipmentIds = originalEquipmentIds.filter((eqId: number) => !newEquipmentIds.includes(eqId));
         for (const equipmentId of removedEquipmentIds) {
@@ -1029,7 +1029,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             dateInstalled: null
           });
         }
-        
+
         // Equipment being added (not in original service, in new service) - mark as in_field
         const addedEquipmentIds = newEquipmentIds.filter((eqId: number) => !originalEquipmentIds.includes(eqId));
         for (const equipmentId of addedEquipmentIds) {
@@ -1093,7 +1093,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete('/api/services/:id', isAuthenticated, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      
+
       // Get service with stock items before deletion
       const service = await storage.getServiceWithStockItems(id);
       if (!service) {
@@ -1602,13 +1602,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/warehouse/weekly-forecast', isAuthenticated, async (req, res) => {
+  // Get weekly stock forecast
+  app.get('/api/warehouse/weekly-forecast', async (req, res) => {
     try {
-      const forecast = await storage.getWeeklyStockForecast();
+      const startDate = req.query.startDate as string | undefined;
+      const forecast = await storage.getWeeklyStockForecast(startDate);
       res.json(forecast);
     } catch (error) {
-      console.error("Error fetching weekly forecast:", error);
-      res.status(500).json({ message: "Failed to fetch weekly forecast" });
+      console.error('Error fetching weekly forecast:', error);
+      res.status(500).json({ message: 'Failed to fetch weekly forecast' });
     }
   });
 
@@ -1616,7 +1618,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const id = parseInt(req.params.id);
       const result = await storage.returnStockItem(id);
-      
+
       await storage.createAuditLog({
         userId: req.user?.claims?.sub,
         action: 'return_stock',

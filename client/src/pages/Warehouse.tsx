@@ -1,16 +1,22 @@
+import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Package, AlertTriangle, TrendingUp, Download, RotateCcw } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { Package, AlertTriangle, TrendingUp, Download, RotateCcw, CalendarIcon } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { format } from "date-fns";
+import { cn } from "@/lib/utils";
 import Header from "@/components/Layout/Header";
 
 export default function Warehouse() {
   const { toast } = useToast();
+  const [forecastStartDate, setForecastStartDate] = useState<Date>(new Date());
 
   // Fetch equipment inventory summary with stock calculations
   const { data: equipmentInventory, isLoading: isLoadingEquipmentInventory } = useQuery<{
@@ -41,9 +47,14 @@ export default function Warehouse() {
     queryKey: ['/api/warehouse/consumables'],
   });
 
-  // Fetch weekly forecast
+  // Fetch weekly forecast with selected start date
   const { data: weeklyForecast, isLoading: isLoadingForecast } = useQuery<any[]>({
-    queryKey: ['/api/warehouse/weekly-forecast'],
+    queryKey: ['/api/warehouse/weekly-forecast', forecastStartDate.toISOString().split('T')[0]],
+    queryFn: async () => {
+      const response = await fetch(`/api/warehouse/weekly-forecast?startDate=${forecastStartDate.toISOString().split('T')[0]}`);
+      if (!response.ok) throw new Error('Failed to fetch forecast');
+      return response.json();
+    },
   });
 
   // Return stock mutation
@@ -280,8 +291,34 @@ export default function Warehouse() {
         <TabsContent value="forecast" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>4-Week Stock Forecast</CardTitle>
-              <CardDescription>Consumables required for upcoming scheduled services</CardDescription>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>4-Week Stock Forecast</CardTitle>
+                  <CardDescription>Consumables required for upcoming scheduled services</CardDescription>
+                </div>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-[240px] justify-start text-left font-normal",
+                        !forecastStartDate && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {forecastStartDate ? format(forecastStartDate, "PPP") : <span>Pick a date</span>}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="end">
+                    <Calendar
+                      mode="single"
+                      selected={forecastStartDate}
+                      onSelect={(date) => date && setForecastStartDate(date)}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
             </CardHeader>
             <CardContent className="space-y-6">
               {isLoadingForecast ? (
