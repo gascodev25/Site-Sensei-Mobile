@@ -120,13 +120,13 @@ export default function ServiceCalendar({ services, onServiceClick, onServiceMov
     filteredServices.forEach(service => {
       // For calendar view, we need to show recurring instances within a reasonable range
       const viewStart = view === 'month' 
-        ? startOfMonth(startOfWeek(startOfMonth(currentDate), { weekStartsOn: 1 }))
+        ? startOfWeek(startOfMonth(currentDate), { weekStartsOn: 1 })
         : view === 'week' 
         ? startOfWeek(currentDate, { weekStartsOn: 1 })
         : currentDate;
 
       const viewEnd = view === 'month' 
-        ? endOfMonth(endOfWeek(endOfMonth(currentDate), { weekStartsOn: 1 }))
+        ? endOfWeek(endOfMonth(currentDate), { weekStartsOn: 1 })
         : view === 'week' 
         ? endOfWeek(currentDate, { weekStartsOn: 1 })
         : currentDate;

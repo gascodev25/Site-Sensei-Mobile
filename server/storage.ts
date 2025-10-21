@@ -45,7 +45,7 @@ export interface IStorage {
   createPasswordUser(userData: { email: string; passwordHash: string; firstName: string; lastName: string; roles: string }): Promise<User>;
   updateUser(id: string, userData: Partial<{ firstName: string; lastName: string; roles: string; passwordHash: string }>): Promise<User>;
   deleteUser(id: string): Promise<void>;
-  
+
   // Client operations
   getClients(): Promise<Client[]>;
   getClient(id: number): Promise<Client | undefined>;
@@ -53,7 +53,7 @@ export interface IStorage {
   updateClient(id: number, client: Partial<InsertClient>): Promise<Client>;
   deleteClient(id: number): Promise<void>;
   searchClients(query: string): Promise<Client[]>;
-  
+
   // Service operations
   getServices(): Promise<ServiceWithDetails[]>;
   getService(id: number): Promise<Service | undefined>;
@@ -61,7 +61,7 @@ export interface IStorage {
   updateService(id: number, service: Partial<InsertService>): Promise<Service>;
   deleteService(id: number): Promise<void>;
   searchServices(query: string): Promise<ServiceWithDetails[]>;
-  
+
   // Equipment operations
   getEquipment(): Promise<Equipment[]>;
   getEquipmentByStatus(status: string): Promise<Equipment[]>;
@@ -79,14 +79,14 @@ export interface IStorage {
   createEquipmentTemplate(template: InsertEquipmentTemplate, consumableIds: number[]): Promise<EquipmentTemplate>;
   updateEquipmentTemplate(id: number, template: Partial<InsertEquipmentTemplate>, consumableIds: number[]): Promise<EquipmentTemplate>;
   deleteEquipmentTemplate(id: number): Promise<void>;
-  
+
   // Consumables operations
   getConsumables(): Promise<Consumable[]>;
   getLowStockConsumables(): Promise<Consumable[]>;
   createConsumable(consumable: InsertConsumable): Promise<Consumable>;
   updateConsumable(id: number, consumable: Partial<InsertConsumable>): Promise<Consumable>;
   deleteConsumable(id: number): Promise<void>;
-  
+
   // Services operations
   getServices(): Promise<Service[]>;
   getServicesForDate(date: Date): Promise<Service[]>;
@@ -95,7 +95,7 @@ export interface IStorage {
   createService(service: InsertService): Promise<Service>;
   updateService(id: number, service: Partial<InsertService>): Promise<Service>;
   deleteService(id: number): Promise<void>;
-  
+
   // Team operations
   getTeamMembers(): Promise<TeamMember[]>;
   getServiceTeams(): Promise<ServiceTeam[]>;
@@ -107,7 +107,7 @@ export interface IStorage {
   deleteServiceTeam(id: number): Promise<void>;
   getTeamAssignments(): Promise<{ teamId: number; memberId: number; }[]>;
   updateTeamAssignments(teamId: number, memberIds: number[]): Promise<void>;
-  
+
   // Dashboard metrics
   getDashboardMetrics(): Promise<{
     servicesToday: number;
@@ -119,11 +119,11 @@ export interface IStorage {
     completionRate: number;
     monthlyRevenue: number;
   }>;
-  
+
   // Service stock assignment methods
   createServiceStockAssignment(assignment: any): Promise<any>;
   getServiceStockAssignments(serviceId: number): Promise<any[]>;
-  
+
   // Audit logging
   createAuditLog(entry: Omit<AuditLogEntry, 'id' | 'timestamp'>): Promise<void>;
 
@@ -261,7 +261,7 @@ export class DatabaseStorage implements IStorage {
       .leftJoin(clients, eq(services.clientId, clients.id))
       .leftJoin(serviceTeams, eq(services.teamId, serviceTeams.id))
       .orderBy(desc(services.installationDate));
-    
+
     return results.map(row => ({
       ...row.service,
       client: row.client,
@@ -276,9 +276,9 @@ export class DatabaseStorage implements IStorage {
 
   async createService(service: InsertService): Promise<Service> {
     const { equipmentItems, consumableItems, ...serviceData } = service;
-    
+
     const [newService] = await db.insert(services).values(serviceData).returning();
-    
+
     // Create service stock associations
     if (equipmentItems && equipmentItems.length > 0) {
       const equipmentStockData = equipmentItems.map(item => ({
@@ -289,7 +289,7 @@ export class DatabaseStorage implements IStorage {
       }));
       await db.insert(serviceStockIssued).values(equipmentStockData);
     }
-    
+
     if (consumableItems && consumableItems.length > 0) {
       const consumableStockData = consumableItems.map(item => ({
         serviceId: newService.id,
@@ -299,7 +299,7 @@ export class DatabaseStorage implements IStorage {
       }));
       await db.insert(serviceStockIssued).values(consumableStockData);
     }
-    
+
     return newService;
   }
 
@@ -315,7 +315,7 @@ export class DatabaseStorage implements IStorage {
   async deleteService(id: number): Promise<void> {
     // First delete related stock issued records
     await db.delete(serviceStockIssued).where(eq(serviceStockIssued.serviceId, id));
-    
+
     // Then delete the service
     await db.delete(services).where(eq(services.id, id));
   }
@@ -338,7 +338,7 @@ export class DatabaseStorage implements IStorage {
         )
       )
       .orderBy(desc(services.installationDate));
-    
+
     return results.map(row => ({
       ...row.service,
       client: row.client,
@@ -359,7 +359,7 @@ export class DatabaseStorage implements IStorage {
     startOfDay.setHours(0, 0, 0, 0);
     const endOfDay = new Date(date);
     endOfDay.setHours(23, 59, 59, 999);
-    
+
     return await db
       .select()
       .from(services)
@@ -460,7 +460,7 @@ export class DatabaseStorage implements IStorage {
 
   async createEquipmentWithConsumables(equipmentData: InsertEquipment, consumableIds: number[]): Promise<Equipment> {
     const [newEquipment] = await db.insert(equipment).values(equipmentData).returning();
-    
+
     if (consumableIds.length > 0) {
       const equipmentConsumableData = consumableIds.map(consumableId => ({
         equipmentId: newEquipment.id,
@@ -468,14 +468,14 @@ export class DatabaseStorage implements IStorage {
       }));
       await db.insert(equipmentConsumables).values(equipmentConsumableData);
     }
-    
+
     return newEquipment;
   }
 
   async updateEquipmentConsumables(equipmentId: number, consumableIds: number[]): Promise<void> {
     // Delete existing relationships
     await db.delete(equipmentConsumables).where(eq(equipmentConsumables.equipmentId, equipmentId));
-    
+
     // Insert new relationships
     if (consumableIds.length > 0) {
       const equipmentConsumableData = consumableIds.map(consumableId => ({
@@ -515,7 +515,7 @@ export class DatabaseStorage implements IStorage {
 
   async createEquipmentTemplate(templateData: InsertEquipmentTemplate, consumableIds: number[]): Promise<EquipmentTemplate> {
     const [newTemplate] = await db.insert(equipmentTemplates).values(templateData).returning();
-    
+
     if (consumableIds.length > 0) {
       const templateConsumableData = consumableIds.map(consumableId => ({
         templateId: newTemplate.id,
@@ -524,7 +524,7 @@ export class DatabaseStorage implements IStorage {
       }));
       await db.insert(templateConsumables).values(templateConsumableData);
     }
-    
+
     return newTemplate;
   }
 
@@ -534,10 +534,10 @@ export class DatabaseStorage implements IStorage {
       .set(templateData)
       .where(eq(equipmentTemplates.id, id))
       .returning();
-    
+
     // Delete existing template-consumable associations
     await db.delete(templateConsumables).where(eq(templateConsumables.templateId, id));
-    
+
     // Create new associations if consumableIds provided
     if (consumableIds.length > 0) {
       const templateConsumableData = consumableIds.map(consumableId => ({
@@ -547,7 +547,7 @@ export class DatabaseStorage implements IStorage {
       }));
       await db.insert(templateConsumables).values(templateConsumableData);
     }
-    
+
     return updatedTemplate;
   }
 
@@ -642,7 +642,7 @@ export class DatabaseStorage implements IStorage {
   async updateTeamAssignments(teamId: number, memberIds: number[]): Promise<void> {
     // Remove existing assignments for this team
     await db.delete(teamAssignments).where(eq(teamAssignments.teamId, teamId));
-    
+
     // Add new assignments
     if (memberIds.length > 0) {
       const assignments = memberIds.map(memberId => ({
@@ -746,7 +746,7 @@ export class DatabaseStorage implements IStorage {
       .map(item => item.equipment.templateId)
       .filter(templateId => templateId !== null);
     let templateConsumablesList: any[] = [];
-    
+
     if (templateIds.length > 0) {
       // Get consumables linked to those templates
       templateConsumablesList = await db
@@ -761,13 +761,13 @@ export class DatabaseStorage implements IStorage {
 
     // Combine directly assigned consumables with template consumables
     const allConsumables = [...consumableAssignments];
-    
+
     // Add template consumables that aren't already directly assigned
     templateConsumablesList.forEach(templateItem => {
       const alreadyAssigned = consumableAssignments.some(
         assigned => assigned.consumable.id === templateItem.consumable.id
       );
-      
+
       if (!alreadyAssigned) {
         allConsumables.push({
           stockItem: { 
@@ -811,7 +811,7 @@ export class DatabaseStorage implements IStorage {
       })
       .from(equipment)
       .groupBy(equipment.status);
-    
+
     return result.map(r => ({
       status: r.status || 'unknown',
       count: r.count
@@ -847,7 +847,7 @@ export class DatabaseStorage implements IStorage {
 
     for (const item of allEquipment) {
       const key = item.stockCode;
-      
+
       if (!inventoryMap.has(key)) {
         inventoryMap.set(key, {
           id: item.id,
@@ -862,11 +862,11 @@ export class DatabaseStorage implements IStorage {
       }
 
       const entry = inventoryMap.get(key)!;
-      
+
       // Sum up total stock levels from all records with this stockCode
       entry.currentStock += (item.currentStock || 0);
       entry.minStockLevel += (item.minStockLevel || 0);
-      
+
       // Count units by status
       if (item.status === 'in_field') {
         entry.inFieldCount++;
@@ -940,7 +940,7 @@ export class DatabaseStorage implements IStorage {
         const weekEnd = new Date(weekStart);
         weekEnd.setDate(weekStart.getDate() + 6);
         weekEnd.setHours(23, 59, 59, 999);
-        
+
         weeks.push({
           week: `Week ${weekOffset + 1}`,
           weekStart: weekStart.toISOString().split('T')[0],
@@ -1030,7 +1030,7 @@ export class DatabaseStorage implements IStorage {
       const weekStart = new Date(now);
       weekStart.setDate(now.getDate() + (weekOffset * 7));
       weekStart.setHours(0, 0, 0, 0);
-      
+
       const weekEnd = new Date(weekStart);
       weekEnd.setDate(weekStart.getDate() + 6);
       weekEnd.setHours(23, 59, 59, 999);
@@ -1038,58 +1038,58 @@ export class DatabaseStorage implements IStorage {
       // Filter services for this week from pre-fetched data
       const weekServices = allServices.filter(s => {
         const serviceDate = new Date(s.installationDate!);
-        
+
         // For recurring services, we need to check if they have occurrences in this week
         const isRecurring = s.recurrencePattern && 
                            typeof s.recurrencePattern === 'object' && 
                            s.recurrencePattern !== null &&
                            'interval' in s.recurrencePattern;
-        
+
         if (isRecurring) {
           // Parse the interval (e.g., "7d" -> 7 days)
           const pattern = s.recurrencePattern as { interval: string; end_date?: string };
           const intervalMatch = pattern.interval.match(/^(\d+)d$/);
           if (!intervalMatch) return false;
-          
+
           const intervalDays = parseInt(intervalMatch[1], 10);
-          
+
           // Check if end_date has passed
           if (pattern.end_date) {
             const endDate = new Date(pattern.end_date);
             if (weekStart > endDate) return false;
           }
-          
+
           // Generate occurrences in this week
           const completedDatesSet = new Set((s.completedDates as string[]) || []);
           let hasNonCompletedOccurrence = false;
-          
+
           // Start from the service's installation date and step by interval
           let currentDate = new Date(serviceDate);
           const maxIterations = 1000; // Safety limit
           let iterations = 0;
-          
+
           while (currentDate <= weekEnd && iterations < maxIterations) {
             iterations++;
-            
+
             // If this occurrence falls within the week
             if (currentDate >= weekStart && currentDate <= weekEnd) {
               const dateStr = currentDate.toISOString().split('T')[0];
-              
+
               // Check if this specific date is not completed
               if (!completedDatesSet.has(dateStr)) {
                 hasNonCompletedOccurrence = true;
                 break;
               }
             }
-            
+
             // Move to next occurrence
             currentDate = new Date(currentDate);
             currentDate.setDate(currentDate.getDate() + intervalDays);
           }
-          
+
           return hasNonCompletedOccurrence;
         }
-        
+
         // For non-recurring services, simple date check
         return serviceDate >= weekStart && serviceDate <= weekEnd;
       });
@@ -1213,9 +1213,9 @@ export class DatabaseStorage implements IStorage {
       for (let dayOffset = 0; dayOffset < 28; dayOffset++) {
         const dayDate = new Date(now);
         dayDate.setDate(now.getDate() + dayOffset);
-        
+
         const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-        
+
         days.push({
           date: dayDate.toISOString().split('T')[0],
           dayOfWeek: dayNames[dayDate.getDay()],
@@ -1302,43 +1302,43 @@ export class DatabaseStorage implements IStorage {
 
     // South African timezone offset (SAST = UTC+2)
     const SAST_OFFSET_HOURS = 2;
-    
+
     // Generate 28 days of forecasts
     for (let dayOffset = 0; dayOffset < 28; dayOffset++) {
       const dayDate = new Date(now);
       dayDate.setDate(now.getDate() + dayOffset);
       dayDate.setHours(0, 0, 0, 0);
-      
+
       const dayEnd = new Date(dayDate);
       dayEnd.setHours(23, 59, 59, 999);
 
       // Filter services for this specific day
       const dayServices = allServices.filter(s => {
         const serviceDate = new Date(s.installationDate!);
-        
+
         const isRecurring = s.recurrencePattern && 
                            typeof s.recurrencePattern === 'object' && 
                            s.recurrencePattern !== null &&
                            'interval' in s.recurrencePattern;
-        
+
         if (isRecurring) {
           const pattern = s.recurrencePattern as { interval: string; end_date?: string };
           const intervalMatch = pattern.interval.match(/^(\d+)d$/);
           if (!intervalMatch) return false;
-          
+
           const intervalDays = parseInt(intervalMatch[1], 10);
-          
+
           // Check if end_date has passed
           if (pattern.end_date) {
             const endDate = new Date(pattern.end_date);
             if (dayDate > endDate) return false;
           }
-          
+
           // Determine the correct recurrence anchor
           // Use the earliest completed date if available, otherwise use installation_date
           const completedDatesArray = (s.completedDates as string[]) || [];
           let anchorDate: Date;
-          
+
           if (completedDatesArray.length > 0) {
             // Use earliest completed date as anchor (this is the true schedule base)
             const sortedCompleted = completedDatesArray.sort();
@@ -1348,36 +1348,36 @@ export class DatabaseStorage implements IStorage {
             const serviceDateSAST = new Date(serviceDate.getTime() + (SAST_OFFSET_HOURS * 60 * 60 * 1000));
             anchorDate = new Date(serviceDateSAST.toISOString().split('T')[0]);
           }
-          
+
           anchorDate.setHours(0, 0, 0, 0);
-          
+
           // Check if service occurs on this specific day
           const completedDatesSet = new Set(completedDatesArray);
-          
+
           // Calculate if dayDate is a valid occurrence from the anchor
           const daysSinceAnchor = Math.floor((dayDate.getTime() - anchorDate.getTime()) / (1000 * 60 * 60 * 24));
-          
+
           if (daysSinceAnchor < 0) {
             // Day is before the anchor, so no occurrence
             return false;
           }
-          
+
           // Check if this day falls on a recurrence interval
           if (daysSinceAnchor % intervalDays === 0) {
             const dateStr = dayDate.toISOString().split('T')[0];
             // Only include if not already completed
             return !completedDatesSet.has(dateStr);
           }
-          
+
           return false;
         }
-        
+
         // For non-recurring services, check if service date falls on this specific day
         // Convert UTC time to SAST (UTC+2) to get the correct local date
         const serviceDateSAST = new Date(serviceDate.getTime() + (SAST_OFFSET_HOURS * 60 * 60 * 1000));
         const serviceLocalDate = serviceDateSAST.toISOString().split('T')[0];
         const dayLocalDate = dayDate.toISOString().split('T')[0];
-        
+
         return serviceLocalDate === dayLocalDate;
       });
 
@@ -1449,7 +1449,7 @@ export class DatabaseStorage implements IStorage {
       })
       .where(eq(serviceStockIssued.id, id))
       .returning();
-    
+
     return updated;
   }
 }

@@ -124,11 +124,11 @@ export default function Warehouse() {
   // Export functions
   const exportToCSV = (data: any[], filename: string) => {
     if (!data || data.length === 0) return;
-    
+
     const headers = Object.keys(data[0]).join(',');
     const rows = data.map(item => Object.values(item).join(','));
     const csv = [headers, ...rows].join('\n');
-    
+
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -398,7 +398,7 @@ export default function Warehouse() {
                           {week.consumables.length} items needed
                         </Badge>
                       </div>
-                      
+
                       {week.consumables.length > 0 ? (
                         <Table>
                           <TableHeader>
@@ -448,7 +448,7 @@ export default function Warehouse() {
                           {day.consumables.length} items needed
                         </Badge>
                       </div>
-                      
+
                       {day.consumables.length > 0 ? (
                         <Table>
                           <TableHeader>
