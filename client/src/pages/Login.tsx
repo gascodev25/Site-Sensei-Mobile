@@ -23,7 +23,9 @@ export default function Login() {
         password,
       });
 
-      if (response.success) {
+      const data = await response.json();
+
+      if (data.success) {
         toast({
           title: "Login successful",
           description: "Redirecting to dashboard...",
