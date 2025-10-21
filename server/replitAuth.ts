@@ -148,24 +148,35 @@ export async function setupAuth(app: Express) {
   app.post("/api/login/local", (req, res, next) => {
     passport.authenticate("local", (err: any, user: User | false, info: any) => {
       if (err) {
+        console.error("Authentication error:", err);
         return res.status(500).json({ message: "Internal server error" });
       }
       if (!user) {
+        console.log("Authentication failed:", info?.message);
         return res.status(401).json({ message: info?.message || "Invalid credentials" });
       }
       req.login(user, (err) => {
         if (err) {
+          console.error("Login session error:", err);
           return res.status(500).json({ message: "Login failed" });
         }
-        return res.json({ 
-          success: true, 
-          user: {
-            id: user.id,
-            email: user.email,
-            firstName: user.firstName,
-            lastName: user.lastName,
-            roles: user.roles,
+        console.log("Login successful for user:", user.email);
+        // Make sure session is saved before responding
+        req.session.save((err) => {
+          if (err) {
+            console.error("Session save error:", err);
+            return res.status(500).json({ message: "Session error" });
           }
+          return res.json({ 
+            success: true, 
+            user: {
+              id: user.id,
+              email: user.email,
+              firstName: user.firstName,
+              lastName: user.lastName,
+              roles: user.roles,
+            }
+          });
         });
       });
     })(req, res, next);

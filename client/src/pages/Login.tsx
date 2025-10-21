@@ -28,8 +28,10 @@ export default function Login() {
           title: "Login successful",
           description: "Redirecting to dashboard...",
         });
-        // Reload to trigger auth check
-        window.location.href = "/";
+        // Force a full page reload to establish session
+        setTimeout(() => {
+          window.location.replace("/");
+        }, 500);
       }
     } catch (error: any) {
       toast({
