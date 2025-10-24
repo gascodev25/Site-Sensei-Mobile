@@ -1315,6 +1315,9 @@ export class DatabaseStorage implements IStorage {
     // South African timezone offset (SAST = UTC+2)
     const SAST_OFFSET_HOURS = 2;
 
+    // Day names array for formatting
+    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
     // Generate 28 days of forecasts
     for (let dayOffset = 0; dayOffset < 28; dayOffset++) {
       const dayDate = new Date(now);
