@@ -788,7 +788,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const hasRole = (role: string) => user.roles?.split(",").includes(role);
-      const canMarkComplete = hasRole("ops_manager") || hasRole("team_member");
+      const canMarkComplete = hasRole("superuser") || hasRole("ops_manager") || hasRole("team_member");
 
       if (!canMarkComplete) {
         return res.status(403).json({ 
