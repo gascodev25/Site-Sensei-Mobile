@@ -782,7 +782,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Permission check: Only ops_manager or team_member can mark services as complete
-      const user = await storage.getUser(req.user?.claims?.sub);
+      const user = await getUserWithRoles(req);
       if (!user || !user.roles) {
         return res.status(403).json({ message: "User not found or no roles assigned" });
       }
@@ -955,7 +955,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Audit log
       await storage.createAuditLog({
-        userId: req.user?.claims?.sub,
+        userId: user.id,
         action: 'complete',
         entityType: 'service',
         entityId: service.id,
