@@ -667,20 +667,9 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  // Helper to format date as YYYY-MM-DD in local timezone
-  private formatLocalDate(date: Date): string {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  }
-
   // Helper to calculate missed recurring service occurrences
   private calculateMissedOccurrences(service: any, now: Date): number {
     const installDate = new Date(service.installationDate);
-    // Normalize to local midnight
-    installDate.setHours(0, 0, 0, 0);
-    
     const recurrencePattern = service.recurrencePattern as { interval?: string; end_date?: string } | null;
     const completedDates = (service.completedDates || []) as string[];
     const excludedDates = (service.excludedDates || []) as string[];
@@ -701,17 +690,13 @@ export class DatabaseStorage implements IStorage {
     }
     
     const intervalDays = parseInt(intervalMatch[1], 10);
-    const endDate = recurrencePattern.end_date ? new Date(recurrencePattern.end_date + 'T23:59:59') : null;
+    const endDate = recurrencePattern.end_date ? new Date(recurrencePattern.end_date) : null;
     
     // Generate all occurrences up to now
     let missedCount = 0;
     let currentDate = new Date(installDate);
     
-    // Normalize now to end of today for comparison
-    const todayEnd = new Date(now);
-    todayEnd.setHours(23, 59, 59, 999);
-    
-    // Set to track completed dates for quick lookup (normalize to YYYY-MM-DD)
+    // Set to track completed dates for quick lookup
     const completedSet = new Set(completedDates.map(d => d.substring(0, 10)));
     const excludedSet = new Set(excludedDates.map(d => d.substring(0, 10)));
     
@@ -721,16 +706,15 @@ export class DatabaseStorage implements IStorage {
         break;
       }
       
-      // Use local date format for comparison
-      const dateStr = this.formatLocalDate(currentDate);
+      const dateStr = currentDate.toISOString().substring(0, 10);
       
       // Count as missed if not completed and not excluded
       if (!completedSet.has(dateStr) && !excludedSet.has(dateStr)) {
         missedCount++;
       }
       
-      // Move to next occurrence (add days using date methods to avoid DST issues)
-      currentDate.setDate(currentDate.getDate() + intervalDays);
+      // Move to next occurrence
+      currentDate = new Date(currentDate.getTime() + intervalDays * 24 * 60 * 60 * 1000);
     }
     
     return missedCount;

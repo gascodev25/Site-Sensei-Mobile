@@ -261,14 +261,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const servicesList = await storage.getServices();
       const now = new Date();
       
-      // Helper to format date as YYYY-MM-DD in local timezone
-      const formatLocalDate = (date: Date): string => {
-        const year = date.getFullYear();
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const day = String(date.getDate()).padStart(2, '0');
-        return `${year}-${month}-${day}`;
-      };
-      
       // Get services that could have missed occurrences
       const eligibleServices = servicesList.filter(s => 
         s.status !== 'completed' && s.installationDate && new Date(s.installationDate) <= now
@@ -279,28 +271,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       for (const service of eligibleServices) {
         const installDate = new Date(service.installationDate!);
-        // Normalize to local midnight
-        installDate.setHours(0, 0, 0, 0);
-        
         const recurrencePattern = service.recurrencePattern as { interval?: string; end_date?: string } | null;
         const completedDates = (service.completedDates || []) as string[];
         const excludedDates = (service.excludedDates || []) as string[];
         
         // For non-recurring services
         if (!recurrencePattern || !recurrencePattern.interval) {
-          missedOccurrences.push({ service, missedDate: formatLocalDate(installDate) });
+          missedOccurrences.push({ service, missedDate: installDate.toISOString().substring(0, 10) });
           continue;
         }
         
         // Parse interval
         const intervalMatch = recurrencePattern.interval.match(/^(\d+)d$/);
         if (!intervalMatch) {
-          missedOccurrences.push({ service, missedDate: formatLocalDate(installDate) });
+          missedOccurrences.push({ service, missedDate: installDate.toISOString().substring(0, 10) });
           continue;
         }
         
         const intervalDays = parseInt(intervalMatch[1], 10);
-        const endDate = recurrencePattern.end_date ? new Date(recurrencePattern.end_date + 'T23:59:59') : null;
+        const endDate = recurrencePattern.end_date ? new Date(recurrencePattern.end_date) : null;
         
         const completedSet = new Set(completedDates.map(d => d.substring(0, 10)));
         const excludedSet = new Set(excludedDates.map(d => d.substring(0, 10)));
@@ -310,14 +299,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         while (currentDate <= now) {
           if (endDate && currentDate > endDate) break;
           
-          const dateStr = formatLocalDate(currentDate);
+          const dateStr = currentDate.toISOString().substring(0, 10);
           
           if (!completedSet.has(dateStr) && !excludedSet.has(dateStr)) {
             missedOccurrences.push({ service, missedDate: dateStr });
           }
           
-          // Move to next occurrence (add days using date methods to avoid DST issues)
-          currentDate.setDate(currentDate.getDate() + intervalDays);
+          currentDate = new Date(currentDate.getTime() + intervalDays * 24 * 60 * 60 * 1000);
         }
       }
       
