@@ -88,7 +88,9 @@ export default function RecentServices() {
     return type || "Service";
   };
 
-  const recentServices = services.slice(0, 5);
+  const recentServices = services
+    .filter(service => service.status === "completed")
+    .slice(0, 5);
 
   return (
     <Card data-testid="card-recent-services">
