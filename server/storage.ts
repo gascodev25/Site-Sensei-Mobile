@@ -667,6 +667,13 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
+  // Helper to convert UTC date to SAST date string (YYYY-MM-DD)
+  private toSASTDateString(date: Date): string {
+    // SAST is UTC+2, so add 2 hours to get the correct local date
+    const sastDate = new Date(date.getTime() + 2 * 60 * 60 * 1000);
+    return sastDate.toISOString().substring(0, 10);
+  }
+
   // Helper to calculate missed recurring service occurrences
   private calculateMissedOccurrences(service: any, now: Date): number {
     const installDate = new Date(service.installationDate);
@@ -706,7 +713,8 @@ export class DatabaseStorage implements IStorage {
         break;
       }
       
-      const dateStr = currentDate.toISOString().substring(0, 10);
+      // Convert to SAST date string for comparison with completed/excluded dates
+      const dateStr = this.toSASTDateString(currentDate);
       
       // Count as missed if not completed and not excluded
       if (!completedSet.has(dateStr) && !excludedSet.has(dateStr)) {

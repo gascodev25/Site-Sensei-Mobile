@@ -261,6 +261,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const servicesList = await storage.getServices();
       const now = new Date();
       
+      // Helper to convert UTC date to SAST date string (YYYY-MM-DD)
+      const toSASTDateString = (date: Date): string => {
+        // SAST is UTC+2, so add 2 hours to get the correct local date
+        const sastDate = new Date(date.getTime() + 2 * 60 * 60 * 1000);
+        return sastDate.toISOString().substring(0, 10);
+      };
+      
       // Get services that could have missed occurrences
       const eligibleServices = servicesList.filter(s => 
         s.status !== 'completed' && s.installationDate && new Date(s.installationDate) <= now
@@ -277,14 +284,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // For non-recurring services
         if (!recurrencePattern || !recurrencePattern.interval) {
-          missedOccurrences.push({ service, missedDate: installDate.toISOString().substring(0, 10) });
+          missedOccurrences.push({ service, missedDate: toSASTDateString(installDate) });
           continue;
         }
         
         // Parse interval
         const intervalMatch = recurrencePattern.interval.match(/^(\d+)d$/);
         if (!intervalMatch) {
-          missedOccurrences.push({ service, missedDate: installDate.toISOString().substring(0, 10) });
+          missedOccurrences.push({ service, missedDate: toSASTDateString(installDate) });
           continue;
         }
         
@@ -299,7 +306,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         while (currentDate <= now) {
           if (endDate && currentDate > endDate) break;
           
-          const dateStr = currentDate.toISOString().substring(0, 10);
+          // Convert to SAST date string for comparison
+          const dateStr = toSASTDateString(currentDate);
           
           if (!completedSet.has(dateStr) && !excludedSet.has(dateStr)) {
             missedOccurrences.push({ service, missedDate: dateStr });
