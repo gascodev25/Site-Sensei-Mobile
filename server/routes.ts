@@ -259,11 +259,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/dashboard/missed-services', isAuthenticated, async (req, res) => {
     try {
       const servicesList = await storage.getServices();
-      const today = new Date();
+      const now = new Date();
       
       const missed = servicesList.filter(s => 
         s.status === 'missed' || 
-        (s.status === 'scheduled' && s.installationDate && new Date(s.installationDate) <= today)
+        (s.status === 'scheduled' && s.installationDate && new Date(s.installationDate) < now)
       );
       
       res.json(missed);

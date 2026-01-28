@@ -50,7 +50,7 @@ export default function Dashboard() {
 
   const { data: missedServices } = useQuery<any[]>({
     queryKey: ["/api/dashboard/missed-services"],
-    enabled: activeModal === "missed-services",
+    enabled: activeModal === "missed-services" && isAuthenticated,
   });
 
   const { data: lowStock } = useQuery<any[]>({

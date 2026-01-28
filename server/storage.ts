@@ -669,10 +669,10 @@ export class DatabaseStorage implements IStorage {
 
   // Dashboard metrics
   async getDashboardMetrics() {
-    const today = new Date();
-    const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-    const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
-    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const tomorrowStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
     const [
       servicesTodayResult,
@@ -685,15 +685,15 @@ export class DatabaseStorage implements IStorage {
     ] = await Promise.all([
       db.select({ count: sql<number>`count(*)` }).from(services)
         .where(and(
-          gte(services.installationDate, startOfDay),
-          lt(services.installationDate, endOfDay)
+          gte(services.installationDate, todayStart),
+          lt(services.installationDate, tomorrowStart)
         )),
       db.select({ count: sql<number>`count(*)` }).from(services)
         .where(or(
           eq(services.status, "missed"),
           and(
             eq(services.status, "scheduled"),
-            lte(services.installationDate, today)
+            lt(services.installationDate, now)
           )
         )),
       db.select({ count: sql<number>`count(*)` }).from(consumables)
