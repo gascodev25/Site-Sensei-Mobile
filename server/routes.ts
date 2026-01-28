@@ -263,7 +263,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const missed = servicesList.filter(s => 
         s.status === 'missed' || 
-        (s.status === 'scheduled' && s.installationDate && new Date(s.installationDate) < now)
+        (s.status === 'scheduled' && s.installationDate && new Date(s.installationDate) <= now)
       );
       
       res.json(missed);
