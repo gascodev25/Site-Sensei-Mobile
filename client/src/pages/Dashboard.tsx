@@ -167,7 +167,7 @@ export default function Dashboard() {
         </div>
 
         <Dialog open={activeModal !== null} onOpenChange={() => setActiveModal(null)}>
-          <DialogContent className="max-w-3xl">
+          <DialogContent className="max-w-3xl max-h-[80vh] flex flex-col">
             <DialogHeader>
               <DialogTitle>
                 {activeModal === "services-today" && "Services Today"}
@@ -176,7 +176,7 @@ export default function Dashboard() {
                 {activeModal === "expiring-contracts" && "Expiring Contracts"}
               </DialogTitle>
             </DialogHeader>
-            <div className="mt-4 overflow-x-auto">
+            <div className="mt-4 overflow-x-auto overflow-y-auto flex-1">
               {activeModal === "services-today" && (
                 <Table>
                   <TableHeader>
