@@ -34,7 +34,7 @@ import {
   type EquipmentWithConsumables,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, or, sql, desc, asc, ilike, lt, gte, lte, inArray, isNull, isNotNull } from "drizzle-orm";
+import { eq, and, or, sql, desc, asc, ilike, lt, gte, lte, inArray, isNull, isNotNull, ne } from "drizzle-orm";
 
 export interface IStorage {
   // User operations (required for Replit Auth)
