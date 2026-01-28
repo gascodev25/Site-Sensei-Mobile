@@ -3,76 +3,65 @@ import { Button } from "@/components/ui/button";
 import { Repeat, Wrench, Loader2 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import type { ServiceWithDetails } from "@shared/schema";
-import { format, isToday, isTomorrow, isYesterday } from "date-fns";
+import { format, isToday, isTomorrow, isYesterday, parseISO } from "date-fns";
+import { useMemo } from "react";
+
+interface CompletedServiceOccurrence {
+  service: ServiceWithDetails;
+  completedDate: Date;
+}
 
 export default function RecentServices() {
   const { data: services = [], isLoading } = useQuery<ServiceWithDetails[]>({
     queryKey: ["/api/services"],
   });
 
-  const formatServiceDate = (date: Date | string | null): string => {
-    if (!date) return "No date";
-    const dateObj = typeof date === "string" ? new Date(date) : date;
-    
-    if (isToday(dateObj)) {
-      return `Today, ${format(dateObj, "h:mm a")}`;
+  const completedOccurrences = useMemo(() => {
+    const occurrences: CompletedServiceOccurrence[] = [];
+
+    services.forEach(service => {
+      if (service.completedDates && Array.isArray(service.completedDates)) {
+        service.completedDates.forEach((dateStr: string) => {
+          occurrences.push({
+            service,
+            completedDate: parseISO(dateStr),
+          });
+        });
+      }
+      
+      if (service.status === "completed" && service.installationDate) {
+        const alreadyIncluded = service.completedDates?.includes(
+          format(new Date(service.installationDate), 'yyyy-MM-dd')
+        );
+        if (!alreadyIncluded) {
+          occurrences.push({
+            service,
+            completedDate: new Date(service.installationDate),
+          });
+        }
+      }
+    });
+
+    return occurrences
+      .sort((a, b) => b.completedDate.getTime() - a.completedDate.getTime())
+      .slice(0, 5);
+  }, [services]);
+
+  const formatServiceDate = (date: Date): string => {
+    if (isToday(date)) {
+      return `Today, ${format(date, "h:mm a")}`;
     }
-    if (isTomorrow(dateObj)) {
-      return `Tomorrow, ${format(dateObj, "h:mm a")}`;
+    if (isTomorrow(date)) {
+      return `Tomorrow, ${format(date, "h:mm a")}`;
     }
-    if (isYesterday(dateObj)) {
-      return `Yesterday, ${format(dateObj, "h:mm a")}`;
+    if (isYesterday(date)) {
+      return `Yesterday, ${format(date, "h:mm a")}`;
     }
-    return format(dateObj, "MMM d, h:mm a");
+    return format(date, "MMM d, yyyy");
   };
 
-  const getStatusColor = (status: string | null) => {
-    switch (status) {
-      case "completed":
-        return "status-completed";
-      case "scheduled":
-        return "status-scheduled";
-      case "missed":
-        return "status-missed";
-      default:
-        return "status-scheduled";
-    }
-  };
-
-  const getActionButton = (status: string | null, serviceId: number) => {
-    switch (status) {
-      case "completed":
-        return (
-          <Button 
-            variant="ghost" 
-            size="sm"
-            data-testid={`button-review-${serviceId}`}
-          >
-            Review
-          </Button>
-        );
-      case "missed":
-        return (
-          <Button 
-            variant="ghost" 
-            size="sm"
-            className="text-destructive hover:text-destructive/80"
-            data-testid={`button-reschedule-${serviceId}`}
-          >
-            Reschedule
-          </Button>
-        );
-      default:
-        return (
-          <Button 
-            variant="ghost" 
-            size="sm"
-            data-testid={`button-view-${serviceId}`}
-          >
-            View
-          </Button>
-        );
-    }
+  const getStatusColor = () => {
+    return "status-completed";
   };
 
   const getServiceIcon = (type: string | null) => {
@@ -87,10 +76,6 @@ export default function RecentServices() {
     if (type === "installation") return "Installation";
     return type || "Service";
   };
-
-  const recentServices = services
-    .filter(service => service.status === "completed")
-    .slice(0, 5);
 
   return (
     <Card data-testid="card-recent-services">
@@ -107,9 +92,9 @@ export default function RecentServices() {
           <div className="flex items-center justify-center py-8">
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
-        ) : recentServices.length === 0 ? (
+        ) : completedOccurrences.length === 0 ? (
           <div className="flex items-center justify-center py-8 text-muted-foreground">
-            No services scheduled
+            No completed services
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -125,41 +110,47 @@ export default function RecentServices() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {recentServices.map((service) => (
+                {completedOccurrences.map((occurrence, index) => (
                   <tr 
-                    key={service.id} 
+                    key={`${occurrence.service.id}-${format(occurrence.completedDate, 'yyyy-MM-dd')}`}
                     className="hover:bg-muted/50"
-                    data-testid={`row-service-${service.id}`}
+                    data-testid={`row-service-${occurrence.service.id}-${index}`}
                   >
                     <td className="py-4 px-6">
                       <div>
                         <div className="font-medium text-foreground">
-                          {service.client?.name || "Unknown Client"}
+                          {occurrence.service.client?.name || "Unknown Client"}
                         </div>
                         <div className="text-sm text-muted-foreground">
-                          {service.client?.addressText || "No address"}
+                          {occurrence.service.client?.addressText || "No address"}
                         </div>
                       </div>
                     </td>
                     <td className="py-4 px-6">
                       <div className="flex items-center space-x-2">
-                        {getServiceIcon(service.type)}
-                        <span className="text-sm">{formatServiceType(service.type)}</span>
+                        {getServiceIcon(occurrence.service.type)}
+                        <span className="text-sm">{formatServiceType(occurrence.service.type)}</span>
                       </div>
                     </td>
                     <td className="py-4 px-6 text-sm text-foreground">
-                      {service.team?.name || "Unassigned"}
+                      {occurrence.service.team?.name || "Unassigned"}
                     </td>
                     <td className="py-4 px-6 text-sm text-muted-foreground">
-                      {formatServiceDate(service.installationDate)}
+                      {formatServiceDate(occurrence.completedDate)}
                     </td>
                     <td className="py-4 px-6">
-                      <span className={`px-2 py-1 text-xs rounded-full ${getStatusColor(service.status)}`}>
-                        {(service.status || "scheduled").charAt(0).toUpperCase() + (service.status || "scheduled").slice(1)}
+                      <span className={`px-2 py-1 text-xs rounded-full ${getStatusColor()}`}>
+                        Completed
                       </span>
                     </td>
                     <td className="py-4 px-6">
-                      {getActionButton(service.status, service.id)}
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        data-testid={`button-review-${occurrence.service.id}`}
+                      >
+                        Review
+                      </Button>
                     </td>
                   </tr>
                 ))}
