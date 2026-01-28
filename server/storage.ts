@@ -689,7 +689,13 @@ export class DatabaseStorage implements IStorage {
           lt(services.installationDate, endOfDay)
         )),
       db.select({ count: sql<number>`count(*)` }).from(services)
-        .where(eq(services.status, "missed")),
+        .where(or(
+          eq(services.status, "missed"),
+          and(
+            eq(services.status, "scheduled"),
+            lt(services.installationDate, startOfDay)
+          )
+        )),
       db.select({ count: sql<number>`count(*)` }).from(consumables)
         .where(sql`${consumables.currentStock} < ${consumables.minStockLevel}`),
       db.select({ count: sql<number>`count(*)` }).from(equipment)

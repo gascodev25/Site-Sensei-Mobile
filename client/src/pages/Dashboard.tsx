@@ -49,7 +49,7 @@ export default function Dashboard() {
   });
 
   const { data: missedServices } = useQuery<any[]>({
-    queryKey: ["/api/services", { status: "missed" }],
+    queryKey: ["/api/dashboard/missed-services"],
     enabled: activeModal === "missed-services",
   });
 

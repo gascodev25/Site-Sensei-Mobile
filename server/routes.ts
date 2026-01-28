@@ -256,6 +256,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get('/api/dashboard/missed-services', isAuthenticated, async (req, res) => {
+    try {
+      const servicesList = await storage.getServices();
+      const today = new Date();
+      const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      
+      const missed = servicesList.filter(s => 
+        s.status === 'missed' || 
+        (s.status === 'scheduled' && s.installationDate && new Date(s.installationDate) < startOfDay)
+      );
+      
+      res.json(missed);
+    } catch (error) {
+      console.error("Error fetching missed services:", error);
+      res.status(500).json({ message: "Failed to fetch missed services" });
+    }
+  });
+
   // Client routes
   app.get('/api/clients', isAuthenticated, async (req, res) => {
     try {
