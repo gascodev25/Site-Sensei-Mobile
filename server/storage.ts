@@ -693,7 +693,7 @@ export class DatabaseStorage implements IStorage {
           eq(services.status, "missed"),
           and(
             eq(services.status, "scheduled"),
-            lt(services.installationDate, startOfDay)
+            lte(services.installationDate, today)
           )
         )),
       db.select({ count: sql<number>`count(*)` }).from(consumables)

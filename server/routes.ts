@@ -260,11 +260,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const servicesList = await storage.getServices();
       const today = new Date();
-      const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
       
       const missed = servicesList.filter(s => 
         s.status === 'missed' || 
-        (s.status === 'scheduled' && s.installationDate && new Date(s.installationDate) < startOfDay)
+        (s.status === 'scheduled' && s.installationDate && new Date(s.installationDate) <= today)
       );
       
       res.json(missed);
