@@ -52,10 +52,13 @@ export default function KPICard({
   return (
     <Card 
       className={cn(
-        "hover:shadow-md transition-shadow cursor-pointer",
+        "hover:shadow-md transition-all cursor-pointer active:scale-[0.98]",
         className
       )}
-      onClick={onClick}
+      onClick={(e) => {
+        console.log(`KPICard ${title} clicked`);
+        if (onClick) onClick();
+      }}
       data-testid={testId}
     >
       <CardContent className="p-6">
