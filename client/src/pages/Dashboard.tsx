@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -13,8 +13,13 @@ import InvoicingStatus from "@/components/Dashboard/InvoicingStatus";
 import ContractAlerts from "@/components/Dashboard/ContractAlerts";
 import { Button } from "@/components/ui/button";
 import { Plus, Download, Calendar, Package, AlertCircle, CheckCircle, File } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { format } from "date-fns";
 
 export default function Dashboard() {
+  const [activeModal, setActiveModal] = useState<string | null>(null);
   const { toast } = useToast();
   const { isAuthenticated, isLoading } = useAuth();
 
@@ -36,6 +41,26 @@ export default function Dashboard() {
   const { data: metrics, isLoading: metricsLoading, error } = useQuery({
     queryKey: ["/api/dashboard/metrics"],
     enabled: isAuthenticated,
+  });
+
+  const { data: servicesToday } = useQuery<any[]>({
+    queryKey: ["/api/services"],
+    enabled: activeModal === "services-today",
+  });
+
+  const { data: missedServices } = useQuery<any[]>({
+    queryKey: ["/api/services", { status: "missed" }],
+    enabled: activeModal === "missed-services",
+  });
+
+  const { data: lowStock } = useQuery<any[]>({
+    queryKey: ["/api/inventory"],
+    enabled: activeModal === "low-stock",
+  });
+
+  const { data: expiringContracts } = useQuery<any[]>({
+    queryKey: ["/api/clients"],
+    enabled: activeModal === "expiring-contracts",
   });
 
   if (error && isUnauthorizedError(error as Error)) {
@@ -107,7 +132,7 @@ export default function Dashboard() {
             icon={Calendar}
             trend="+2"
             trendLabel="from yesterday"
-            onClick={() => {}} // TODO: Navigate to services
+            onClick={() => setActiveModal("services-today")}
             data-testid="kpi-services-today"
           />
           
@@ -117,7 +142,7 @@ export default function Dashboard() {
             icon={AlertCircle}
             status="destructive"
             label="Requires attention"
-            onClick={() => {}} // TODO: Navigate to missed services
+            onClick={() => setActiveModal("missed-services")}
             data-testid="kpi-missed-services"
           />
           
@@ -127,7 +152,7 @@ export default function Dashboard() {
             icon={Package}
             status="warning"
             label="Reorder required"
-            onClick={() => {}} // TODO: Navigate to inventory
+            onClick={() => setActiveModal("low-stock")}
             data-testid="kpi-low-stock"
           />
           
@@ -136,10 +161,124 @@ export default function Dashboard() {
             value={metrics?.expiringContracts || 0}
             icon={File}
             label="Next 30 days"
-            onClick={() => {}} // TODO: Navigate to contracts
+            onClick={() => setActiveModal("expiring-contracts")}
             data-testid="kpi-expiring-contracts"
           />
         </div>
+
+        <Dialog open={activeModal !== null} onOpenChange={() => setActiveModal(null)}>
+          <DialogContent className="max-w-3xl">
+            <DialogHeader>
+              <DialogTitle>
+                {activeModal === "services-today" && "Services Today"}
+                {activeModal === "missed-services" && "Missed Services"}
+                {activeModal === "low-stock" && "Low Stock Items"}
+                {activeModal === "expiring-contracts" && "Expiring Contracts"}
+              </DialogTitle>
+            </DialogHeader>
+            <div className="mt-4 overflow-x-auto">
+              {activeModal === "services-today" && (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Client</TableHead>
+                      <TableHead>Service Type</TableHead>
+                      <TableHead>Time</TableHead>
+                      <TableHead>Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {servicesToday?.filter(s => format(new Date(s.scheduledDate), 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd')).map((s: any) => (
+                      <TableRow key={s.id}>
+                        <TableCell className="font-medium">{s.clientName}</TableCell>
+                        <TableCell>{s.type}</TableCell>
+                        <TableCell>{format(new Date(s.scheduledDate), 'HH:mm')}</TableCell>
+                        <TableCell><Badge variant="outline">{s.status}</Badge></TableCell>
+                      </TableRow>
+                    ))}
+                    {(!servicesToday || servicesToday.length === 0) && (
+                      <TableRow><TableCell colSpan={4} className="text-center py-4">No services scheduled for today</TableCell></TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              )}
+              {activeModal === "missed-services" && (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Client</TableHead>
+                      <TableHead>Service Type</TableHead>
+                      <TableHead>Scheduled Date</TableHead>
+                      <TableHead>Reason</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {missedServices?.map((s: any) => (
+                      <TableRow key={s.id}>
+                        <TableCell className="font-medium">{s.clientName}</TableCell>
+                        <TableCell>{s.type}</TableCell>
+                        <TableCell>{format(new Date(s.scheduledDate), 'dd MMM yyyy')}</TableCell>
+                        <TableCell className="text-destructive">Missed</TableCell>
+                      </TableRow>
+                    ))}
+                    {(!missedServices || missedServices.length === 0) && (
+                      <TableRow><TableCell colSpan={4} className="text-center py-4 text-muted-foreground">No missed services recorded</TableCell></TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              )}
+              {activeModal === "low-stock" && (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Item Name</TableHead>
+                      <TableHead>Category</TableHead>
+                      <TableHead>Current Stock</TableHead>
+                      <TableHead>Min Threshold</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {lowStock?.filter(i => i.currentStock <= i.minThreshold).map((i: any) => (
+                      <TableRow key={i.id}>
+                        <TableCell className="font-medium">{i.name}</TableCell>
+                        <TableCell>{i.category}</TableCell>
+                        <TableCell className="text-destructive font-bold">{i.currentStock}</TableCell>
+                        <TableCell>{i.minThreshold}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+              {activeModal === "expiring-contracts" && (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Client Name</TableHead>
+                      <TableHead>Contract End Date</TableHead>
+                      <TableHead>Monthly Value</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {expiringContracts?.filter(c => {
+                      if (!c.contractEndDate) return false;
+                      const end = new Date(c.contractEndDate);
+                      const now = new Date();
+                      const thirtyDays = new Date();
+                      thirtyDays.setDate(now.getDate() + 30);
+                      return end >= now && end <= thirtyDays;
+                    }).map((c: any) => (
+                      <TableRow key={c.id}>
+                        <TableCell className="font-medium">{c.name}</TableCell>
+                        <TableCell>{format(new Date(c.contractEndDate), 'dd MMM yyyy')}</TableCell>
+                        <TableCell>R{c.monthlyValue?.toLocaleString()}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Main Dashboard Content */}
