@@ -188,7 +188,15 @@ export default function Dashboard() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {servicesToday?.filter(s => format(new Date(s.scheduledDate), 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd')).map((s: any) => (
+                    {servicesToday?.filter(s => {
+                      if (!s.scheduledDate) return false;
+                      try {
+                        const date = new Date(s.scheduledDate);
+                        return !isNaN(date.getTime()) && format(date, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd');
+                      } catch (e) {
+                        return false;
+                      }
+                    }).map((s: any) => (
                       <TableRow key={s.id}>
                         <TableCell className="font-medium">{s.clientName}</TableCell>
                         <TableCell>{s.type}</TableCell>
@@ -213,7 +221,11 @@ export default function Dashboard() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {missedServices?.map((s: any) => (
+                    {missedServices?.filter(s => {
+                      if (!s.scheduledDate) return false;
+                      const date = new Date(s.scheduledDate);
+                      return !isNaN(date.getTime());
+                    }).map((s: any) => (
                       <TableRow key={s.id}>
                         <TableCell className="font-medium">{s.clientName}</TableCell>
                         <TableCell>{s.type}</TableCell>
