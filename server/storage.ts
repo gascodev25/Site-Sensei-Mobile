@@ -667,6 +667,75 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
+  // Helper to format date as YYYY-MM-DD in local timezone
+  private formatLocalDate(date: Date): string {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
+  // Helper to calculate missed recurring service occurrences
+  private calculateMissedOccurrences(service: any, now: Date): number {
+    const installDate = new Date(service.installationDate);
+    // Normalize to local midnight
+    installDate.setHours(0, 0, 0, 0);
+    
+    const recurrencePattern = service.recurrencePattern as { interval?: string; end_date?: string } | null;
+    const completedDates = (service.completedDates || []) as string[];
+    const excludedDates = (service.excludedDates || []) as string[];
+    
+    // For non-recurring services
+    if (!recurrencePattern || !recurrencePattern.interval) {
+      // If installation date is in the past and not completed, count as 1 missed
+      if (installDate <= now && service.status !== 'completed') {
+        return 1;
+      }
+      return 0;
+    }
+    
+    // Parse interval (e.g., "7d", "30d")
+    const intervalMatch = recurrencePattern.interval.match(/^(\d+)d$/);
+    if (!intervalMatch) {
+      return installDate <= now && service.status !== 'completed' ? 1 : 0;
+    }
+    
+    const intervalDays = parseInt(intervalMatch[1], 10);
+    const endDate = recurrencePattern.end_date ? new Date(recurrencePattern.end_date + 'T23:59:59') : null;
+    
+    // Generate all occurrences up to now
+    let missedCount = 0;
+    let currentDate = new Date(installDate);
+    
+    // Normalize now to end of today for comparison
+    const todayEnd = new Date(now);
+    todayEnd.setHours(23, 59, 59, 999);
+    
+    // Set to track completed dates for quick lookup (normalize to YYYY-MM-DD)
+    const completedSet = new Set(completedDates.map(d => d.substring(0, 10)));
+    const excludedSet = new Set(excludedDates.map(d => d.substring(0, 10)));
+    
+    while (currentDate <= now) {
+      // Check if we've passed the end date
+      if (endDate && currentDate > endDate) {
+        break;
+      }
+      
+      // Use local date format for comparison
+      const dateStr = this.formatLocalDate(currentDate);
+      
+      // Count as missed if not completed and not excluded
+      if (!completedSet.has(dateStr) && !excludedSet.has(dateStr)) {
+        missedCount++;
+      }
+      
+      // Move to next occurrence (add days using date methods to avoid DST issues)
+      currentDate.setDate(currentDate.getDate() + intervalDays);
+    }
+    
+    return missedCount;
+  }
+
   // Dashboard metrics
   async getDashboardMetrics() {
     const now = new Date();
@@ -674,9 +743,21 @@ export class DatabaseStorage implements IStorage {
     const tomorrowStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
+    // Get all services that could have missed occurrences
+    const allServices = await db.select().from(services)
+      .where(and(
+        ne(services.status, "completed"),
+        lte(services.installationDate, now)
+      ));
+    
+    // Calculate total missed occurrences across all services
+    let totalMissedOccurrences = 0;
+    for (const service of allServices) {
+      totalMissedOccurrences += this.calculateMissedOccurrences(service, now);
+    }
+
     const [
       servicesTodayResult,
-      missedServicesResult,
       lowStockResult,
       equipmentInFieldResult,
       activeContractsResult,
@@ -687,11 +768,6 @@ export class DatabaseStorage implements IStorage {
         .where(and(
           gte(services.installationDate, todayStart),
           lt(services.installationDate, tomorrowStart)
-        )),
-      db.select({ count: sql<number>`count(*)` }).from(services)
-        .where(and(
-          ne(services.status, "completed"),
-          lte(services.installationDate, now)
         )),
       db.select({ count: sql<number>`count(*)` }).from(consumables)
         .where(sql`${consumables.currentStock} < ${consumables.minStockLevel}`),
@@ -714,7 +790,7 @@ export class DatabaseStorage implements IStorage {
 
     return {
       servicesToday: servicesTodayResult[0].count,
-      missedServices: missedServicesResult[0].count,
+      missedServices: totalMissedOccurrences,
       lowStockItems: lowStockResult[0].count,
       expiringContracts: 5, // TODO: Calculate based on contract end dates
       equipmentInField: equipmentInFieldResult[0].count,

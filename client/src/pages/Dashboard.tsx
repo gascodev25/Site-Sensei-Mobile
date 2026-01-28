@@ -216,20 +216,20 @@ export default function Dashboard() {
                     <TableRow>
                       <TableHead>Client</TableHead>
                       <TableHead>Service Type</TableHead>
-                      <TableHead>Scheduled Date</TableHead>
-                      <TableHead>Reason</TableHead>
+                      <TableHead>Missed Date</TableHead>
+                      <TableHead>Status</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {missedServices?.filter(s => {
-                      if (!s.scheduledDate) return false;
-                      const date = new Date(s.scheduledDate);
+                    {missedServices?.filter(item => {
+                      if (!item.missedDate) return false;
+                      const date = new Date(item.missedDate);
                       return !isNaN(date.getTime());
-                    }).map((s: any) => (
-                      <TableRow key={s.id}>
-                        <TableCell className="font-medium">{s.clientName}</TableCell>
-                        <TableCell>{s.type}</TableCell>
-                        <TableCell>{format(new Date(s.scheduledDate), 'dd MMM yyyy')}</TableCell>
+                    }).map((item: any, index: number) => (
+                      <TableRow key={`${item.service?.id}-${item.missedDate}-${index}`}>
+                        <TableCell className="font-medium">{item.service?.client?.name || 'Unknown'}</TableCell>
+                        <TableCell>{item.service?.type || 'Unknown'}</TableCell>
+                        <TableCell>{format(new Date(item.missedDate), 'dd MMM yyyy')}</TableCell>
                         <TableCell className="text-destructive">Missed</TableCell>
                       </TableRow>
                     ))}
