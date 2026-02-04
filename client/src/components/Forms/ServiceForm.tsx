@@ -9,12 +9,12 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { CalendarIcon, Repeat, Package, Wrench } from "lucide-react";
+import { CalendarIcon, Repeat, Package, Wrench, Search } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 interface ServiceFormProps {
   service?: Service;
@@ -91,6 +91,21 @@ export default function ServiceForm({ service, initialDate, onSuccess, onCancel,
 
   const watchType = form.watch("type");
   const watchInstallationDate = form.watch("installationDate");
+
+  const [equipmentSearch, setEquipmentSearch] = useState("");
+  const [consumableSearch, setConsumableSearch] = useState("");
+
+  const filteredEquipment = equipment.filter((item) =>
+    equipmentSearch === "" ||
+    item.name.toLowerCase().includes(equipmentSearch.toLowerCase()) ||
+    item.stockCode?.toLowerCase().includes(equipmentSearch.toLowerCase())
+  );
+
+  const filteredConsumables = consumables.filter((item) =>
+    consumableSearch === "" ||
+    item.name.toLowerCase().includes(consumableSearch.toLowerCase()) ||
+    item.stockCode?.toLowerCase().includes(consumableSearch.toLowerCase())
+  );
 
   // Update form with loaded equipment and consumables when editing
   useEffect(() => {
@@ -552,14 +567,29 @@ export default function ServiceForm({ service, initialDate, onSuccess, onCancel,
           </div>
           <p className="text-sm text-muted-foreground">Select equipment needed for this service</p>
 
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              type="text"
+              placeholder="Search equipment by name or code..."
+              value={equipmentSearch}
+              onChange={(e) => setEquipmentSearch(e.target.value)}
+              className="pl-10"
+              data-testid="input-equipment-search"
+            />
+          </div>
+
           <FormField
             control={form.control}
             name="equipmentItems"
             render={({ field }) => (
               <FormItem>
                 <FormControl>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {equipment.map((item) => {
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-64 overflow-y-auto">
+                    {filteredEquipment.length === 0 && equipmentSearch && (
+                      <p className="text-sm text-muted-foreground col-span-2 py-4 text-center">No equipment found matching "{equipmentSearch}"</p>
+                    )}
+                    {filteredEquipment.map((item) => {
                       const isSelected = field.value?.some(eq => eq.id === item.id) || false;
                       const selectedItem = field.value?.some(eq => eq.id === item.id);
 
@@ -619,14 +649,29 @@ export default function ServiceForm({ service, initialDate, onSuccess, onCancel,
           </div>
           <p className="text-sm text-muted-foreground">Select consumables needed for this service</p>
 
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              type="text"
+              placeholder="Search consumables by name or code..."
+              value={consumableSearch}
+              onChange={(e) => setConsumableSearch(e.target.value)}
+              className="pl-10"
+              data-testid="input-consumable-search"
+            />
+          </div>
+
           <FormField
             control={form.control}
             name="consumableItems"
             render={({ field }) => (
               <FormItem>
                 <FormControl>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {consumables.map((item) => {
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-64 overflow-y-auto">
+                    {filteredConsumables.length === 0 && consumableSearch && (
+                      <p className="text-sm text-muted-foreground col-span-2 py-4 text-center">No consumables found matching "{consumableSearch}"</p>
+                    )}
+                    {filteredConsumables.map((item) => {
                       const isSelected = field.value?.some(con => con.id === item.id) || false;
                       const selectedItem = field.value?.some(con => con.id === item.id);
 
