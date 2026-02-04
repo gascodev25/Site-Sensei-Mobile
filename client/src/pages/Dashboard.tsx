@@ -11,15 +11,17 @@ import StockLevels from "@/components/Dashboard/StockLevels";
 import TeamStatus from "@/components/Dashboard/TeamStatus";
 import InvoicingStatus from "@/components/Dashboard/InvoicingStatus";
 import ContractAlerts from "@/components/Dashboard/ContractAlerts";
+import ServiceForm from "@/components/Forms/ServiceForm";
 import { Button } from "@/components/ui/button";
 import { Plus, Download, Calendar, Package, AlertCircle, CheckCircle, File } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 
 export default function Dashboard() {
   const [activeModal, setActiveModal] = useState<string | null>(null);
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
   const { toast } = useToast();
   const { isAuthenticated, isLoading } = useAuth();
 
@@ -113,10 +115,23 @@ export default function Dashboard() {
         <div className="flex items-center justify-between mb-8">
           <h2 className="text-3xl font-bold text-foreground">Dashboard</h2>
           <div className="flex space-x-3">
-            <Button data-testid="button-new-service">
-              <Plus className="h-4 w-4 mr-2" />
-              New Service
-            </Button>
+            <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+              <DialogTrigger asChild>
+                <Button data-testid="button-schedule-service">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Schedule Service
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>Schedule New Service</DialogTitle>
+                </DialogHeader>
+                <ServiceForm
+                  onSuccess={() => setIsCreateOpen(false)}
+                  onCancel={() => setIsCreateOpen(false)}
+                />
+              </DialogContent>
+            </Dialog>
             <Button variant="outline" data-testid="button-export">
               <Download className="h-4 w-4 mr-2" />
               Export
