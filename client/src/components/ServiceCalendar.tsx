@@ -123,13 +123,13 @@ export default function ServiceCalendar({ services, onServiceClick, onServiceMov
         ? startOfWeek(startOfMonth(currentDate), { weekStartsOn: 1 })
         : view === 'week' 
         ? startOfWeek(currentDate, { weekStartsOn: 1 })
-        : currentDate;
+        : startOfMonth(currentDate);
 
       const viewEnd = view === 'month' 
         ? endOfWeek(endOfMonth(currentDate), { weekStartsOn: 1 })
         : view === 'week' 
         ? endOfWeek(currentDate, { weekStartsOn: 1 })
-        : currentDate;
+        : endOfMonth(currentDate);
 
       const instances = generateRecurringInstances(service, viewStart, viewEnd);
 
