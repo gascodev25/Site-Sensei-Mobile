@@ -1,30 +1,41 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Repeat, Wrench, Loader2 } from "lucide-react";
+import { Repeat, Wrench, Loader2, ChevronDown } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import type { ServiceWithDetails } from "@shared/schema";
 import { format, isToday, isTomorrow, isYesterday, parseISO } from "date-fns";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
-interface CompletedServiceOccurrence {
+interface ServiceOccurrence {
   service: ServiceWithDetails;
-  completedDate: Date;
+  date: Date;
+  status: "completed" | "scheduled" | "missed";
 }
 
 export default function RecentServices() {
+  const [filter, setFilter] = useState<"completed" | "scheduled" | "missed">("completed");
+  
   const { data: services = [], isLoading } = useQuery<ServiceWithDetails[]>({
     queryKey: ["/api/services"],
   });
 
-  const completedOccurrences = useMemo(() => {
-    const occurrences: CompletedServiceOccurrence[] = [];
+  const filteredOccurrences = useMemo(() => {
+    const occurrences: ServiceOccurrence[] = [];
 
     services.forEach(service => {
+      // Completed Occurrences
       if (service.completedDates && Array.isArray(service.completedDates)) {
         service.completedDates.forEach((dateStr: string) => {
           occurrences.push({
             service,
-            completedDate: parseISO(dateStr),
+            date: parseISO(dateStr),
+            status: "completed"
           });
         });
       }
@@ -36,16 +47,36 @@ export default function RecentServices() {
         if (!alreadyIncluded) {
           occurrences.push({
             service,
-            completedDate: new Date(service.installationDate),
+            date: new Date(service.installationDate),
+            status: "completed"
           });
         }
+      }
+
+      // Scheduled Occurrences
+      if (service.status === "scheduled" && service.installationDate) {
+        occurrences.push({
+          service,
+          date: new Date(service.installationDate),
+          status: "scheduled"
+        });
+      }
+
+      // Missed Occurrences
+      if (service.status === "missed" && service.installationDate) {
+        occurrences.push({
+          service,
+          date: new Date(service.installationDate),
+          status: "missed"
+        });
       }
     });
 
     return occurrences
-      .sort((a, b) => b.completedDate.getTime() - a.completedDate.getTime())
+      .filter(occ => occ.status === filter)
+      .sort((a, b) => b.date.getTime() - a.date.getTime())
       .slice(0, 5);
-  }, [services]);
+  }, [services, filter]);
 
   const formatServiceDate = (date: Date): string => {
     if (isToday(date)) {
@@ -60,8 +91,13 @@ export default function RecentServices() {
     return format(date, "MMM d, yyyy");
   };
 
-  const getStatusColor = () => {
-    return "status-completed";
+  const getStatusColor = (status: string) => {
+    switch(status) {
+      case "completed": return "status-completed";
+      case "scheduled": return "bg-amber-100 text-amber-800";
+      case "missed": return "bg-red-100 text-red-800";
+      default: return "bg-gray-100 text-gray-800";
+    }
   };
 
   const getServiceIcon = (type: string | null) => {
@@ -82,9 +118,25 @@ export default function RecentServices() {
       <CardHeader className="border-b border-border">
         <div className="flex items-center justify-between">
           <CardTitle>Recent Services</CardTitle>
-          <Button variant="ghost" size="sm" data-testid="button-view-all-services">
-            View All
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="sm" data-testid="button-view-all-services" className="flex items-center gap-1">
+                View: {filter.charAt(0).toUpperCase() + filter.slice(1)}
+                <ChevronDown className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => setFilter("completed")}>
+                Completed
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setFilter("scheduled")}>
+                Scheduled
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setFilter("missed")}>
+                Missed
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </CardHeader>
       <CardContent className="p-0">
@@ -92,9 +144,9 @@ export default function RecentServices() {
           <div className="flex items-center justify-center py-8">
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
-        ) : completedOccurrences.length === 0 ? (
+        ) : filteredOccurrences.length === 0 ? (
           <div className="flex items-center justify-center py-8 text-muted-foreground">
-            No completed services
+            No {filter} services
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -110,9 +162,9 @@ export default function RecentServices() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {completedOccurrences.map((occurrence, index) => (
+                {filteredOccurrences.map((occurrence, index) => (
                   <tr 
-                    key={`${occurrence.service.id}-${format(occurrence.completedDate, 'yyyy-MM-dd')}`}
+                    key={`${occurrence.service.id}-${format(occurrence.date, 'yyyy-MM-dd')}`}
                     className="hover:bg-muted/50"
                     data-testid={`row-service-${occurrence.service.id}-${index}`}
                   >
@@ -136,11 +188,11 @@ export default function RecentServices() {
                       {occurrence.service.team?.name || "Unassigned"}
                     </td>
                     <td className="py-4 px-6 text-sm text-muted-foreground">
-                      {formatServiceDate(occurrence.completedDate)}
+                      {formatServiceDate(occurrence.date)}
                     </td>
                     <td className="py-4 px-6">
-                      <span className={`px-2 py-1 text-xs rounded-full ${getStatusColor()}`}>
-                        Completed
+                      <span className={`px-2 py-1 text-xs rounded-full ${getStatusColor(occurrence.status)}`}>
+                        {occurrence.status.charAt(0).toUpperCase() + occurrence.status.slice(1)}
                       </span>
                     </td>
                     <td className="py-4 px-6">
