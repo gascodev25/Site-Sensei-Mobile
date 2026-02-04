@@ -55,11 +55,16 @@ export default function RecentServices() {
 
       // Scheduled Occurrences
       if (service.status === "scheduled" && service.installationDate) {
-        occurrences.push({
-          service,
-          date: new Date(service.installationDate),
-          status: "scheduled"
-        });
+        const isCompleted = service.completedDates?.includes(
+          format(new Date(service.installationDate), 'yyyy-MM-dd')
+        );
+        if (!isCompleted) {
+          occurrences.push({
+            service,
+            date: new Date(service.installationDate),
+            status: "scheduled"
+          });
+        }
       }
 
       // Missed Occurrences
