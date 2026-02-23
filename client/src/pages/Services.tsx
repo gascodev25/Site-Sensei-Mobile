@@ -528,7 +528,15 @@ export default function Services() {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {filteredServices.map((service: ServiceWithDetails) => (
-                  <Card key={service.id} className={`hover:shadow-md transition-shadow ${getTeamBackgroundColor(service.team?.name)}`} data-testid={`card-service-${service.id}`}>
+                  <Card
+                    key={service.id}
+                    className={`hover:shadow-md transition-shadow cursor-pointer hover:ring-2 hover:ring-blue-300 dark:hover:ring-blue-700 ${getTeamBackgroundColor(service.team?.name)}`}
+                    data-testid={`card-service-${service.id}`}
+                    onClick={() => {
+                      setSelectedServiceDate(null);
+                      setEditingService(service);
+                    }}
+                  >
                     <CardHeader className="pb-3">
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
@@ -548,8 +556,9 @@ export default function Services() {
                           <Button 
                             variant="ghost" 
                             size="sm"
-                            onClick={() => {
-                              setSelectedServiceDate(null); // Clear any previously selected date
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedServiceDate(null);
                               setEditingService(service);
                             }}
                             data-testid={`button-edit-${service.id}`}
@@ -559,7 +568,10 @@ export default function Services() {
                           <Button 
                             variant="ghost" 
                             size="sm"
-                            onClick={() => handleDelete(service)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDelete(service);
+                            }}
                             disabled={deleteServiceMutation.isPending}
                             data-testid={`button-delete-${service.id}`}
                           >
