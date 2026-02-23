@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/authUtils";
+import { queryClient } from "@/lib/queryClient";
 import Header from "@/components/Layout/Header";
 import KPICard from "@/components/Dashboard/KPICard";
 import ServicesOverview from "@/components/Dashboard/ServicesOverview";
@@ -13,7 +14,7 @@ import InvoicingStatus from "@/components/Dashboard/InvoicingStatus";
 import ContractAlerts from "@/components/Dashboard/ContractAlerts";
 import ServiceForm from "@/components/Forms/ServiceForm";
 import { Button } from "@/components/ui/button";
-import { Plus, Download, Calendar, Package, AlertCircle, CheckCircle, File } from "lucide-react";
+import { Plus, Download, Calendar, Package, AlertCircle, CheckCircle, File, ExternalLink } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -22,6 +23,7 @@ import { format } from "date-fns";
 export default function Dashboard() {
   const [activeModal, setActiveModal] = useState<string | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [selectedService, setSelectedService] = useState<any>(null);
   const { toast } = useToast();
   const { isAuthenticated, isLoading } = useAuth();
 
@@ -212,11 +214,12 @@ export default function Dashboard() {
                         return false;
                       }
                     }).map((s: any) => (
-                      <TableRow key={s.id}>
+                      <TableRow key={s.id} className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => setSelectedService(s)}>
                         <TableCell className="font-medium">{s.clientName}</TableCell>
                         <TableCell>{s.type}</TableCell>
                         <TableCell>{format(new Date(s.scheduledDate), 'HH:mm')}</TableCell>
                         <TableCell><Badge variant="outline">{s.status}</Badge></TableCell>
+                        <TableCell><ExternalLink className="h-4 w-4 text-muted-foreground" /></TableCell>
                       </TableRow>
                     ))}
                     {(!servicesToday || servicesToday.length === 0) && (
@@ -241,11 +244,12 @@ export default function Dashboard() {
                       const date = new Date(item.missedDate);
                       return !isNaN(date.getTime());
                     }).map((item: any, index: number) => (
-                      <TableRow key={`${item.service?.id}-${item.missedDate}-${index}`}>
+                      <TableRow key={`${item.service?.id}-${item.missedDate}-${index}`} className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => item.service && setSelectedService(item.service)}>
                         <TableCell className="font-medium">{item.service?.client?.name || 'Unknown'}</TableCell>
                         <TableCell>{item.service?.type || 'Unknown'}</TableCell>
                         <TableCell>{format(new Date(item.missedDate), 'dd MMM yyyy')}</TableCell>
                         <TableCell className="text-destructive">Missed</TableCell>
+                        <TableCell><ExternalLink className="h-4 w-4 text-muted-foreground" /></TableCell>
                       </TableRow>
                     ))}
                     {(!missedServices || missedServices.length === 0) && (
@@ -304,6 +308,26 @@ export default function Dashboard() {
                 </Table>
               )}
             </div>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={!!selectedService} onOpenChange={(open) => { if (!open) setSelectedService(null); }}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Edit Service</DialogTitle>
+            </DialogHeader>
+            {selectedService && (
+              <ServiceForm
+                service={selectedService}
+                onSuccess={() => {
+                  setSelectedService(null);
+                  queryClient.invalidateQueries({ queryKey: ["/api/services"] });
+                  queryClient.invalidateQueries({ queryKey: ["/api/dashboard/metrics"] });
+                  queryClient.invalidateQueries({ queryKey: ["/api/dashboard/missed-services"] });
+                }}
+                onCancel={() => setSelectedService(null)}
+              />
+            )}
           </DialogContent>
         </Dialog>
 
