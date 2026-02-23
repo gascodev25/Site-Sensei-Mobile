@@ -270,7 +270,7 @@ export default function Dashboard() {
                   </TableHeader>
                   <TableBody>
                     {lowStock?.filter(i => i.currentStock <= i.minThreshold).map((i: any) => (
-                      <TableRow key={i.id}>
+                      <TableRow key={i.id} className="hover:bg-muted/50 transition-colors">
                         <TableCell className="font-medium">{i.name}</TableCell>
                         <TableCell>{i.category}</TableCell>
                         <TableCell className="text-destructive font-bold">{i.currentStock}</TableCell>
@@ -298,7 +298,7 @@ export default function Dashboard() {
                       thirtyDays.setDate(now.getDate() + 30);
                       return end >= now && end <= thirtyDays;
                     }).map((c: any) => (
-                      <TableRow key={c.id}>
+                      <TableRow key={c.id} className="hover:bg-muted/50 transition-colors">
                         <TableCell className="font-medium">{c.name}</TableCell>
                         <TableCell>{format(new Date(c.contractEndDate), 'dd MMM yyyy')}</TableCell>
                         <TableCell>R{c.monthlyValue?.toLocaleString()}</TableCell>
