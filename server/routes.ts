@@ -256,6 +256,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get('/api/geocode/search', isAuthenticated, async (req, res) => {
+    try {
+      const query = req.query.q as string;
+      if (!query || query.trim().length < 3) {
+        return res.json([]);
+      }
+
+      const params = new URLSearchParams({
+        format: 'json',
+        q: query,
+        countrycodes: 'za',
+        addressdetails: '1',
+        limit: '5',
+      });
+
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?${params.toString()}`,
+        {
+          headers: {
+            'User-Agent': 'ACGWorksApp/1.0',
+            'Accept': 'application/json',
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`Nominatim responded with ${response.status}`);
+      }
+
+      const data = await response.json();
+      res.json(data);
+    } catch (error) {
+      console.error("Geocode search error:", error);
+      res.status(500).json({ message: "Address search failed" });
+    }
+  });
+
   app.get('/api/dashboard/missed-services', isAuthenticated, async (req, res) => {
     try {
       const servicesList = await storage.getServices();

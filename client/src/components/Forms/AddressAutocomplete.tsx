@@ -28,6 +28,35 @@ interface AddressAutocompleteProps {
   "data-testid"?: string;
 }
 
+function extractStreetAddress(suggestion: AddressSuggestion, userQuery: string): string {
+  const addr = suggestion.address;
+
+  if (addr?.house_number && addr?.road) {
+    return `${addr.house_number} ${addr.road}`;
+  }
+
+  const displayParts = suggestion.display_name.split(',');
+  const firstPart = displayParts[0]?.trim() || '';
+
+  if (/^\d/.test(firstPart)) {
+    return firstPart;
+  }
+
+  const numberMatch = userQuery.match(/^(\d+[\w]*)\s+/);
+  if (numberMatch && addr?.road) {
+    const typedNumber = numberMatch[1];
+    if (!addr.road.startsWith(typedNumber)) {
+      return `${typedNumber} ${addr.road}`;
+    }
+  }
+
+  if (addr?.road) {
+    return addr.road;
+  }
+
+  return firstPart;
+}
+
 export default function AddressAutocomplete({
   value,
   onAddressSelect,
@@ -38,16 +67,15 @@ export default function AddressAutocomplete({
   const [isLoading, setIsLoading] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [inputValue, setInputValue] = useState(value);
+  const [lastQuery, setLastQuery] = useState('');
   const containerRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const { toast } = useToast();
 
-  // Sync external value changes
   useEffect(() => {
     setInputValue(value);
   }, [value]);
 
-  // Click outside handler
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
@@ -61,29 +89,22 @@ export default function AddressAutocomplete({
     };
   }, []);
 
-  // Search function with proper error handling
   const searchAddress = async (query: string): Promise<AddressSuggestion[]> => {
-    // Cancel previous request if exists
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
     }
 
-    // Create new abort controller for this request
     abortControllerRef.current = new AbortController();
 
     try {
       const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?` +
-        `format=json&` +
-        `q=${encodeURIComponent(query)}&` +
-        `countrycodes=za&` +
-        `addressdetails=1&` +
-        `limit=5`,
-        { 
+        `/api/geocode/search?q=${encodeURIComponent(query)}`,
+        {
           signal: abortControllerRef.current.signal,
           headers: {
             'Accept': 'application/json',
-          }
+          },
+          credentials: 'include',
         }
       );
 
@@ -94,7 +115,6 @@ export default function AddressAutocomplete({
       const data = await response.json();
       return data;
     } catch (error: any) {
-      // Ignore abort errors
       if (error.name === 'AbortError') {
         return [];
       }
@@ -102,7 +122,6 @@ export default function AddressAutocomplete({
     }
   };
 
-  // Debounced search with proper async handling
   const debouncedSearch = useCallback(
     (() => {
       let timeoutId: NodeJS.Timeout;
@@ -110,7 +129,6 @@ export default function AddressAutocomplete({
       return async (query: string) => {
         clearTimeout(timeoutId);
         
-        // Reset if query too short
         if (query.trim().length < 3) {
           setSuggestions([]);
           setShowSuggestions(false);
@@ -118,11 +136,11 @@ export default function AddressAutocomplete({
           return;
         }
 
+        setIsLoading(true);
+
         timeoutId = setTimeout(async () => {
-          setIsLoading(true);
-          setSuggestions([]);
-          
           try {
+            setLastQuery(query);
             const results = await searchAddress(query);
             setSuggestions(results);
             setShowSuggestions(results.length > 0);
@@ -133,7 +151,7 @@ export default function AddressAutocomplete({
           } finally {
             setIsLoading(false);
           }
-        }, 500); // 500ms debounce
+        }, 300);
       };
     })(),
     []
@@ -149,7 +167,6 @@ export default function AddressAutocomplete({
     const lat = parseFloat(suggestion.lat);
     const lng = parseFloat(suggestion.lon);
 
-    // Extract address components
     const city = suggestion.address?.city || 
                 suggestion.address?.town || 
                 suggestion.address?.village || 
@@ -157,17 +174,7 @@ export default function AddressAutocomplete({
     
     const postcode = suggestion.address?.postcode;
 
-    // Build readable address
-    let streetAddress = '';
-    if (suggestion.address?.house_number && suggestion.address?.road) {
-      streetAddress = `${suggestion.address.house_number} ${suggestion.address.road}`;
-    } else if (suggestion.address?.road) {
-      streetAddress = suggestion.address.road;
-    } else {
-      // Fallback to first part of display name
-      const parts = suggestion.display_name.split(',');
-      streetAddress = parts[0].trim();
-    }
+    const streetAddress = extractStreetAddress(suggestion, lastQuery || inputValue);
 
     setInputValue(streetAddress);
     onAddressSelect(streetAddress, lat, lng, city, postcode);
@@ -185,7 +192,6 @@ export default function AddressAutocomplete({
   };
 
   const handleInputFocus = () => {
-    // Show existing suggestions if we have them and query is long enough
     if (suggestions.length > 0 && inputValue.trim().length >= 3) {
       setShowSuggestions(true);
     }
@@ -214,15 +220,12 @@ export default function AddressAutocomplete({
           {suggestions.length > 0 ? (
             <>
               {suggestions.map((suggestion, index) => {
-                // Create readable display name
-                let displayName = suggestion.display_name;
-                if (suggestion.address?.house_number && suggestion.address?.road) {
-                  const area = [
-                    suggestion.address?.suburb,
-                    suggestion.address?.city || suggestion.address?.town
-                  ].filter(Boolean).join(', ');
-                  displayName = `${suggestion.address.house_number} ${suggestion.address.road}${area ? `, ${area}` : ''}`;
-                }
+                const displayStreet = extractStreetAddress(suggestion, lastQuery || inputValue);
+                const area = [
+                  suggestion.address?.suburb,
+                  suggestion.address?.city || suggestion.address?.town || suggestion.address?.village
+                ].filter(Boolean).join(', ');
+                const displayName = area ? `${displayStreet}, ${area}` : displayStreet;
 
                 return (
                   <button
