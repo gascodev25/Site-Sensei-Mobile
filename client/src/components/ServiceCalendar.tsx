@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { ChevronLeft, ChevronRight, Calendar, User, Clock, MapPin, Wrench, Package } from "lucide-react";
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, parseISO, addWeeks, subWeeks, startOfWeek, endOfWeek } from "date-fns";
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, parseISO, addWeeks, subWeeks, startOfWeek, endOfWeek, startOfDay } from "date-fns";
 import type { ServiceWithDetails } from "@shared/schema";
 
 interface ServiceCalendarProps {
@@ -185,20 +185,24 @@ export default function ServiceCalendar({ services, onServiceClick, onServiceMov
 
   // Helper function to get effective status for a service on a specific date
   const getEffectiveStatus = (service: ServiceWithDetails, displayDate: Date): string => {
-    // For recurring services, check if this specific date is completed
-    const isRecurring = service.recurrencePattern && 
-                       typeof service.recurrencePattern === 'object' && 
-                       service.recurrencePattern !== null &&
-                       'interval' in service.recurrencePattern;
+    const dateString = format(displayDate, 'yyyy-MM-dd');
+    const today = startOfDay(new Date());
+    const displayDay = startOfDay(displayDate);
 
-    if (isRecurring && service.completedDates && Array.isArray(service.completedDates)) {
-      const dateString = format(displayDate, 'yyyy-MM-dd');
+    if (service.completedDates && Array.isArray(service.completedDates)) {
       if (service.completedDates.includes(dateString)) {
         return 'completed';
       }
     }
 
-    // For non-recurring services, just return the status
+    if (service.status === 'completed') {
+      return 'completed';
+    }
+
+    if (displayDay < today) {
+      return 'missed';
+    }
+
     return service.status || 'scheduled';
   };
 

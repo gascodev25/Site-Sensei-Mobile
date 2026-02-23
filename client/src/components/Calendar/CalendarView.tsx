@@ -24,7 +24,8 @@ import { format,
   addMonths, 
   subMonths,
   isToday,
-  parseISO
+  parseISO,
+  startOfDay
 } from "date-fns";
 import { cn } from "@/lib/utils";
 
@@ -58,6 +59,18 @@ export default function CalendarView() {
     return services.filter((service: Service) => 
       isSameDay(parseISO(service.installationDate), date)
     );
+  };
+
+  const getEffectiveStatus = (service: Service, displayDate: Date): string => {
+    const dateString = format(displayDate, 'yyyy-MM-dd');
+    const today = startOfDay(new Date());
+    const displayDay = startOfDay(displayDate);
+
+    if (service.status === 'completed') return 'completed';
+
+    if (displayDay < today) return 'missed';
+
+    return service.status || 'scheduled';
   };
 
   const getStatusColor = (status: string) => {
@@ -214,7 +227,7 @@ export default function CalendarView() {
                       key={service.id}
                       className={cn(
                         "text-xs p-1 rounded border",
-                        getStatusColor(service.status)
+                        getStatusColor(getEffectiveStatus(service, day))
                       )}
                       data-testid={`service-${service.id}`}
                     >
@@ -295,8 +308,8 @@ export default function CalendarView() {
                         </div>
                       </div>
                     </div>
-                    <Badge className={getStatusColor(service.status)}>
-                      {service.status.charAt(0).toUpperCase() + service.status.slice(1)}
+                    <Badge className={getStatusColor(getEffectiveStatus(service, selectedDate!))}>
+                      {getEffectiveStatus(service, selectedDate!).replace('_', ' ').charAt(0).toUpperCase() + getEffectiveStatus(service, selectedDate!).replace('_', ' ').slice(1)}
                     </Badge>
                   </div>
                 ))}
