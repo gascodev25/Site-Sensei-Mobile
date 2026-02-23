@@ -4,7 +4,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Repeat, Wrench, Loader2, ChevronDown } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import type { ServiceWithDetails } from "@shared/schema";
-import { format, isToday, isTomorrow, isYesterday, parseISO } from "date-fns";
+import { format, isToday, isTomorrow, isYesterday, parseISO, startOfDay } from "date-fns";
 import { useMemo, useState } from "react";
 import {
   DropdownMenu,
@@ -31,60 +31,71 @@ export default function RecentServices() {
 
   const filteredOccurrences = useMemo(() => {
     const occurrences: ServiceOccurrence[] = [];
+    const now = new Date();
+    const today = startOfDay(now);
 
     services.forEach(service => {
-      // Completed Occurrences
-      if (service.completedDates && Array.isArray(service.completedDates)) {
-        service.completedDates.forEach((dateStr: string) => {
-          occurrences.push({
-            service,
-            date: parseISO(dateStr),
-            status: "completed"
-          });
-        });
-      }
-      
-      if (service.status === "completed" && service.installationDate) {
-        const alreadyIncluded = service.completedDates?.includes(
-          format(new Date(service.installationDate), 'yyyy-MM-dd')
-        );
-        if (!alreadyIncluded) {
-          occurrences.push({
-            service,
-            date: new Date(service.installationDate),
-            status: "completed"
-          });
+      if (!service.installationDate) return;
+
+      const baseDate = new Date(service.installationDate);
+      const recurrencePattern = service.recurrencePattern as { interval?: string; end_date?: string } | null;
+      const completedDates = (service.completedDates || []) as string[];
+      const excludedDates = (service.excludedDates || []) as string[];
+      const completedSet = new Set(completedDates.map(d => d.substring(0, 10)));
+      const excludedSet = new Set(excludedDates.map(d => d.substring(0, 10)));
+      const isRecurring = recurrencePattern && recurrencePattern.interval;
+
+      if (!isRecurring) {
+        const dateStr = format(baseDate, "yyyy-MM-dd");
+        if (excludedSet.has(dateStr)) return;
+
+        let status: "completed" | "scheduled" | "missed";
+        if (service.status === "completed" || completedSet.has(dateStr)) {
+          status = "completed";
+        } else if (startOfDay(baseDate) < today) {
+          status = "missed";
+        } else {
+          status = "scheduled";
         }
+        occurrences.push({ service, date: baseDate, status });
+        return;
       }
 
-      // Scheduled Occurrences
-      if (service.status === "scheduled" && service.installationDate) {
-        const isCompleted = service.completedDates?.includes(
-          format(new Date(service.installationDate), 'yyyy-MM-dd')
-        );
-        if (!isCompleted) {
-          occurrences.push({
-            service,
-            date: new Date(service.installationDate),
-            status: "scheduled"
-          });
-        }
+      const intervalMatch = recurrencePattern!.interval!.match(/^(\d+)d$/);
+      if (!intervalMatch) {
+        occurrences.push({ service, date: baseDate, status: "scheduled" });
+        return;
       }
 
-      // Missed Occurrences
-      if (service.status === "missed" && service.installationDate) {
-        occurrences.push({
-          service,
-          date: new Date(service.installationDate),
-          status: "missed"
-        });
+      const intervalDays = parseInt(intervalMatch[1], 10);
+      const recurrenceEnd = recurrencePattern!.end_date ? parseISO(recurrencePattern!.end_date) : null;
+      const futureLimit = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+      let currentDate = new Date(baseDate);
+
+      while (currentDate <= futureLimit) {
+        if (recurrenceEnd && currentDate > recurrenceEnd) break;
+
+        const dateStr = format(currentDate, "yyyy-MM-dd");
+        if (!excludedSet.has(dateStr)) {
+          let status: "completed" | "scheduled" | "missed";
+          if (completedSet.has(dateStr)) {
+            status = "completed";
+          } else if (startOfDay(currentDate) < today) {
+            status = "missed";
+          } else {
+            status = "scheduled";
+          }
+          occurrences.push({ service, date: new Date(currentDate), status });
+        }
+
+        currentDate = new Date(currentDate.getTime() + intervalDays * 24 * 60 * 60 * 1000);
       }
     });
 
     return occurrences
       .filter(occ => occ.status === filter)
       .sort((a, b) => b.date.getTime() - a.date.getTime())
-      .slice(0, 5);
+      .slice(0, 10);
   }, [services, filter]);
 
   const formatServiceDate = (date: Date): string => {
