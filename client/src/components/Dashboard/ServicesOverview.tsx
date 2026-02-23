@@ -1,15 +1,22 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { ExternalLink } from "lucide-react";
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { parseISO, format, startOfDay } from "date-fns";
 import type { ServiceWithDetails } from "@shared/schema";
+import ServiceForm from "@/components/Forms/ServiceForm";
+import { queryClient } from "@/lib/queryClient";
 
 type ViewMode = "today" | "week" | "month";
 
 interface ServiceOccurrence {
   date: Date;
   status: "scheduled" | "completed" | "missed";
+  service: ServiceWithDetails;
 }
 
 interface ChartDataItem {
@@ -18,6 +25,7 @@ interface ChartDataItem {
   completed: number;
   missed: number;
   isHighlighted: boolean;
+  occurrences: ServiceOccurrence[];
 }
 
 function getDateRange(view: ViewMode): { start: Date; end: Date } {
@@ -86,7 +94,7 @@ function generateServiceOccurrences(
       } else {
         status = "scheduled";
       }
-      occurrences.push({ date: new Date(baseDate), status });
+      occurrences.push({ date: new Date(baseDate), status, service });
     }
     return occurrences;
   }
@@ -95,7 +103,7 @@ function generateServiceOccurrences(
   if (!intervalMatch) {
     const dateStr = format(baseDate, "yyyy-MM-dd");
     if (baseDate >= rangeStart && baseDate <= rangeEnd && !excludedSet.has(dateStr)) {
-      occurrences.push({ date: new Date(baseDate), status: "scheduled" });
+      occurrences.push({ date: new Date(baseDate), status: "scheduled", service });
     }
     return occurrences;
   }
@@ -120,7 +128,7 @@ function generateServiceOccurrences(
       } else {
         status = "scheduled";
       }
-      occurrences.push({ date: new Date(currentDate), status });
+      occurrences.push({ date: new Date(currentDate), status, service });
     }
 
     currentDate = new Date(currentDate.getTime() + intervalDays * 24 * 60 * 60 * 1000);
@@ -181,6 +189,7 @@ function aggregateServices(
         completed: inRange.filter((o) => o.status === "completed").length,
         missed: inRange.filter((o) => o.status === "missed").length,
         isHighlighted: isCurrentRange,
+        occurrences: inRange,
       };
     });
   }
@@ -206,6 +215,7 @@ function aggregateServices(
         completed: inDay.filter((o) => o.status === "completed").length,
         missed: inDay.filter((o) => o.status === "missed").length,
         isHighlighted: idx === todayIndex,
+        occurrences: inDay,
       };
     });
   }
@@ -232,6 +242,7 @@ function aggregateServices(
       completed: inWeek.filter((o) => o.status === "completed").length,
       missed: inWeek.filter((o) => o.status === "missed").length,
       isHighlighted: isCurrentWeek,
+      occurrences: inWeek,
     });
 
     weekStart = new Date(weekEnd);
@@ -245,6 +256,8 @@ function aggregateServices(
 
 export default function ServicesOverview() {
   const [view, setView] = useState<ViewMode>("today");
+  const [selectedBar, setSelectedBar] = useState<ChartDataItem | null>(null);
+  const [selectedService, setSelectedService] = useState<ServiceWithDetails | null>(null);
 
   const { data: services = [], isLoading } = useQuery<ServiceWithDetails[]>({
     queryKey: ["/api/services"],
@@ -260,6 +273,12 @@ export default function ServicesOverview() {
     1
   );
   const maxHeight = 180;
+
+  const statusColors: Record<string, string> = {
+    scheduled: "bg-blue-100 text-blue-800",
+    completed: "bg-green-100 text-green-800",
+    missed: "bg-red-100 text-red-800",
+  };
 
   return (
     <Card data-testid="card-services-overview">
@@ -309,24 +328,28 @@ export default function ServicesOverview() {
               const missedHeight = totalCount > 0 ? (item.missed / totalCount) * totalHeight : 0;
 
               return (
-                <div key={item.label} className="flex flex-col items-center">
+                <div
+                  key={item.label}
+                  className="flex flex-col items-center cursor-pointer group"
+                  onClick={() => totalCount > 0 && setSelectedBar(item)}
+                >
                   <div className="flex flex-col-reverse mb-2" style={{ height: `${maxHeight}px` }}>
-                    <div className="flex flex-col-reverse">
+                    <div className="flex flex-col-reverse group-hover:opacity-80 transition-opacity">
                       {scheduledHeight > 0 && (
                         <div
-                          className={`w-12 ${item.isHighlighted ? "bg-blue-600" : "bg-blue-500"}`}
+                          className={`w-12 ${item.isHighlighted ? "bg-blue-600" : "bg-blue-500"} group-hover:ring-2 group-hover:ring-blue-300 transition-all`}
                           style={{ height: `${scheduledHeight}px` }}
                         />
                       )}
                       {completedHeight > 0 && (
                         <div
-                          className="w-12 bg-green-500"
+                          className="w-12 bg-green-500 group-hover:ring-2 group-hover:ring-green-300 transition-all"
                           style={{ height: `${completedHeight}px` }}
                         />
                       )}
                       {missedHeight > 0 && (
                         <div
-                          className="w-12 bg-red-500"
+                          className="w-12 bg-red-500 group-hover:ring-2 group-hover:ring-red-300 transition-all"
                           style={{ height: `${missedHeight}px` }}
                         />
                       )}
@@ -360,6 +383,76 @@ export default function ServicesOverview() {
           </div>
         </div>
       </CardContent>
+
+      <Dialog open={!!selectedBar} onOpenChange={(open) => { if (!open) setSelectedBar(null); }}>
+        <DialogContent className="max-w-3xl max-h-[80vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>
+              Services — {selectedBar?.label}
+              <span className="ml-2 text-sm font-normal text-muted-foreground">
+                ({selectedBar?.occurrences.length || 0} services)
+              </span>
+            </DialogTitle>
+          </DialogHeader>
+          <div className="mt-4 overflow-y-auto flex-1">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Client</TableHead>
+                  <TableHead>Service Type</TableHead>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {selectedBar?.occurrences.map((occ, index) => (
+                  <TableRow
+                    key={`${occ.service.id}-${index}`}
+                    className="cursor-pointer hover:!bg-blue-50 dark:hover:!bg-blue-950 transition-colors"
+                    onClick={() => setSelectedService(occ.service)}
+                  >
+                    <TableCell className="font-medium">{occ.service.client?.name || 'Unknown'}</TableCell>
+                    <TableCell>{occ.service.type?.replace('_', ' ') || 'Unknown'}</TableCell>
+                    <TableCell>{format(occ.date, 'dd MMM yyyy')}</TableCell>
+                    <TableCell>
+                      <Badge className={statusColors[occ.status]}>
+                        {occ.status.charAt(0).toUpperCase() + occ.status.slice(1)}
+                      </Badge>
+                    </TableCell>
+                    <TableCell><ExternalLink className="h-4 w-4 text-muted-foreground" /></TableCell>
+                  </TableRow>
+                ))}
+                {(!selectedBar?.occurrences || selectedBar.occurrences.length === 0) && (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center py-4 text-muted-foreground">No services in this period</TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!selectedService} onOpenChange={(open) => { if (!open) setSelectedService(null); }}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Service</DialogTitle>
+          </DialogHeader>
+          {selectedService && (
+            <ServiceForm
+              service={selectedService}
+              onSuccess={() => {
+                setSelectedService(null);
+                setSelectedBar(null);
+                queryClient.invalidateQueries({ queryKey: ["/api/services"] });
+                queryClient.invalidateQueries({ queryKey: ["/api/dashboard/metrics"] });
+              }}
+              onCancel={() => setSelectedService(null)}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }
