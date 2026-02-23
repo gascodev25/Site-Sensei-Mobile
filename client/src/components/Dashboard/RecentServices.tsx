@@ -1,5 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Repeat, Wrench, Loader2, ChevronDown } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import type { ServiceWithDetails } from "@shared/schema";
@@ -11,6 +12,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import ServiceForm from "@/components/Forms/ServiceForm";
+import { queryClient } from "@/lib/queryClient";
 
 interface ServiceOccurrence {
   service: ServiceWithDetails;
@@ -20,6 +23,7 @@ interface ServiceOccurrence {
 
 export default function RecentServices() {
   const [filter, setFilter] = useState<"completed" | "scheduled" | "missed">("completed");
+  const [selectedService, setSelectedService] = useState<ServiceWithDetails | null>(null);
   
   const { data: services = [], isLoading } = useQuery<ServiceWithDetails[]>({
     queryKey: ["/api/services"],
@@ -170,8 +174,9 @@ export default function RecentServices() {
                 {filteredOccurrences.map((occurrence, index) => (
                   <tr 
                     key={`${occurrence.service.id}-${format(occurrence.date, 'yyyy-MM-dd')}`}
-                    className="hover:bg-muted/50"
+                    className="cursor-pointer hover:!bg-blue-50 dark:hover:!bg-blue-950 transition-colors"
                     data-testid={`row-service-${occurrence.service.id}-${index}`}
+                    onClick={() => setSelectedService(occurrence.service)}
                   >
                     <td className="py-4 px-6">
                       <div>
@@ -205,6 +210,7 @@ export default function RecentServices() {
                         variant="ghost" 
                         size="sm"
                         data-testid={`button-review-${occurrence.service.id}`}
+                        onClick={(e) => { e.stopPropagation(); setSelectedService(occurrence.service); }}
                       >
                         Review
                       </Button>
@@ -216,6 +222,25 @@ export default function RecentServices() {
           </div>
         )}
       </CardContent>
+
+      <Dialog open={!!selectedService} onOpenChange={(open) => { if (!open) setSelectedService(null); }}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Service</DialogTitle>
+          </DialogHeader>
+          {selectedService && (
+            <ServiceForm
+              service={selectedService}
+              onSuccess={() => {
+                setSelectedService(null);
+                queryClient.invalidateQueries({ queryKey: ["/api/services"] });
+                queryClient.invalidateQueries({ queryKey: ["/api/dashboard/metrics"] });
+              }}
+              onCancel={() => setSelectedService(null)}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }
