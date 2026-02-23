@@ -214,7 +214,7 @@ export default function Dashboard() {
                         return false;
                       }
                     }).map((s: any) => (
-                      <TableRow key={s.id} className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => setSelectedService(s)}>
+                      <TableRow key={s.id} className="cursor-pointer hover:!bg-blue-50 dark:hover:!bg-blue-950 transition-colors" onClick={() => setSelectedService(s)}>
                         <TableCell className="font-medium">{s.clientName}</TableCell>
                         <TableCell>{s.type}</TableCell>
                         <TableCell>{format(new Date(s.scheduledDate), 'HH:mm')}</TableCell>
@@ -244,7 +244,7 @@ export default function Dashboard() {
                       const date = new Date(item.missedDate);
                       return !isNaN(date.getTime());
                     }).map((item: any, index: number) => (
-                      <TableRow key={`${item.service?.id}-${item.missedDate}-${index}`} className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => item.service && setSelectedService(item.service)}>
+                      <TableRow key={`${item.service?.id}-${item.missedDate}-${index}`} className="cursor-pointer hover:!bg-blue-50 dark:hover:!bg-blue-950 transition-colors" onClick={() => item.service && setSelectedService(item.service)}>
                         <TableCell className="font-medium">{item.service?.client?.name || 'Unknown'}</TableCell>
                         <TableCell>{item.service?.type || 'Unknown'}</TableCell>
                         <TableCell>{format(new Date(item.missedDate), 'dd MMM yyyy')}</TableCell>
@@ -270,7 +270,7 @@ export default function Dashboard() {
                   </TableHeader>
                   <TableBody>
                     {lowStock?.filter(i => i.currentStock <= i.minThreshold).map((i: any) => (
-                      <TableRow key={i.id} className="hover:bg-muted/50 transition-colors">
+                      <TableRow key={i.id} className="hover:!bg-blue-50 dark:hover:!bg-blue-950 transition-colors">
                         <TableCell className="font-medium">{i.name}</TableCell>
                         <TableCell>{i.category}</TableCell>
                         <TableCell className="text-destructive font-bold">{i.currentStock}</TableCell>
@@ -298,7 +298,7 @@ export default function Dashboard() {
                       thirtyDays.setDate(now.getDate() + 30);
                       return end >= now && end <= thirtyDays;
                     }).map((c: any) => (
-                      <TableRow key={c.id} className="hover:bg-muted/50 transition-colors">
+                      <TableRow key={c.id} className="hover:!bg-blue-50 dark:hover:!bg-blue-950 transition-colors">
                         <TableCell className="font-medium">{c.name}</TableCell>
                         <TableCell>{format(new Date(c.contractEndDate), 'dd MMM yyyy')}</TableCell>
                         <TableCell>R{c.monthlyValue?.toLocaleString()}</TableCell>
