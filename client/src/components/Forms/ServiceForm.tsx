@@ -207,68 +207,49 @@ export default function ServiceForm({ service, initialDate, onSuccess, onCancel,
   });
 
   const onSubmit = (data: InsertService) => {
-    // Check if user is changing the interval, equipment, or consumables of a recurring service
     if (isEditing && service && initialDate) {
       const originalPattern = service.recurrencePattern as { interval?: string } | null;
       const newPattern = data.recurrencePattern as { interval?: string } | null;
       
-      // Check for interval change
       const intervalChanged = originalPattern?.interval && 
           newPattern?.interval && 
           originalPattern.interval !== newPattern.interval;
       
-      // Check for equipment changes
-      const originalEquipment = serviceWithStock?.equipmentItems?.map((item: any) => ({
-        id: item.id,
-        quantity: item.quantity
-      })) || [];
-      
-      const newEquipment = data.equipmentItems || [];
-      
-      const equipmentChanged = JSON.stringify(
-        originalEquipment.sort((a, b) => a.id - b.id)
-      ) !== JSON.stringify(
-        newEquipment.sort((a, b) => a.id - b.id)
-      );
-      
-      // Check for consumable changes
-      const originalConsumables = serviceWithStock?.consumableItems?.map((item: any) => ({
-        id: item.id,
-        quantity: item.quantity
-      })) || [];
-      
-      const newConsumables = data.consumableItems || [];
-      
-      const consumablesChanged = JSON.stringify(
-        originalConsumables.sort((a, b) => a.id - b.id)
-      ) !== JSON.stringify(
-        newConsumables.sort((a, b) => a.id - b.id)
-      );
-      
-      // If anything changed and it's a recurring service with initialDate set
-      if (originalPattern?.interval && (intervalChanged || equipmentChanged || consumablesChanged)) {
-        // Build the change description
-        const changes = [];
-        if (intervalChanged) changes.push(`interval from ${originalPattern.interval} to ${newPattern?.interval}`);
-        if (equipmentChanged) changes.push('equipment items');
-        if (consumablesChanged) changes.push('consumable items');
-        
-        const changeDescription = changes.join(', ');
-        
-        // Ask user if they want to split the series
+      if (originalPattern?.interval && intervalChanged) {
         const shouldSplit = confirm(
-          `You're changing the ${changeDescription}.\n\n` +
+          `You're changing the service interval from ${originalPattern.interval} to ${newPattern?.interval}.\n\n` +
           `Would you like to:\n` +
           `- YES: Apply changes from ${format(initialDate, 'PPP')} forward only (recommended)\n` +
           `- NO: Change for entire series (affects past dates)`
         );
         
         if (shouldSplit) {
-          // Format the split date
           const year = initialDate.getFullYear();
           const month = String(initialDate.getMonth() + 1).padStart(2, '0');
           const day = String(initialDate.getDate()).padStart(2, '0');
           const splitDate = `${year}-${month}-${day}`;
+          
+          const originalEquipment = serviceWithStock?.equipmentItems?.map((item: any) => ({
+            id: item.id,
+            quantity: item.quantity
+          })) || [];
+          const originalConsumables = serviceWithStock?.consumableItems?.map((item: any) => ({
+            id: item.id,
+            quantity: item.quantity
+          })) || [];
+          const newEquipment = data.equipmentItems || [];
+          const newConsumables = data.consumableItems || [];
+          
+          const equipmentChanged = JSON.stringify(
+            [...originalEquipment].sort((a: any, b: any) => a.id - b.id)
+          ) !== JSON.stringify(
+            [...newEquipment].sort((a: any, b: any) => a.id - b.id)
+          );
+          const consumablesChanged = JSON.stringify(
+            [...originalConsumables].sort((a: any, b: any) => a.id - b.id)
+          ) !== JSON.stringify(
+            [...newConsumables].sort((a: any, b: any) => a.id - b.id)
+          );
           
           splitServiceMutation.mutate({
             serviceId: service.id,
@@ -282,7 +263,6 @@ export default function ServiceForm({ service, initialDate, onSuccess, onCancel,
       }
     }
     
-    // Normal create or update
     createServiceMutation.mutate(data);
   };
 

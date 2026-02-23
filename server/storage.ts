@@ -318,11 +318,80 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateService(id: number, service: Partial<InsertService>): Promise<Service> {
+    const { equipmentItems, consumableItems, ...serviceData } = service as any;
+
     const [updatedService] = await db
       .update(services)
-      .set(service)
+      .set(serviceData)
       .where(eq(services.id, id))
       .returning();
+
+    if (equipmentItems !== undefined) {
+      const existingEquipment = await db.select().from(serviceStockIssued).where(
+        and(
+          eq(serviceStockIssued.serviceId, id),
+          isNotNull(serviceStockIssued.equipmentId)
+        )
+      );
+      const existingEquipmentMap = new Map(existingEquipment.map(e => [e.equipmentId, e]));
+      const newEquipmentIds = new Set((equipmentItems || []).map((item: any) => item.id));
+
+      for (const existing of existingEquipment) {
+        if (!newEquipmentIds.has(existing.equipmentId)) {
+          await db.delete(serviceStockIssued).where(eq(serviceStockIssued.id, existing.id));
+        }
+      }
+
+      for (const item of (equipmentItems || [])) {
+        const existing = existingEquipmentMap.get(item.id);
+        if (existing) {
+          await db.update(serviceStockIssued)
+            .set({ quantity: item.quantity })
+            .where(eq(serviceStockIssued.id, existing.id));
+        } else {
+          await db.insert(serviceStockIssued).values({
+            serviceId: id,
+            equipmentId: item.id,
+            quantity: item.quantity,
+            returned: false,
+          });
+        }
+      }
+    }
+
+    if (consumableItems !== undefined) {
+      const existingConsumables = await db.select().from(serviceStockIssued).where(
+        and(
+          eq(serviceStockIssued.serviceId, id),
+          isNotNull(serviceStockIssued.consumableId)
+        )
+      );
+      const existingConsumableMap = new Map(existingConsumables.map(c => [c.consumableId, c]));
+      const newConsumableIds = new Set((consumableItems || []).map((item: any) => item.id));
+
+      for (const existing of existingConsumables) {
+        if (!newConsumableIds.has(existing.consumableId)) {
+          await db.delete(serviceStockIssued).where(eq(serviceStockIssued.id, existing.id));
+        }
+      }
+
+      for (const item of (consumableItems || [])) {
+        const existing = existingConsumableMap.get(item.id);
+        if (existing) {
+          await db.update(serviceStockIssued)
+            .set({ quantity: item.quantity })
+            .where(eq(serviceStockIssued.id, existing.id));
+        } else {
+          await db.insert(serviceStockIssued).values({
+            serviceId: id,
+            consumableId: item.id,
+            quantity: item.quantity,
+            returned: false,
+          });
+        }
+      }
+    }
+
     return updatedService;
   }
 

@@ -821,9 +821,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const id = parseInt(req.params.id);
       const serviceData = insertServiceSchema.partial().parse(req.body);
+
+      const existingServiceWithStock = await storage.getServiceWithStockItems(id);
+      const oldEquipmentIds = (existingServiceWithStock?.equipmentItems || []).map((item: any) => item.id);
+      const newEquipmentIds = ((serviceData as any).equipmentItems || []).map((item: any) => item.id);
+
       const service = await storage.updateService(id, serviceData);
 
-      // Audit log
+      if ((serviceData as any).equipmentItems !== undefined) {
+        const removedEquipmentIds = oldEquipmentIds.filter((eqId: number) => !newEquipmentIds.includes(eqId));
+        for (const equipmentId of removedEquipmentIds) {
+          await storage.updateEquipment(equipmentId, {
+            status: 'in_warehouse',
+            installedAtClientId: null,
+            dateInstalled: null
+          });
+        }
+
+        const addedEquipmentIds = newEquipmentIds.filter((eqId: number) => !oldEquipmentIds.includes(eqId));
+        for (const equipmentId of addedEquipmentIds) {
+          await storage.updateEquipment(equipmentId, {
+            status: 'in_field',
+            installedAtClientId: service.clientId,
+            dateInstalled: new Date()
+          });
+        }
+      }
+
       await storage.createAuditLog({
         userId: req.user?.claims?.sub,
         action: 'update',

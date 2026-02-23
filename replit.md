@@ -19,13 +19,13 @@ The system is built as a full-stack web application using modern technologies in
 - Both authentication methods share same session store and role-based access control system
 - Login page features username/password form with optional "Sign in with Replit" button
 
-**Series Splitting for Equipment & Consumables (October 2025)**
-- Implemented series splitting capability for recurring services when equipment or consumables change
-- When editing a recurring service from the calendar, changes to equipment items, consumable items, or service intervals trigger a split confirmation dialog
-- Users can choose to apply changes from a specific date forward (creates new service series) or modify the entire series
-- The split operation maintains data integrity by ending the original series one day before the split date and creating a new series with updated stock assignments
-- Warehouse forecasting automatically updates after splits through cache invalidation
-- All stock assignments (equipment and consumables) are properly copied to the new service series
+**Service Update & Series Splitting Fix (February 2026)**
+- Fixed service duplication bug: updating equipment or consumables on a service no longer creates a duplicate service
+- Equipment and consumable changes now update the existing service's stock assignments in-place via the PUT endpoint
+- Only recurrence interval changes trigger the series split dialog (creates new series from date forward)
+- Storage layer uses diff-based updates for service_stock_issued: preserves returned status and other fields, only adds/removes/updates changed items
+- PUT route manages equipment status transitions (in_warehouse/in_field) when equipment is added or removed from a service
+- Split logic only passes equipment/consumable data to new series when those items actually changed
 
 **Daily Stock Forecast with Timezone Support (October 2025)**
 - Implemented getDailyStockForecast() method providing accurate per-day consumable requirements for 28-day forecast period
