@@ -276,10 +276,53 @@ export class DatabaseStorage implements IStorage {
       .leftJoin(serviceTeams, eq(services.teamId, serviceTeams.id))
       .orderBy(desc(services.installationDate));
 
+    const serviceIds = results.map(r => r.service.id);
+
+    let stockByService: Map<number, { equipmentNames: string[]; consumableNames: string[] }> = new Map();
+
+    if (serviceIds.length > 0) {
+      const equipmentRows = await db
+        .select({
+          serviceId: serviceStockIssued.serviceId,
+          name: equipment.name,
+          quantity: serviceStockIssued.quantity,
+        })
+        .from(serviceStockIssued)
+        .innerJoin(equipment, eq(serviceStockIssued.equipmentId, equipment.id))
+        .where(inArray(serviceStockIssued.serviceId, serviceIds));
+
+      const consumableRows = await db
+        .select({
+          serviceId: serviceStockIssued.serviceId,
+          name: consumables.name,
+          quantity: serviceStockIssued.quantity,
+        })
+        .from(serviceStockIssued)
+        .innerJoin(consumables, eq(serviceStockIssued.consumableId, consumables.id))
+        .where(inArray(serviceStockIssued.serviceId, serviceIds));
+
+      for (const row of equipmentRows) {
+        if (!stockByService.has(row.serviceId)) {
+          stockByService.set(row.serviceId, { equipmentNames: [], consumableNames: [] });
+        }
+        const entry = stockByService.get(row.serviceId)!;
+        entry.equipmentNames.push(row.quantity > 1 ? `${row.name} ×${row.quantity}` : row.name);
+      }
+
+      for (const row of consumableRows) {
+        if (!stockByService.has(row.serviceId)) {
+          stockByService.set(row.serviceId, { equipmentNames: [], consumableNames: [] });
+        }
+        const entry = stockByService.get(row.serviceId)!;
+        entry.consumableNames.push(row.quantity > 1 ? `${row.name} ×${row.quantity}` : row.name);
+      }
+    }
+
     return results.map(row => ({
       ...row.service,
       client: row.client,
-      team: row.team
+      team: row.team,
+      stockSummary: stockByService.get(row.service.id) || { equipmentNames: [], consumableNames: [] },
     }));
   }
 

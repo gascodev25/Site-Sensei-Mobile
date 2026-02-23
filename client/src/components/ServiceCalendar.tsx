@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { ChevronLeft, ChevronRight, Calendar, User, Clock, MapPin } from "lucide-react";
+import { ChevronLeft, ChevronRight, Calendar, User, Clock, MapPin, Wrench, Package } from "lucide-react";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, parseISO, addWeeks, subWeeks, startOfWeek, endOfWeek } from "date-fns";
 import type { ServiceWithDetails } from "@shared/schema";
 
@@ -244,6 +244,18 @@ export default function ServiceCalendar({ services, onServiceClick, onServiceMov
               <div className="flex items-center text-xs mt-1 opacity-75">
                 <Clock className="h-3 w-3 mr-1" />
                 <span>{service.estimatedDuration}min</span>
+              </div>
+            )}
+            {(service as any).stockSummary?.equipmentNames?.length > 0 && (
+              <div className="flex items-center text-xs mt-1 opacity-75">
+                <Wrench className="h-3 w-3 mr-1 shrink-0" />
+                <span className="truncate">{(service as any).stockSummary.equipmentNames.slice(0, 2).join(', ')}{(service as any).stockSummary.equipmentNames.length > 2 ? ` +${(service as any).stockSummary.equipmentNames.length - 2}` : ''}</span>
+              </div>
+            )}
+            {(service as any).stockSummary?.consumableNames?.length > 0 && (
+              <div className="flex items-center text-xs mt-1 opacity-75">
+                <Package className="h-3 w-3 mr-1 shrink-0" />
+                <span className="truncate">{(service as any).stockSummary.consumableNames.slice(0, 2).join(', ')}{(service as any).stockSummary.consumableNames.length > 2 ? ` +${(service as any).stockSummary.consumableNames.length - 2}` : ''}</span>
               </div>
             )}
           </>

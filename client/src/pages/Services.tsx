@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Search, Edit, Trash2, Calendar, Clock, User, MapPin, List } from "lucide-react";
+import { Plus, Search, Edit, Trash2, Calendar, Clock, User, MapPin, List, Wrench, Package, Repeat } from "lucide-react";
 import type { ServiceWithDetails, ServiceTeam } from "@shared/schema";
 import ServiceCalendar from "@/components/ServiceCalendar";
 import RecurringServiceMoveDialog from "@/components/Dialogs/RecurringServiceMoveDialog";
@@ -593,6 +593,43 @@ export default function Services() {
                         {service.contractLengthMonths && (
                           <div>
                             <span className="font-medium">Contract:</span> {service.contractLengthMonths} months
+                          </div>
+                        )}
+                        {(service.recurrencePattern as any)?.interval && (
+                          <div className="flex items-center">
+                            <Repeat className="h-3 w-3 mr-1" />
+                            <span className="font-medium">Frequency:</span>
+                            <span className="ml-1">
+                              {(() => {
+                                const interval = (service.recurrencePattern as any).interval;
+                                const labels: Record<string, string> = { '7d': 'Weekly', '14d': 'Bi-weekly', '30d': 'Monthly', '60d': 'Bi-monthly', '90d': 'Quarterly', '180d': 'Semi-annually' };
+                                return labels[interval] || `Every ${interval}`;
+                              })()}
+                            </span>
+                          </div>
+                        )}
+                        {(service as any).stockSummary?.equipmentNames?.length > 0 && (
+                          <div className="flex items-start mt-1">
+                            <Wrench className="h-3 w-3 mr-1 mt-0.5 shrink-0" />
+                            <div>
+                              <span className="font-medium">Equipment:</span>
+                              <span className="ml-1 text-muted-foreground">
+                                {(service as any).stockSummary.equipmentNames.slice(0, 3).join(', ')}
+                                {(service as any).stockSummary.equipmentNames.length > 3 && ` +${(service as any).stockSummary.equipmentNames.length - 3} more`}
+                              </span>
+                            </div>
+                          </div>
+                        )}
+                        {(service as any).stockSummary?.consumableNames?.length > 0 && (
+                          <div className="flex items-start mt-1">
+                            <Package className="h-3 w-3 mr-1 mt-0.5 shrink-0" />
+                            <div>
+                              <span className="font-medium">Consumables:</span>
+                              <span className="ml-1 text-muted-foreground">
+                                {(service as any).stockSummary.consumableNames.slice(0, 3).join(', ')}
+                                {(service as any).stockSummary.consumableNames.length > 3 && ` +${(service as any).stockSummary.consumableNames.length - 3} more`}
+                              </span>
+                            </div>
                           </div>
                         )}
                       </div>
