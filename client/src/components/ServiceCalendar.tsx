@@ -4,7 +4,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { ChevronLeft, ChevronRight, Calendar, User, Clock, MapPin, Wrench, Package } from "lucide-react";
+import { ChevronLeft, ChevronRight, ChevronDown, Calendar, User, Clock, MapPin, Wrench, Package } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar as CalendarPicker } from "@/components/ui/calendar";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, parseISO, addWeeks, subWeeks, startOfWeek, endOfWeek, startOfDay } from "date-fns";
 import type { ServiceWithDetails } from "@shared/schema";
 import { generateOccurrences } from "@shared/recurrence";
@@ -20,6 +22,7 @@ export default function ServiceCalendar({ services, onServiceClick, onServiceMov
   const [currentDate, setCurrentDate] = useState(new Date());
   const [view, setView] = useState<'month' | 'week' | 'day'>('month');
   const [selectedTeam, setSelectedTeam] = useState<string>('all');
+  const [calendarPopoverOpen, setCalendarPopoverOpen] = useState(false);
   const [draggedService, setDraggedService] = useState<ServiceWithDetails | null>(null);
   const [draggedFromDate, setDraggedFromDate] = useState<Date | null>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -407,7 +410,33 @@ export default function ServiceCalendar({ services, onServiceClick, onServiceMov
             <Button variant="outline" size="sm" onClick={navigatePrevious} data-testid="calendar-prev">
               <ChevronLeft className="h-4 w-4" />
             </Button>
-            <h2 className="text-xl font-semibold min-w-[200px] text-center">{getViewTitle()}</h2>
+
+            <Popover open={calendarPopoverOpen} onOpenChange={setCalendarPopoverOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className="text-xl font-semibold min-w-[200px] justify-center gap-1"
+                >
+                  {getViewTitle()}
+                  <ChevronDown className="h-4 w-4 opacity-60" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <CalendarPicker
+                  mode="single"
+                  selected={currentDate}
+                  onSelect={(date) => {
+                    if (date) {
+                      setCurrentDate(date);
+                      setView('day');
+                      setCalendarPopoverOpen(false);
+                    }
+                  }}
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
+
             <Button variant="outline" size="sm" onClick={navigateNext} data-testid="calendar-next">
               <ChevronRight className="h-4 w-4" />
             </Button>
