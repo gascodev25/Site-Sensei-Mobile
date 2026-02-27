@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Search, Edit, Trash2, Calendar, Clock, User, MapPin, List, Wrench, Package, Repeat, ChevronDown } from "lucide-react";
+import { Plus, Search, Edit, Trash2, Calendar, Clock, User, MapPin, List, Wrench, Package, Repeat, ChevronDown, CheckCircle } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarPicker } from "@/components/ui/calendar";
 import type { ServiceWithDetails, ServiceTeam } from "@shared/schema";
@@ -371,6 +371,24 @@ export default function Services() {
     );
   };
 
+  const isServiceCompleted = (service: ServiceWithDetails): boolean => {
+    const isRecurring = service.recurrencePattern &&
+      typeof service.recurrencePattern === 'object' &&
+      service.recurrencePattern !== null &&
+      'interval' in service.recurrencePattern;
+
+    if (isRecurring && service.completedDates && Array.isArray(service.completedDates)) {
+      const today = new Date().toISOString().split('T')[0];
+      const serviceDate = service.installationDate
+        ? new Date(service.installationDate).toISOString().split('T')[0]
+        : null;
+      return service.completedDates.includes(today) ||
+        (serviceDate ? service.completedDates.includes(serviceDate) : false);
+    }
+
+    return service.status === 'completed';
+  };
+
   const formatDate = (dateString: string | Date | null) => {
     if (!dateString) return "Not scheduled";
     return new Date(dateString).toLocaleDateString('en-ZA', {
@@ -658,6 +676,22 @@ export default function Services() {
                           </div>
                         </div>
                         <div className="flex space-x-1">
+                          {!isServiceCompleted(service) && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleServiceComplete(service);
+                              }}
+                              disabled={completeServiceMutation.isPending}
+                              title="Mark as complete"
+                              data-testid={`button-complete-${service.id}`}
+                            >
+                              <CheckCircle className="h-4 w-4" />
+                            </Button>
+                          )}
                           <Button 
                             variant="ghost" 
                             size="sm"
