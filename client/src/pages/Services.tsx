@@ -676,22 +676,24 @@ export default function Services() {
                           </div>
                         </div>
                         <div className="flex space-x-1">
-                          {!isServiceCompleted(service) && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="text-green-600 hover:text-green-700 hover:bg-green-50"
-                              onClick={(e) => {
-                                e.stopPropagation();
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className={isServiceCompleted(service)
+                              ? "text-green-600 hover:text-green-700 hover:bg-green-50"
+                              : "text-black hover:text-gray-700 hover:bg-gray-100"}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (!isServiceCompleted(service)) {
                                 handleServiceComplete(service);
-                              }}
-                              disabled={completeServiceMutation.isPending}
-                              title="Mark as complete"
-                              data-testid={`button-complete-${service.id}`}
-                            >
-                              <CheckCircle className="h-4 w-4" />
-                            </Button>
-                          )}
+                              }
+                            }}
+                            disabled={completeServiceMutation.isPending}
+                            title={isServiceCompleted(service) ? "Completed" : "Mark as complete"}
+                            data-testid={`button-complete-${service.id}`}
+                          >
+                            <CheckCircle className="h-4 w-4" />
+                          </Button>
                           <Button 
                             variant="ghost" 
                             size="sm"
