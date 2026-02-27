@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { startOfMonth, endOfMonth, startOfWeek, endOfWeek, startOfDay, endOfDay, subMonths, addMonths, subWeeks, addWeeks, subDays, addDays, format, isWithinInterval } from "date-fns";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -21,6 +22,8 @@ export default function Services() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTeamId, setSelectedTeamId] = useState<string>("all");
   const [activeTab, setActiveTab] = useState("list");
+  const [listDateView, setListDateView] = useState<'month' | 'week' | 'day'>('month');
+  const [listCurrentDate, setListCurrentDate] = useState(new Date());
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingService, setEditingService] = useState<ServiceWithDetails | null>(null);
   const [preSelectedDate, setPreSelectedDate] = useState<Date | null>(null);
@@ -279,6 +282,35 @@ export default function Services() {
     setRecurringMoveDialog({ open: false, service: null, originalDate: null, newDate: null });
   };
 
+  // List view date navigation
+  const navigateListPrevious = () => {
+    if (listDateView === 'month') setListCurrentDate(d => subMonths(d, 1));
+    else if (listDateView === 'week') setListCurrentDate(d => subWeeks(d, 1));
+    else setListCurrentDate(d => subDays(d, 1));
+  };
+
+  const navigateListNext = () => {
+    if (listDateView === 'month') setListCurrentDate(d => addMonths(d, 1));
+    else if (listDateView === 'week') setListCurrentDate(d => addWeeks(d, 1));
+    else setListCurrentDate(d => addDays(d, 1));
+  };
+
+  const getListDateRange = () => {
+    if (listDateView === 'month') return { start: startOfMonth(listCurrentDate), end: endOfMonth(listCurrentDate) };
+    if (listDateView === 'week') return { start: startOfWeek(listCurrentDate), end: endOfWeek(listCurrentDate) };
+    return { start: startOfDay(listCurrentDate), end: endOfDay(listCurrentDate) };
+  };
+
+  const getListPeriodLabel = () => {
+    if (listDateView === 'month') return format(listCurrentDate, 'MMMM yyyy');
+    if (listDateView === 'week') {
+      const start = startOfWeek(listCurrentDate);
+      const end = endOfWeek(listCurrentDate);
+      return `${format(start, 'MMM d')} – ${format(end, 'MMM d, yyyy')}`;
+    }
+    return format(listCurrentDate, 'MMMM d, yyyy');
+  };
+
   // Client-side filtering like Clients and Inventory pages
   const filteredServices = services.filter(service => {
     const searchLower = searchQuery.toLowerCase();
@@ -293,8 +325,14 @@ export default function Services() {
     );
     
     const matchesTeam = selectedTeamId === "all" || service.teamId?.toString() === selectedTeamId;
+
+    const dateRange = getListDateRange();
+    const serviceDate = service.installationDate ? new Date(service.installationDate) : null;
+    const matchesDateRange = serviceDate
+      ? isWithinInterval(serviceDate, { start: dateRange.start, end: dateRange.end })
+      : false;
     
-    return matchesSearch && matchesTeam;
+    return matchesSearch && matchesTeam && matchesDateRange;
   });
 
   const getStatusBadge = (service: ServiceWithDetails) => {
@@ -441,12 +479,50 @@ export default function Services() {
                     data-testid="input-search-services"
                   />
                 </div>
+
+                <div className="flex items-center gap-1 border rounded-md">
+                  <Button
+                    variant={listDateView === 'month' ? 'default' : 'ghost'}
+                    size="sm"
+                    className="rounded-r-none"
+                    onClick={() => setListDateView('month')}
+                  >
+                    Month
+                  </Button>
+                  <Button
+                    variant={listDateView === 'week' ? 'default' : 'ghost'}
+                    size="sm"
+                    className="rounded-none border-x"
+                    onClick={() => setListDateView('week')}
+                  >
+                    Week
+                  </Button>
+                  <Button
+                    variant={listDateView === 'day' ? 'default' : 'ghost'}
+                    size="sm"
+                    className="rounded-l-none"
+                    onClick={() => setListDateView('day')}
+                  >
+                    Day
+                  </Button>
+                </div>
               </div>
             )}
           </div>
 
           {/* List View Tab Content */}
           <TabsContent value="list" className="space-y-8">
+            {/* Date Navigation */}
+            <div className="flex items-center gap-3">
+              <Button variant="outline" size="icon" onClick={navigateListPrevious} className="h-8 w-8">
+                {"<"}
+              </Button>
+              <span className="font-semibold text-base min-w-[180px] text-center">{getListPeriodLabel()}</span>
+              <Button variant="outline" size="icon" onClick={navigateListNext} className="h-8 w-8">
+                {">"}
+              </Button>
+            </div>
+
             {/* Service Stats Cards */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <Card>
@@ -454,11 +530,11 @@ export default function Services() {
                   <div className="flex items-center space-x-2">
                     <Calendar className="h-4 w-4 text-blue-600" />
                     <div>
-                      <p className="text-sm font-medium text-muted-foreground">Today's Services</p>
+                      <p className="text-sm font-medium text-muted-foreground">
+                        {listDateView === 'day' ? "Today's Services" : listDateView === 'week' ? "This Week's Services" : "This Month's Services"}
+                      </p>
                       <p className="text-2xl font-bold text-blue-600">
-                        {services.filter(s => s.installationDate && 
-                          new Date(s.installationDate).toDateString() === new Date().toDateString()
-                        ).length}
+                        {filteredServices.length}
                       </p>
                     </div>
                   </div>
@@ -472,7 +548,7 @@ export default function Services() {
                     <div>
                       <p className="text-sm font-medium text-muted-foreground">Completed</p>
                       <p className="text-2xl font-bold text-green-600">
-                        {services.filter(s => s.status === 'completed').length}
+                        {filteredServices.filter(s => s.status === 'completed').length}
                       </p>
                     </div>
                   </div>
@@ -486,7 +562,7 @@ export default function Services() {
                     <div>
                       <p className="text-sm font-medium text-muted-foreground">Scheduled</p>
                       <p className="text-2xl font-bold text-orange-600">
-                        {services.filter(s => s.status === 'scheduled').length}
+                        {filteredServices.filter(s => s.status === 'scheduled').length}
                       </p>
                     </div>
                   </div>
@@ -500,7 +576,7 @@ export default function Services() {
                     <div>
                       <p className="text-sm font-medium text-muted-foreground">Missed</p>
                       <p className="text-2xl font-bold text-red-600">
-                        {services.filter(s => s.status === 'missed').length}
+                        {filteredServices.filter(s => s.status === 'missed').length}
                       </p>
                     </div>
                   </div>
