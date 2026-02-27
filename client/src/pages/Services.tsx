@@ -12,7 +12,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Search, Edit, Trash2, Calendar, Clock, User, MapPin, List, Wrench, Package, Repeat } from "lucide-react";
+import { Plus, Search, Edit, Trash2, Calendar, Clock, User, MapPin, List, Wrench, Package, Repeat, ChevronDown } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar as CalendarPicker } from "@/components/ui/calendar";
 import type { ServiceWithDetails, ServiceTeam } from "@shared/schema";
 import ServiceCalendar from "@/components/ServiceCalendar";
 import RecurringServiceMoveDialog from "@/components/Dialogs/RecurringServiceMoveDialog";
@@ -24,6 +26,7 @@ export default function Services() {
   const [activeTab, setActiveTab] = useState("list");
   const [listDateView, setListDateView] = useState<'month' | 'week' | 'day'>('month');
   const [listCurrentDate, setListCurrentDate] = useState(new Date());
+  const [calendarPopoverOpen, setCalendarPopoverOpen] = useState(false);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingService, setEditingService] = useState<ServiceWithDetails | null>(null);
   const [preSelectedDate, setPreSelectedDate] = useState<Date | null>(null);
@@ -517,7 +520,33 @@ export default function Services() {
               <Button variant="outline" size="icon" onClick={navigateListPrevious} className="h-8 w-8">
                 {"<"}
               </Button>
-              <span className="font-semibold text-base min-w-[180px] text-center">{getListPeriodLabel()}</span>
+
+              <Popover open={calendarPopoverOpen} onOpenChange={setCalendarPopoverOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="font-semibold text-base min-w-[180px] justify-center gap-1"
+                  >
+                    {getListPeriodLabel()}
+                    <ChevronDown className="h-4 w-4 opacity-60" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <CalendarPicker
+                    mode="single"
+                    selected={listCurrentDate}
+                    onSelect={(date) => {
+                      if (date) {
+                        setListCurrentDate(date);
+                        setListDateView('day');
+                        setCalendarPopoverOpen(false);
+                      }
+                    }}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+
               <Button variant="outline" size="icon" onClick={navigateListNext} className="h-8 w-8">
                 {">"}
               </Button>
