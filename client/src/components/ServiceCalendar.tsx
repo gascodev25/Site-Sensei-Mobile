@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { ChevronLeft, ChevronRight, ChevronDown, Calendar, User, Clock, MapPin, Wrench, Package } from "lucide-react";
+import { ChevronLeft, ChevronRight, ChevronDown, Calendar, User, Clock, MapPin, Wrench, Package, CheckCircle } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarPicker } from "@/components/ui/calendar";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, parseISO, addWeeks, subWeeks, startOfWeek, endOfWeek, startOfDay } from "date-fns";
@@ -16,9 +16,10 @@ interface ServiceCalendarProps {
   onServiceClick?: (service: ServiceWithDetails, clickedDate?: Date) => void;
   onServiceMove?: (serviceId: number, newDate: Date, originalDate?: Date) => void;
   onDateClick?: (date: Date) => void;
+  onComplete?: (service: ServiceWithDetails, date: Date) => void;
 }
 
-export default function ServiceCalendar({ services, onServiceClick, onServiceMove, onDateClick }: ServiceCalendarProps) {
+export default function ServiceCalendar({ services, onServiceClick, onServiceMove, onDateClick, onComplete }: ServiceCalendarProps) {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [view, setView] = useState<'month' | 'week' | 'day'>('month');
   const [selectedTeam, setSelectedTeam] = useState<string>('all');
@@ -213,7 +214,25 @@ export default function ServiceCalendar({ services, onServiceClick, onServiceMov
         `}
         data-testid={`calendar-service-${service.id}`}
       >
-        <div className="font-medium truncate">{service.client?.name || 'Unknown'}</div>
+        <div className="flex items-center justify-between gap-1">
+          <div className="font-medium truncate flex-1">{service.client?.name || 'Unknown'}</div>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              if (effectiveStatus !== 'completed') {
+                onComplete?.(service, displayDate);
+              }
+            }}
+            title={effectiveStatus === 'completed' ? 'Completed' : 'Mark as complete'}
+            className={`shrink-0 rounded-full p-0.5 transition-colors ${
+              effectiveStatus === 'completed'
+                ? 'text-green-600'
+                : 'text-gray-800 hover:text-gray-600'
+            }`}
+          >
+            <CheckCircle className={size === 'small' ? 'h-3 w-3' : 'h-4 w-4'} />
+          </button>
+        </div>
         {size === 'large' && (
           <>
             <div className="flex items-center text-xs mt-1 opacity-75">

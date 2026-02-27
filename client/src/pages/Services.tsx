@@ -178,9 +178,9 @@ export default function Services() {
     setSelectedServiceDate(clickedDate || null); // Store the clicked date
   };
 
-  const handleServiceComplete = (service: ServiceWithDetails) => {
-    // Use the selected date from calendar, or today if completed from list view
-    const completionDate = selectedServiceDate || new Date();
+  const handleServiceComplete = (service: ServiceWithDetails, dateOverride?: Date) => {
+    // Use explicit date override, selected calendar date, or today
+    const completionDate = dateOverride || selectedServiceDate || new Date();
     
     // Format date in local timezone to avoid timezone conversion issues
     const year = completionDate.getFullYear();
@@ -800,6 +800,7 @@ export default function Services() {
               onServiceClick={handleServiceClick}
               onServiceMove={handleServiceMove}
               onDateClick={handleDateClick}
+              onComplete={(service, date) => handleServiceComplete(service, date)}
             />
           </TabsContent>
         </Tabs>
