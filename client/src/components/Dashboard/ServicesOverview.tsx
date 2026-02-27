@@ -8,6 +8,7 @@ import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { parseISO, format, startOfDay } from "date-fns";
 import type { ServiceWithDetails } from "@shared/schema";
+import { generateOccurrences } from "@shared/recurrence";
 import ServiceForm from "@/components/Forms/ServiceForm";
 import { queryClient } from "@/lib/queryClient";
 
@@ -99,8 +100,7 @@ function generateServiceOccurrences(
     return occurrences;
   }
 
-  const intervalMatch = recurrencePattern!.interval!.match(/^(\d+)d$/);
-  if (!intervalMatch) {
+  if (!recurrencePattern!.interval) {
     const dateStr = format(baseDate, "yyyy-MM-dd");
     if (baseDate >= rangeStart && baseDate <= rangeEnd && !excludedSet.has(dateStr)) {
       occurrences.push({ date: new Date(baseDate), status: "scheduled", service });
@@ -108,30 +108,28 @@ function generateServiceOccurrences(
     return occurrences;
   }
 
-  const intervalDays = parseInt(intervalMatch[1], 10);
-  let currentDate = new Date(baseDate);
-
   const recurrenceEnd = recurrencePattern!.end_date ? parseISO(recurrencePattern!.end_date) : null;
 
-  while (currentDate <= rangeEnd) {
-    if (recurrenceEnd && currentDate > recurrenceEnd) break;
+  const dates = generateOccurrences(baseDate, recurrencePattern!.interval!, {
+    rangeStart,
+    rangeEnd,
+    endDate: recurrenceEnd,
+    excludedDates: excludedDates.map(d => d.substring(0, 10)),
+  });
 
-    const dateStr = format(currentDate, "yyyy-MM-dd");
-    if (currentDate >= rangeStart && currentDate >= baseDate && !excludedSet.has(dateStr)) {
-      let status: "scheduled" | "completed" | "missed";
-      if (completedSet.has(dateStr)) {
-        status = "completed";
-      } else if (service.status === "completed") {
-        status = "completed";
-      } else if (startOfDay(currentDate) < startOfDay(now)) {
-        status = "missed";
-      } else {
-        status = "scheduled";
-      }
-      occurrences.push({ date: new Date(currentDate), status, service });
+  for (const date of dates) {
+    const dateStr = format(date, "yyyy-MM-dd");
+    let status: "scheduled" | "completed" | "missed";
+    if (completedSet.has(dateStr)) {
+      status = "completed";
+    } else if (service.status === "completed") {
+      status = "completed";
+    } else if (startOfDay(date) < startOfDay(now)) {
+      status = "missed";
+    } else {
+      status = "scheduled";
     }
-
-    currentDate = new Date(currentDate.getTime() + intervalDays * 24 * 60 * 60 * 1000);
+    occurrences.push({ date, status, service });
   }
 
   return occurrences;

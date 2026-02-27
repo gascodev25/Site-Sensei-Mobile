@@ -4,6 +4,7 @@ import { Users, Loader2 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { parseISO } from "date-fns";
 import type { ServiceTeam, TeamMember, ServiceWithDetails } from "@shared/schema";
+import { generateOccurrences } from "@shared/recurrence";
 
 interface TeamAssignment {
   teamId: number;
@@ -53,37 +54,23 @@ export default function TeamStatus() {
       return [baseDate];
     }
 
-    const intervalMatch = recurrencePattern.interval.match(/^(\d+)d$/);
-    if (!intervalMatch) {
+    if (!recurrencePattern.interval) {
       return [baseDate];
     }
 
-    const intervalDays = parseInt(intervalMatch[1]);
-    const instances: Date[] = [];
-
     const excludedDates = (service.excludedDates as string[]) || [];
-    const excludedDateStrings = new Set(excludedDates.map(date => date.split('T')[0]));
     const completedDates = (service.completedDates as string[]) || [];
     const completedDateStrings = new Set(completedDates.map(date => date.split('T')[0]));
+    const recurrenceEndDate = recurrencePattern.end_date ? parseISO(recurrencePattern.end_date) : null;
 
-    let currentDate = new Date(baseDate);
-    while (currentDate <= endDate) {
-      const currentDateString = currentDate.toISOString().split('T')[0];
+    const allDates = generateOccurrences(baseDate, recurrencePattern.interval, {
+      rangeStart: startDate,
+      rangeEnd: endDate,
+      endDate: recurrenceEndDate,
+      excludedDates,
+    });
 
-      if (currentDate >= startDate && 
-          currentDate >= baseDate && 
-          !excludedDateStrings.has(currentDateString) &&
-          !completedDateStrings.has(currentDateString)) {
-        instances.push(new Date(currentDate));
-      }
-      currentDate = new Date(currentDate.getTime() + (intervalDays * 24 * 60 * 60 * 1000));
-
-      if (recurrencePattern.end_date && currentDate > parseISO(recurrencePattern.end_date)) {
-        break;
-      }
-    }
-
-    return instances;
+    return allDates.filter(d => !completedDateStrings.has(d.toISOString().split('T')[0]));
   };
 
   const getTeamStatus = (teamId: number): "active" | "scheduled" | "available" => {

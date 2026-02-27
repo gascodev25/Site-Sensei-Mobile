@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { ChevronLeft, ChevronRight, Calendar, User, Clock, MapPin, Wrench, Package } from "lucide-react";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, parseISO, addWeeks, subWeeks, startOfWeek, endOfWeek, startOfDay } from "date-fns";
 import type { ServiceWithDetails } from "@shared/schema";
+import { generateOccurrences } from "@shared/recurrence";
 
 interface ServiceCalendarProps {
   services: ServiceWithDetails[];
@@ -78,37 +79,15 @@ export default function ServiceCalendar({ services, onServiceClick, onServiceMov
       return [baseDate];
     }
 
-    // Parse interval (e.g., "7d", "30d", "60d")
-    const intervalMatch = recurrencePattern.interval.match(/^(\d+)d$/);
-    if (!intervalMatch) {
-      return [baseDate]; // If interval format is not recognized, show single occurrence
-    }
-
-    const intervalDays = parseInt(intervalMatch[1]);
-    const instances: Date[] = [];
-
-    // Get excluded dates (dates to skip)
     const excludedDates = (service.excludedDates as string[]) || [];
-    const excludedDateStrings = new Set(excludedDates.map(date => date.split('T')[0])); // Normalize to YYYY-MM-DD
+    const recurrenceEnd = recurrencePattern.end_date ? parseISO(recurrencePattern.end_date) : null;
 
-    // Generate instances ONLY forward from the installation date
-    let currentDate = new Date(baseDate);
-    while (currentDate <= endDate) {
-      const currentDateString = currentDate.toISOString().split('T')[0]; // YYYY-MM-DD format
-
-      // Only add if the date is within our view range, on or after the installation date, and NOT excluded
-      if (currentDate >= startDate && 
-          currentDate >= baseDate && 
-          !excludedDateStrings.has(currentDateString)) {
-        instances.push(new Date(currentDate));
-      }
-      currentDate = new Date(currentDate.getTime() + (intervalDays * 24 * 60 * 60 * 1000));
-
-      // Optional: respect end_date if specified in recurrence pattern
-      if (recurrencePattern.end_date && currentDate > parseISO(recurrencePattern.end_date)) {
-        break;
-      }
-    }
+    const instances = generateOccurrences(baseDate, recurrencePattern.interval, {
+      rangeStart: startDate,
+      rangeEnd: endDate,
+      endDate: recurrenceEnd,
+      excludedDates,
+    });
 
     return instances.sort((a, b) => a.getTime() - b.getTime());
   };

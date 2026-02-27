@@ -15,6 +15,7 @@ import {
   serviceCompletionSchema,
   insertUserSchema
 } from "@shared/schema";
+import { generateOccurrences } from "@shared/recurrence";
 import { z } from "zod";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -325,32 +326,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
           continue;
         }
         
-        // Parse interval
-        const intervalMatch = recurrencePattern.interval.match(/^(\d+)d$/);
-        if (!intervalMatch) {
-          missedOccurrences.push({ service, missedDate: toSASTDateString(installDate) });
-          continue;
-        }
-        
-        const intervalDays = parseInt(intervalMatch[1], 10);
         const endDate = recurrencePattern.end_date ? new Date(recurrencePattern.end_date) : null;
         
         const completedSet = new Set(completedDates.map(d => d.substring(0, 10)));
-        const excludedSet = new Set(excludedDates.map(d => d.substring(0, 10)));
         
-        let currentDate = new Date(installDate);
+        const occurrences = generateOccurrences(installDate, recurrencePattern.interval, {
+          rangeEnd: now,
+          endDate,
+          excludedDates,
+        });
         
-        while (currentDate <= now) {
-          if (endDate && currentDate > endDate) break;
-          
-          // Convert to SAST date string for comparison
-          const dateStr = toSASTDateString(currentDate);
-          
-          if (!completedSet.has(dateStr) && !excludedSet.has(dateStr)) {
+        for (const occDate of occurrences) {
+          const dateStr = toSASTDateString(occDate);
+          if (!completedSet.has(dateStr)) {
             missedOccurrences.push({ service, missedDate: dateStr });
           }
-          
-          currentDate = new Date(currentDate.getTime() + intervalDays * 24 * 60 * 60 * 1000);
         }
       }
       

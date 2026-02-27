@@ -4,6 +4,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Repeat, Wrench, Loader2, ChevronDown } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import type { ServiceWithDetails } from "@shared/schema";
+import { generateOccurrences } from "@shared/recurrence";
 import { format, isToday, isTomorrow, isYesterday, parseISO, startOfDay } from "date-fns";
 import { useMemo, useState } from "react";
 import {
@@ -61,34 +62,31 @@ export default function RecentServices() {
         return;
       }
 
-      const intervalMatch = recurrencePattern!.interval!.match(/^(\d+)d$/);
-      if (!intervalMatch) {
+      if (!recurrencePattern!.interval) {
         occurrences.push({ service, date: baseDate, status: "scheduled" });
         return;
       }
 
-      const intervalDays = parseInt(intervalMatch[1], 10);
       const recurrenceEnd = recurrencePattern!.end_date ? parseISO(recurrencePattern!.end_date) : null;
       const futureLimit = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
-      let currentDate = new Date(baseDate);
 
-      while (currentDate <= futureLimit) {
-        if (recurrenceEnd && currentDate > recurrenceEnd) break;
+      const dates = generateOccurrences(baseDate, recurrencePattern!.interval!, {
+        rangeEnd: futureLimit,
+        endDate: recurrenceEnd,
+        excludedDates: excludedDates,
+      });
 
-        const dateStr = format(currentDate, "yyyy-MM-dd");
-        if (!excludedSet.has(dateStr)) {
-          let status: "completed" | "scheduled" | "missed";
-          if (completedSet.has(dateStr)) {
-            status = "completed";
-          } else if (startOfDay(currentDate) < today) {
-            status = "missed";
-          } else {
-            status = "scheduled";
-          }
-          occurrences.push({ service, date: new Date(currentDate), status });
+      for (const date of dates) {
+        const dateStr = format(date, "yyyy-MM-dd");
+        let status: "completed" | "scheduled" | "missed";
+        if (completedSet.has(dateStr)) {
+          status = "completed";
+        } else if (startOfDay(date) < today) {
+          status = "missed";
+        } else {
+          status = "scheduled";
         }
-
-        currentDate = new Date(currentDate.getTime() + intervalDays * 24 * 60 * 60 * 1000);
+        occurrences.push({ service, date, status });
       }
     });
 

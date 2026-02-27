@@ -33,6 +33,7 @@ import {
   type EquipmentTemplateWithConsumables,
   type EquipmentWithConsumables,
 } from "@shared/schema";
+import { generateOccurrences, isOccurrenceOnDay } from "@shared/recurrence";
 import { db } from "./db";
 import { eq, and, or, sql, desc, asc, ilike, lt, gte, lte, inArray, isNull, isNotNull, ne } from "drizzle-orm";
 
@@ -802,41 +803,27 @@ export class DatabaseStorage implements IStorage {
       return 0;
     }
     
-    // Parse interval (e.g., "7d", "30d")
-    const intervalMatch = recurrencePattern.interval.match(/^(\d+)d$/);
-    if (!intervalMatch) {
+    if (!recurrencePattern.interval) {
       return installDate <= now && service.status !== 'completed' ? 1 : 0;
     }
-    
-    const intervalDays = parseInt(intervalMatch[1], 10);
+
     const endDate = recurrencePattern.end_date ? new Date(recurrencePattern.end_date) : null;
-    
-    // Generate all occurrences up to now
-    let missedCount = 0;
-    let currentDate = new Date(installDate);
-    
-    // Set to track completed dates for quick lookup
     const completedSet = new Set(completedDates.map(d => d.substring(0, 10)));
-    const excludedSet = new Set(excludedDates.map(d => d.substring(0, 10)));
-    
-    while (currentDate <= now) {
-      // Check if we've passed the end date
-      if (endDate && currentDate > endDate) {
-        break;
-      }
-      
-      // Convert to SAST date string for comparison with completed/excluded dates
-      const dateStr = this.toSASTDateString(currentDate);
-      
-      // Count as missed if not completed and not excluded
-      if (!completedSet.has(dateStr) && !excludedSet.has(dateStr)) {
+
+    const occurrences = generateOccurrences(installDate, recurrencePattern.interval, {
+      rangeEnd: now,
+      endDate,
+      excludedDates,
+    });
+
+    let missedCount = 0;
+    for (const occ of occurrences) {
+      const dateStr = this.toSASTDateString(occ);
+      if (!completedSet.has(dateStr)) {
         missedCount++;
       }
-      
-      // Move to next occurrence
-      currentDate = new Date(currentDate.getTime() + intervalDays * 24 * 60 * 60 * 1000);
     }
-    
+
     return missedCount;
   }
 
@@ -1243,48 +1230,25 @@ export class DatabaseStorage implements IStorage {
                            'interval' in s.recurrencePattern;
 
         if (isRecurring) {
-          // Parse the interval (e.g., "7d" -> 7 days)
           const pattern = s.recurrencePattern as { interval: string; end_date?: string };
-          const intervalMatch = pattern.interval.match(/^(\d+)d$/);
-          if (!intervalMatch) return false;
+          const endDate = pattern.end_date ? new Date(pattern.end_date) : null;
 
-          const intervalDays = parseInt(intervalMatch[1], 10);
+          if (endDate && weekStart > endDate) return false;
 
-          // Check if end_date has passed
-          if (pattern.end_date) {
-            const endDate = new Date(pattern.end_date);
-            if (weekStart > endDate) return false;
-          }
-
-          // Generate occurrences in this week
           const completedDatesSet = new Set((s.completedDates as string[]) || []);
-          let hasNonCompletedOccurrence = false;
+          const excludedDates = (s.excludedDates as string[]) || [];
 
-          // Start from the service's installation date and step by interval
-          let currentDate = new Date(serviceDate);
-          const maxIterations = 1000; // Safety limit
-          let iterations = 0;
+          const weekOccurrences = generateOccurrences(serviceDate, pattern.interval, {
+            rangeStart: weekStart,
+            rangeEnd: weekEnd,
+            endDate,
+            excludedDates,
+          });
 
-          while (currentDate <= weekEnd && iterations < maxIterations) {
-            iterations++;
-
-            // If this occurrence falls within the week
-            if (currentDate >= weekStart && currentDate <= weekEnd) {
-              const dateStr = currentDate.toISOString().split('T')[0];
-
-              // Check if this specific date is not completed
-              if (!completedDatesSet.has(dateStr)) {
-                hasNonCompletedOccurrence = true;
-                break;
-              }
-            }
-
-            // Move to next occurrence
-            currentDate = new Date(currentDate);
-            currentDate.setDate(currentDate.getDate() + intervalDays);
-          }
-
-          return hasNonCompletedOccurrence;
+          return weekOccurrences.some(d => {
+            const dateStr = d.toISOString().split('T')[0];
+            return !completedDatesSet.has(dateStr);
+          });
         }
 
         // For non-recurring services, simple date check
@@ -1521,53 +1485,17 @@ export class DatabaseStorage implements IStorage {
 
         if (isRecurring) {
           const pattern = s.recurrencePattern as { interval: string; end_date?: string };
-          const intervalMatch = pattern.interval.match(/^(\d+)d$/);
-          if (!intervalMatch) return false;
+          const endDate = pattern.end_date ? new Date(pattern.end_date) : null;
 
-          const intervalDays = parseInt(intervalMatch[1], 10);
+          if (endDate && dayDate > endDate) return false;
 
-          // Check if end_date has passed
-          if (pattern.end_date) {
-            const endDate = new Date(pattern.end_date);
-            if (dayDate > endDate) return false;
-          }
-
-          // Determine the correct recurrence anchor
-          // Use the earliest completed date if available, otherwise use installation_date
           const completedDatesArray = (s.completedDates as string[]) || [];
-          let anchorDate: Date;
-
-          if (completedDatesArray.length > 0) {
-            // Use earliest completed date as anchor (this is the true schedule base)
-            const sortedCompleted = completedDatesArray.sort();
-            anchorDate = new Date(sortedCompleted[0]);
-          } else {
-            // No completed dates yet, convert installation_date to SAST to get correct local date
-            const serviceDateSAST = new Date(serviceDate.getTime() + (SAST_OFFSET_HOURS * 60 * 60 * 1000));
-            anchorDate = new Date(serviceDateSAST.toISOString().split('T')[0]);
-          }
-
-          anchorDate.setHours(0, 0, 0, 0);
-
-          // Check if service occurs on this specific day
           const completedDatesSet = new Set(completedDatesArray);
+          const dateStr = dayDate.toISOString().split('T')[0];
 
-          // Calculate if dayDate is a valid occurrence from the anchor
-          const daysSinceAnchor = Math.floor((dayDate.getTime() - anchorDate.getTime()) / (1000 * 60 * 60 * 24));
+          if (completedDatesSet.has(dateStr)) return false;
 
-          if (daysSinceAnchor < 0) {
-            // Day is before the anchor, so no occurrence
-            return false;
-          }
-
-          // Check if this day falls on a recurrence interval
-          if (daysSinceAnchor % intervalDays === 0) {
-            const dateStr = dayDate.toISOString().split('T')[0];
-            // Only include if not already completed
-            return !completedDatesSet.has(dateStr);
-          }
-
-          return false;
+          return isOccurrenceOnDay(serviceDate, pattern.interval, dayDate, endDate);
         }
 
         // For non-recurring services, check if service date falls on this specific day
