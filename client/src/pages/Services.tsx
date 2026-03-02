@@ -359,24 +359,49 @@ export default function Services() {
     return matchesSearch && matchesTeam && matchesDateRange;
   });
 
-  const getStatusBadge = (service: ServiceWithDetails) => {
-    let status = service.status || 'scheduled';
-    
-    // For recurring services, check if today's date is in completedDates
-    const isRecurring = service.recurrencePattern && 
-                       typeof service.recurrencePattern === 'object' && 
-                       service.recurrencePattern !== null &&
-                       'interval' in service.recurrencePattern;
-    
-    if (isRecurring && service.completedDates && Array.isArray(service.completedDates)) {
-      const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
-      const serviceDate = service.installationDate ? new Date(service.installationDate).toISOString().split('T')[0] : null;
-      
-      // Check if the service date or today is in completed dates
-      if (service.completedDates.includes(today) || (serviceDate && service.completedDates.includes(serviceDate))) {
-        status = 'completed';
+  // Expand filtered services into individual occurrence rows (matches calendar view)
+  const expandedOccurrences: { service: ServiceWithDetails; occurrenceDate: Date }[] = [];
+  {
+    const dateRange = getListDateRange();
+    for (const service of filteredServices) {
+      const serviceDate = service.installationDate
+        ? (typeof service.installationDate === 'string' ? parseISO(service.installationDate) : service.installationDate)
+        : null;
+      if (!serviceDate) continue;
+      const recurrencePattern = service.recurrencePattern as { interval?: string; end_date?: string } | null;
+      if (recurrencePattern && recurrencePattern.interval) {
+        const excludedDates = (service.excludedDates as string[]) || [];
+        const recurrenceEnd = recurrencePattern.end_date ? parseISO(recurrencePattern.end_date) : null;
+        const occurrences = generateOccurrences(serviceDate, recurrencePattern.interval, {
+          rangeStart: dateRange.start,
+          rangeEnd: dateRange.end,
+          endDate: recurrenceEnd,
+          excludedDates,
+        });
+        for (const occ of occurrences) {
+          expandedOccurrences.push({ service, occurrenceDate: occ });
+        }
+      } else {
+        expandedOccurrences.push({ service, occurrenceDate: serviceDate });
       }
     }
+    expandedOccurrences.sort((a, b) => a.occurrenceDate.getTime() - b.occurrenceDate.getTime());
+  }
+
+  const getEffectiveStatus = (service: ServiceWithDetails, occurrenceDate: Date): string => {
+    const dateStr = format(occurrenceDate, 'yyyy-MM-dd');
+    if (service.completedDates && Array.isArray(service.completedDates) && service.completedDates.includes(dateStr)) {
+      return 'completed';
+    }
+    if (service.status === 'completed') return 'completed';
+    if (startOfDay(occurrenceDate) < startOfDay(new Date())) return 'missed';
+    return service.status || 'scheduled';
+  };
+
+  const getStatusBadge = (service: ServiceWithDetails, occurrenceDate?: Date) => {
+    const status = occurrenceDate
+      ? getEffectiveStatus(service, occurrenceDate)
+      : (service.status || 'scheduled');
     
     const statusColors = {
       scheduled: "bg-amber-100 border-amber-400 text-amber-800",
@@ -392,21 +417,10 @@ export default function Services() {
     );
   };
 
-  const isServiceCompleted = (service: ServiceWithDetails): boolean => {
-    const isRecurring = service.recurrencePattern &&
-      typeof service.recurrencePattern === 'object' &&
-      service.recurrencePattern !== null &&
-      'interval' in service.recurrencePattern;
-
-    if (isRecurring && service.completedDates && Array.isArray(service.completedDates)) {
-      const today = new Date().toISOString().split('T')[0];
-      const serviceDate = service.installationDate
-        ? new Date(service.installationDate).toISOString().split('T')[0]
-        : null;
-      return service.completedDates.includes(today) ||
-        (serviceDate ? service.completedDates.includes(serviceDate) : false);
+  const isServiceCompleted = (service: ServiceWithDetails, occurrenceDate?: Date): boolean => {
+    if (occurrenceDate) {
+      return getEffectiveStatus(service, occurrenceDate) === 'completed';
     }
-
     return service.status === 'completed';
   };
 
@@ -602,7 +616,7 @@ export default function Services() {
                         {listDateView === 'day' ? "Today's Services" : listDateView === 'week' ? "This Week's Services" : "This Month's Services"}
                       </p>
                       <p className="text-2xl font-bold text-blue-600">
-                        {filteredServices.length}
+                        {expandedOccurrences.length}
                       </p>
                     </div>
                   </div>
@@ -616,7 +630,7 @@ export default function Services() {
                     <div>
                       <p className="text-sm font-medium text-muted-foreground">Completed</p>
                       <p className="text-2xl font-bold text-green-600">
-                        {filteredServices.filter(s => s.status === 'completed').length}
+                        {expandedOccurrences.filter(({ service, occurrenceDate }) => getEffectiveStatus(service, occurrenceDate) === 'completed').length}
                       </p>
                     </div>
                   </div>
@@ -630,7 +644,7 @@ export default function Services() {
                     <div>
                       <p className="text-sm font-medium text-muted-foreground">Scheduled</p>
                       <p className="text-2xl font-bold text-orange-600">
-                        {filteredServices.filter(s => s.status === 'scheduled').length}
+                        {expandedOccurrences.filter(({ service, occurrenceDate }) => getEffectiveStatus(service, occurrenceDate) === 'scheduled').length}
                       </p>
                     </div>
                   </div>
@@ -644,7 +658,7 @@ export default function Services() {
                     <div>
                       <p className="text-sm font-medium text-muted-foreground">Missed</p>
                       <p className="text-2xl font-bold text-red-600">
-                        {filteredServices.filter(s => s.status === 'missed').length}
+                        {expandedOccurrences.filter(({ service, occurrenceDate }) => getEffectiveStatus(service, occurrenceDate) === 'missed').length}
                       </p>
                     </div>
                   </div>
@@ -653,7 +667,7 @@ export default function Services() {
             </div>
 
             {/* Services Grid */}
-            {filteredServices.length === 0 ? (
+            {expandedOccurrences.length === 0 ? (
               <Card>
                 <CardContent className="flex flex-col items-center justify-center py-12">
                   <div className="text-muted-foreground text-center">
@@ -671,13 +685,13 @@ export default function Services() {
               </Card>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filteredServices.map((service: ServiceWithDetails) => (
+                {expandedOccurrences.map(({ service, occurrenceDate }) => (
                   <Card
-                    key={service.id}
+                    key={`${service.id}-${occurrenceDate.toISOString()}`}
                     className={`hover:shadow-md transition-shadow cursor-pointer hover:ring-2 hover:ring-blue-300 dark:hover:ring-blue-700 ${getTeamBackgroundColor(service.team?.name)}`}
                     data-testid={`card-service-${service.id}`}
                     onClick={() => {
-                      setSelectedServiceDate(null);
+                      setSelectedServiceDate(occurrenceDate);
                       setEditingService(service);
                     }}
                   >
@@ -693,24 +707,24 @@ export default function Services() {
                           </div>
                           <div className="flex items-center text-sm text-muted-foreground">
                             <Calendar className="h-3 w-3 mr-1" />
-                            <span>{formatDate(service.installationDate)}</span>
+                            <span>{formatDate(occurrenceDate)}</span>
                           </div>
                         </div>
                         <div className="flex space-x-1">
                           <Button
                             variant="ghost"
                             size="sm"
-                            className={isServiceCompleted(service)
+                            className={isServiceCompleted(service, occurrenceDate)
                               ? "text-green-600 hover:text-green-700 hover:bg-green-50"
                               : "text-black hover:text-gray-700 hover:bg-gray-100"}
                             onClick={(e) => {
                               e.stopPropagation();
-                              if (!isServiceCompleted(service)) {
-                                handleServiceComplete(service);
+                              if (!isServiceCompleted(service, occurrenceDate)) {
+                                handleServiceComplete(service, occurrenceDate);
                               }
                             }}
                             disabled={completeServiceMutation.isPending}
-                            title={isServiceCompleted(service) ? "Completed" : "Mark as complete"}
+                            title={isServiceCompleted(service, occurrenceDate) ? "Completed" : "Mark as complete"}
                             data-testid={`button-complete-${service.id}`}
                           >
                             <CheckCircle className="h-4 w-4" />
