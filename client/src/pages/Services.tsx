@@ -300,8 +300,11 @@ export default function Services() {
   };
 
   const getListDateRange = () => {
-    if (listDateView === 'month') return { start: startOfMonth(listCurrentDate), end: endOfMonth(listCurrentDate) };
-    if (listDateView === 'week') return { start: startOfWeek(listCurrentDate), end: endOfWeek(listCurrentDate) };
+    if (listDateView === 'month') return {
+      start: startOfWeek(startOfMonth(listCurrentDate), { weekStartsOn: 1 }),
+      end: endOfWeek(endOfMonth(listCurrentDate), { weekStartsOn: 1 }),
+    };
+    if (listDateView === 'week') return { start: startOfWeek(listCurrentDate, { weekStartsOn: 1 }), end: endOfWeek(listCurrentDate, { weekStartsOn: 1 }) };
     return { start: startOfDay(listCurrentDate), end: endOfDay(listCurrentDate) };
   };
 
