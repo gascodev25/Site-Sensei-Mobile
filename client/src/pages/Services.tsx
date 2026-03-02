@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { startOfMonth, endOfMonth, startOfWeek, endOfWeek, startOfDay, endOfDay, subMonths, addMonths, subWeeks, addWeeks, subDays, addDays, format, isWithinInterval } from "date-fns";
+import { startOfMonth, endOfMonth, startOfWeek, endOfWeek, startOfDay, endOfDay, subMonths, addMonths, subWeeks, addWeeks, subDays, addDays, format, isWithinInterval, parseISO } from "date-fns";
+import { generateOccurrences } from "@shared/recurrence";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -330,11 +331,28 @@ export default function Services() {
     const matchesTeam = selectedTeamId === "all" || service.teamId?.toString() === selectedTeamId;
 
     const dateRange = getListDateRange();
-    const serviceDate = service.installationDate ? new Date(service.installationDate) : null;
-    const matchesDateRange = serviceDate
-      ? isWithinInterval(serviceDate, { start: dateRange.start, end: dateRange.end })
-      : false;
-    
+    const serviceDate = service.installationDate
+      ? (typeof service.installationDate === 'string' ? parseISO(service.installationDate) : service.installationDate)
+      : null;
+
+    let matchesDateRange = false;
+    if (serviceDate) {
+      const recurrencePattern = service.recurrencePattern as { interval?: string; end_date?: string } | null;
+      if (recurrencePattern && recurrencePattern.interval) {
+        const excludedDates = (service.excludedDates as string[]) || [];
+        const recurrenceEnd = recurrencePattern.end_date ? parseISO(recurrencePattern.end_date) : null;
+        const occurrences = generateOccurrences(serviceDate, recurrencePattern.interval, {
+          rangeStart: dateRange.start,
+          rangeEnd: dateRange.end,
+          endDate: recurrenceEnd,
+          excludedDates,
+        });
+        matchesDateRange = occurrences.length > 0;
+      } else {
+        matchesDateRange = isWithinInterval(serviceDate, { start: dateRange.start, end: dateRange.end });
+      }
+    }
+
     return matchesSearch && matchesTeam && matchesDateRange;
   });
 
