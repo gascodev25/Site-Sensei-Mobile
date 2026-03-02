@@ -232,7 +232,7 @@ export default function ServiceCalendar({ services, onServiceClick, onServiceMov
                 : 'text-gray-800 hover:text-gray-600'
             }`}
           >
-            <CheckCircle className={size === 'small' ? 'h-3 w-3' : 'h-6 w-6'} />
+            <CheckCircle className={size === 'small' ? 'h-3 w-3' : 'h-12 w-12'} />
           </button>
         </div>
         {size === 'large' && (
