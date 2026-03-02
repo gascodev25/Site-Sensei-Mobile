@@ -224,13 +224,15 @@ export default function ServiceCalendar({ services, onServiceClick, onServiceMov
               }
             }}
             title={effectiveStatus === 'completed' ? 'Completed' : 'Mark as complete'}
-            className={`shrink-0 rounded-full p-0.5 transition-colors ${
+            className={`shrink-0 rounded-full transition-colors ${
+              size === 'large' ? 'p-1.5' : 'p-0.5'
+            } ${
               effectiveStatus === 'completed'
                 ? 'text-green-600'
                 : 'text-gray-800 hover:text-gray-600'
             }`}
           >
-            <CheckCircle className={size === 'small' ? 'h-3 w-3' : 'h-4 w-4'} />
+            <CheckCircle className={size === 'small' ? 'h-3 w-3' : 'h-6 w-6'} />
           </button>
         </div>
         {size === 'large' && (
