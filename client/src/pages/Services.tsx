@@ -189,8 +189,18 @@ export default function Services() {
     const day = String(completionDate.getDate()).padStart(2, '0');
     const dateString = `${year}-${month}-${day}`;
     
-    // Always show the completion dialog so consumables can be recorded and deducted from stock
-    setCompletionDialog({ open: true, service, completionDate });
+    if (service.type === 'installation') {
+      // For installations, show completion dialog to update equipment/consumables
+      setCompletionDialog({ open: true, service, completionDate });
+    } else {
+      // For all other services (recurring and non-recurring), use the completion endpoint
+      completeServiceMutation.mutate({
+        serviceId: service.id,
+        data: { 
+          completionDate: dateString 
+        }
+      });
+    }
   };
 
   const handleServiceMove = (serviceId: number, newDate: Date, draggedFromDate?: Date) => {
