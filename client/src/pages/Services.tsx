@@ -152,6 +152,7 @@ export default function Services() {
       queryClient.invalidateQueries({ queryKey: ["/api/warehouse/consumables"] });
       queryClient.invalidateQueries({ queryKey: ["/api/warehouse/weekly-forecast"] });
       queryClient.invalidateQueries({ queryKey: ["/api/equipment"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/consumables"] });
       setCompletionDialog({ open: false, service: null });
       setEditingService(null);
       toast({
@@ -194,10 +195,16 @@ export default function Services() {
       setCompletionDialog({ open: true, service, completionDate });
     } else {
       // For all other services (recurring and non-recurring), use the completion endpoint
+      // Include pre-assigned consumables so stock is automatically deducted
+      const consumableItems = (service as any).consumableItems
+        ?.filter((item: any) => item.id && item.quantity)
+        .map((item: any) => ({ id: item.id, quantity: item.quantity }));
+
       completeServiceMutation.mutate({
         serviceId: service.id,
         data: { 
-          completionDate: dateString 
+          completionDate: dateString,
+          ...(consumableItems && consumableItems.length > 0 ? { consumableItems } : {})
         }
       });
     }
