@@ -1075,15 +1075,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Update the service
       const service = await storage.updateService(id, updateData);
 
-      // Step 6: Deduct consumable stock for items used in this service completion
+      // Step 6: Deduct consumable stock for items used in this service completion.
+      // If consumableItems were sent explicitly (installation dialog), use those.
+      // Otherwise, look up the service's pre-assigned consumables from the database.
+      let itemsToDeduct: { id: number; quantity: number }[] = [];
+
       if (consumableItems && consumableItems.length > 0) {
+        itemsToDeduct = consumableItems;
+      } else {
+        const serviceWithStock = await storage.getServiceWithStockItems(id);
+        if (serviceWithStock?.consumableItems?.length > 0) {
+          itemsToDeduct = serviceWithStock.consumableItems.map((item: any) => ({
+            id: item.id,
+            quantity: item.quantity || 1,
+          }));
+        }
+      }
+
+      if (itemsToDeduct.length > 0) {
         const allConsumables = await storage.getConsumables();
         const consumableMap = new Map(allConsumables.map(c => [c.id, c]));
 
-        for (const item of consumableItems) {
+        for (const item of itemsToDeduct) {
           const consumable = consumableMap.get(item.id);
           if (consumable) {
-            const newStock = Math.max(0, (consumable.currentStock || 0) - (item.quantity || 1));
+            const newStock = Math.max(0, (consumable.currentStock || 0) - item.quantity);
             await storage.updateConsumable(item.id, { currentStock: newStock });
           }
         }

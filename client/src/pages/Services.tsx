@@ -194,17 +194,12 @@ export default function Services() {
       // For installations, show completion dialog to update equipment/consumables
       setCompletionDialog({ open: true, service, completionDate });
     } else {
-      // For all other services (recurring and non-recurring), use the completion endpoint
-      // Include pre-assigned consumables so stock is automatically deducted
-      const consumableItems = (service as any).consumableItems
-        ?.filter((item: any) => item.id && item.quantity)
-        .map((item: any) => ({ id: item.id, quantity: item.quantity }));
-
+      // For all other services (recurring and non-recurring), use the completion endpoint.
+      // The backend automatically looks up and deducts pre-assigned consumables.
       completeServiceMutation.mutate({
         serviceId: service.id,
         data: { 
           completionDate: dateString,
-          ...(consumableItems && consumableItems.length > 0 ? { consumableItems } : {})
         }
       });
     }
