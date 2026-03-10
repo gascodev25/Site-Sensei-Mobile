@@ -114,6 +114,9 @@ export default function ServiceCompletionDialog({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/services"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard/metrics"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/consumables"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/warehouse/consumables"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/warehouse/weekly-forecast"] });
       toast({
         title: "Success",
         description: service?.type === 'installation' 
@@ -151,248 +154,250 @@ export default function ServiceCompletionDialog({
           <DialogDescription>
             {isInstallation 
               ? "Update the final equipment and consumable quantities used during installation."
-              : "Mark this service as completed."
+              : "Select the consumables used during this service visit. Stock levels will be updated accordingly."
             }
           </DialogDescription>
         </DialogHeader>
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            {/* Equipment Section — installations only */}
             {isInstallation && (
-              <>
-                {/* Equipment Section */}
-                <div className="space-y-4 border-t border-border pt-4">
-                  <div className="flex items-center space-x-2">
-                    <Wrench className="h-5 w-5 text-muted-foreground" />
-                    <h3 className="text-lg font-medium">Equipment Used</h3>
-                  </div>
-                  <p className="text-sm text-muted-foreground">
-                    Update the final quantities of equipment used in this installation
-                  </p>
-                  
-                  <FormField
-                    control={form.control}
-                    name="equipmentItems"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormControl>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            {equipment.map((item) => {
-                              const isSelected = field.value?.some(eq => eq.id === item.id) || false;
-                              const selectedItem = field.value?.find(eq => eq.id === item.id);
-                              
-                              return (
-                                <div key={item.id} className="flex items-center space-x-3 p-3 border rounded-lg">
-                                  <Checkbox
-                                    checked={isSelected}
-                                    onCheckedChange={(checked) => {
-                                      if (checked) {
-                                        field.onChange([...(field.value || []), { id: item.id, quantity: 1 }]);
-                                      } else {
-                                        field.onChange(field.value?.filter(eq => eq.id !== item.id) || []);
-                                      }
-                                    }}
-                                    data-testid={`checkbox-equipment-${item.id}`}
-                                  />
-                                  <div className="flex-1">
-                                    <p className="font-medium">{item.name}</p>
-                                    <p className="text-sm text-muted-foreground">{item.stockCode}</p>
-                                    <Badge variant="outline" className="text-xs">
-                                      Stock: {item.stockQuantity || 0}
-                                    </Badge>
-                                  </div>
-                                  {isSelected && (
-                                    <div className="flex items-center space-x-2">
-                                      <span className="text-sm">Qty:</span>
-                                      <Input
-                                        type="number"
-                                        min="1"
-                                        value={selectedItem?.quantity || 1}
-                                        onChange={(e) => {
-                                          const newQty = parseInt(e.target.value) || 1;
-                                          field.onChange(
-                                            field.value?.map(eq => 
-                                              eq.id === item.id ? { ...eq, quantity: newQty } : eq
-                                            ) || []
-                                          );
-                                        }}
-                                        className="w-20"
-                                        data-testid={`input-equipment-quantity-${item.id}`}
-                                      />
-                                    </div>
-                                  )}
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </FormControl>
-                      </FormItem>
-                    )}
-                  />
+              <div className="space-y-4 border-t border-border pt-4">
+                <div className="flex items-center space-x-2">
+                  <Wrench className="h-5 w-5 text-muted-foreground" />
+                  <h3 className="text-lg font-medium">Equipment Used</h3>
                 </div>
-
-                {/* Consumables Section */}
-                <div className="space-y-4 border-t border-border pt-4">
-                  <div className="flex items-center space-x-2">
-                    <Package className="h-5 w-5 text-muted-foreground" />
-                    <h3 className="text-lg font-medium">Consumables Used</h3>
-                  </div>
-                  <p className="text-sm text-muted-foreground">
-                    Update the final quantities of consumables used in this installation
-                  </p>
-                  
-                  <FormField
-                    control={form.control}
-                    name="consumableItems"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormControl>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            {consumables.map((item) => {
-                              const isSelected = field.value?.some(con => con.id === item.id) || false;
-                              const selectedItem = field.value?.find(con => con.id === item.id);
-                              
-                              return (
-                                <div key={item.id} className="flex items-center space-x-3 p-3 border rounded-lg">
-                                  <Checkbox
-                                    checked={isSelected}
-                                    onCheckedChange={(checked) => {
-                                      if (checked) {
-                                        field.onChange([...(field.value || []), { id: item.id, quantity: 1 }]);
-                                      } else {
-                                        field.onChange(field.value?.filter(con => con.id !== item.id) || []);
-                                      }
-                                    }}
-                                    data-testid={`checkbox-consumable-${item.id}`}
-                                  />
-                                  <div className="flex-1">
-                                    <p className="font-medium">{item.name}</p>
-                                    <p className="text-sm text-muted-foreground">R{item.unitCost}</p>
-                                    <Badge variant="outline" className="text-xs">
-                                      Stock: {item.stockQuantity || 0}
-                                    </Badge>
-                                  </div>
-                                  {isSelected && (
-                                    <div className="flex items-center space-x-2">
-                                      <span className="text-sm">Qty:</span>
-                                      <Input
-                                        type="number"
-                                        min="1"
-                                        value={selectedItem?.quantity || 1}
-                                        onChange={(e) => {
-                                          const newQty = parseInt(e.target.value) || 1;
-                                          field.onChange(
-                                            field.value?.map(con => 
-                                              con.id === item.id ? { ...con, quantity: newQty } : con
-                                            ) || []
-                                          );
-                                        }}
-                                        className="w-20"
-                                        data-testid={`input-consumable-quantity-${item.id}`}
-                                      />
-                                    </div>
-                                  )}
+                <p className="text-sm text-muted-foreground">
+                  Update the final quantities of equipment used in this installation
+                </p>
+                
+                <FormField
+                  control={form.control}
+                  name="equipmentItems"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormControl>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          {equipment.map((item) => {
+                            const isSelected = field.value?.some(eq => eq.id === item.id) || false;
+                            const selectedItem = field.value?.find(eq => eq.id === item.id);
+                            
+                            return (
+                              <div key={item.id} className="flex items-center space-x-3 p-3 border rounded-lg">
+                                <Checkbox
+                                  checked={isSelected}
+                                  onCheckedChange={(checked) => {
+                                    if (checked) {
+                                      field.onChange([...(field.value || []), { id: item.id, quantity: 1 }]);
+                                    } else {
+                                      field.onChange(field.value?.filter(eq => eq.id !== item.id) || []);
+                                    }
+                                  }}
+                                  data-testid={`checkbox-equipment-${item.id}`}
+                                />
+                                <div className="flex-1">
+                                  <p className="font-medium">{item.name}</p>
+                                  <p className="text-sm text-muted-foreground">{item.stockCode}</p>
+                                  <Badge variant="outline" className="text-xs">
+                                    Stock: {item.stockQuantity || 0}
+                                  </Badge>
                                 </div>
-                              );
-                            })}
-                          </div>
-                        </FormControl>
-                      </FormItem>
-                    )}
-                  />
-                </div>
-
-                {/* Conversion Option */}
-                <div className="space-y-4 border-t border-border pt-4">
-                  <FormField
-                    control={form.control}
-                    name="convertToContract"
-                    render={({ field }) => (
-                      <FormItem className="flex flex-row items-start space-x-3 space-y-0">
-                        <FormControl>
-                          <Checkbox
-                            checked={field.value}
-                            onCheckedChange={field.onChange}
-                            data-testid="checkbox-convert-to-contract"
-                          />
-                        </FormControl>
-                        <div className="space-y-1 leading-none">
-                          <FormLabel>
-                            Convert to Service Contract
-                          </FormLabel>
-                          <p className="text-sm text-muted-foreground">
-                            This will change the service type from Installation to Service Contract
-                          </p>
+                                {isSelected && (
+                                  <div className="flex items-center space-x-2">
+                                    <span className="text-sm">Qty:</span>
+                                    <Input
+                                      type="number"
+                                      min="1"
+                                      value={selectedItem?.quantity || 1}
+                                      onChange={(e) => {
+                                        const newQty = parseInt(e.target.value) || 1;
+                                        field.onChange(
+                                          field.value?.map(eq => 
+                                            eq.id === item.id ? { ...eq, quantity: newQty } : eq
+                                          ) || []
+                                        );
+                                      }}
+                                      className="w-20"
+                                      data-testid={`input-equipment-quantity-${item.id}`}
+                                    />
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
                         </div>
-                      </FormItem>
-                    )}
-                  />
-
-                  {/* Service Contract Settings */}
-                  {form.watch("convertToContract") && (
-                    <div className="space-y-4 ml-6 pl-4 border-l-2 border-muted">
-                      <div className="flex items-center space-x-2">
-                        <Calendar className="h-4 w-4 text-muted-foreground" />
-                        <h4 className="font-medium">Service Contract Settings</h4>
-                      </div>
-                      
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {/* Service Interval */}
-                        <FormField
-                          control={form.control}
-                          name="serviceInterval"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Service Interval</FormLabel>
-                              <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                <FormControl>
-                                  <SelectTrigger data-testid="select-service-interval">
-                                    <SelectValue placeholder="Select interval" />
-                                  </SelectTrigger>
-                                </FormControl>
-                                <SelectContent>
-                                  <SelectItem value="7d">Weekly (7 days)</SelectItem>
-                                  <SelectItem value="14d">Bi-weekly (14 days)</SelectItem>
-                                  <SelectItem value="30d">Monthly (30 days)</SelectItem>
-                                  <SelectItem value="60d">Bi-monthly (60 days)</SelectItem>
-                                  <SelectItem value="90d">Quarterly (90 days)</SelectItem>
-                                  <SelectItem value="180d">Semi-annually (180 days)</SelectItem>
-                                  <SelectItem value="365d">Annually (365 days)</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </FormItem>
-                          )}
-                        />
-
-                        {/* Contract Length */}
-                        <FormField
-                          control={form.control}
-                          name="contractLengthMonths"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Contract Length (Months)</FormLabel>
-                              <Select onValueChange={(value) => field.onChange(parseInt(value))} defaultValue={String(field.value)}>
-                                <FormControl>
-                                  <SelectTrigger data-testid="select-contract-length">
-                                    <SelectValue placeholder="Select length" />
-                                  </SelectTrigger>
-                                </FormControl>
-                                <SelectContent>
-                                  <SelectItem value="3">3 months</SelectItem>
-                                  <SelectItem value="6">6 months</SelectItem>
-                                  <SelectItem value="12">12 months</SelectItem>
-                                  <SelectItem value="24">24 months</SelectItem>
-                                  <SelectItem value="36">36 months</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </FormItem>
-                          )}
-                        />
-                      </div>
-                    </div>
+                      </FormControl>
+                    </FormItem>
                   )}
-                </div>
-              </>
+                />
+              </div>
+            )}
+
+            {/* Consumables Section — shown for all service types */}
+            <div className="space-y-4 border-t border-border pt-4">
+              <div className="flex items-center space-x-2">
+                <Package className="h-5 w-5 text-muted-foreground" />
+                <h3 className="text-lg font-medium">Consumables Used</h3>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                {isInstallation
+                  ? "Update the final quantities of consumables used in this installation"
+                  : "Select the consumables used during this service visit"}
+              </p>
+              
+              <FormField
+                control={form.control}
+                name="consumableItems"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormControl>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {consumables.map((item) => {
+                          const isSelected = field.value?.some(con => con.id === item.id) || false;
+                          const selectedItem = field.value?.find(con => con.id === item.id);
+                          
+                          return (
+                            <div key={item.id} className="flex items-center space-x-3 p-3 border rounded-lg">
+                              <Checkbox
+                                checked={isSelected}
+                                onCheckedChange={(checked) => {
+                                  if (checked) {
+                                    field.onChange([...(field.value || []), { id: item.id, quantity: 1 }]);
+                                  } else {
+                                    field.onChange(field.value?.filter(con => con.id !== item.id) || []);
+                                  }
+                                }}
+                                data-testid={`checkbox-consumable-${item.id}`}
+                              />
+                              <div className="flex-1">
+                                <p className="font-medium">{item.name}</p>
+                                <p className="text-sm text-muted-foreground">{item.stockCode}</p>
+                                <Badge variant="outline" className="text-xs">
+                                  Stock: {item.currentStock ?? 0}
+                                </Badge>
+                              </div>
+                              {isSelected && (
+                                <div className="flex items-center space-x-2">
+                                  <span className="text-sm">Qty:</span>
+                                  <Input
+                                    type="number"
+                                    min="1"
+                                    value={selectedItem?.quantity || 1}
+                                    onChange={(e) => {
+                                      const newQty = parseInt(e.target.value) || 1;
+                                      field.onChange(
+                                        field.value?.map(con => 
+                                          con.id === item.id ? { ...con, quantity: newQty } : con
+                                        ) || []
+                                      );
+                                    }}
+                                    className="w-20"
+                                    data-testid={`input-consumable-quantity-${item.id}`}
+                                  />
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            {/* Conversion Option — installations only */}
+            {isInstallation && (
+              <div className="space-y-4 border-t border-border pt-4">
+                <FormField
+                  control={form.control}
+                  name="convertToContract"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                      <FormControl>
+                        <Checkbox
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                          data-testid="checkbox-convert-to-contract"
+                        />
+                      </FormControl>
+                      <div className="space-y-1 leading-none">
+                        <FormLabel>
+                          Convert to Service Contract
+                        </FormLabel>
+                        <p className="text-sm text-muted-foreground">
+                          This will change the service type from Installation to Service Contract
+                        </p>
+                      </div>
+                    </FormItem>
+                  )}
+                />
+
+                {/* Service Contract Settings */}
+                {form.watch("convertToContract") && (
+                  <div className="space-y-4 ml-6 pl-4 border-l-2 border-muted">
+                    <div className="flex items-center space-x-2">
+                      <Calendar className="h-4 w-4 text-muted-foreground" />
+                      <h4 className="font-medium">Service Contract Settings</h4>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Service Interval */}
+                      <FormField
+                        control={form.control}
+                        name="serviceInterval"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Service Interval</FormLabel>
+                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                              <FormControl>
+                                <SelectTrigger data-testid="select-service-interval">
+                                  <SelectValue placeholder="Select interval" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="7d">Weekly (7 days)</SelectItem>
+                                <SelectItem value="14d">Bi-weekly (14 days)</SelectItem>
+                                <SelectItem value="30d">Monthly (30 days)</SelectItem>
+                                <SelectItem value="60d">Bi-monthly (60 days)</SelectItem>
+                                <SelectItem value="90d">Quarterly (90 days)</SelectItem>
+                                <SelectItem value="180d">Semi-annually (180 days)</SelectItem>
+                                <SelectItem value="365d">Annually (365 days)</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </FormItem>
+                        )}
+                      />
+
+                      {/* Contract Length */}
+                      <FormField
+                        control={form.control}
+                        name="contractLengthMonths"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Contract Length (Months)</FormLabel>
+                            <Select onValueChange={(value) => field.onChange(parseInt(value))} defaultValue={String(field.value)}>
+                              <FormControl>
+                                <SelectTrigger data-testid="select-contract-length">
+                                  <SelectValue placeholder="Select length" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="3">3 months</SelectItem>
+                                <SelectItem value="6">6 months</SelectItem>
+                                <SelectItem value="12">12 months</SelectItem>
+                                <SelectItem value="24">24 months</SelectItem>
+                                <SelectItem value="36">36 months</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
             )}
 
             <div className="flex justify-end space-x-4">
