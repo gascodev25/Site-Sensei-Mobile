@@ -409,7 +409,7 @@ export default function ServiceCalendar({ services, onServiceClick, onServiceMov
               {dayServices.map(service => (
                 <Card key={service.id} className="cursor-pointer hover:shadow-md transition-shadow" onClick={(e) => {
                   e.stopPropagation();
-                  onServiceClick?.(service);
+                  onServiceClick?.(service, currentDate);
                 }}>
                   <CardContent className="p-4">
                     {renderServiceItem(service, 'large', currentDate)}
