@@ -17,10 +17,10 @@ interface ServiceCalendarProps {
   onServiceMove?: (serviceId: number, newDate: Date, originalDate?: Date) => void;
   onDateClick?: (date: Date) => void;
   onComplete?: (service: ServiceWithDetails, date: Date) => void;
-  adjustedServiceIds?: Set<number>;
+  adjustedOccurrences?: Map<string, boolean>;
 }
 
-export default function ServiceCalendar({ services, onServiceClick, onServiceMove, onDateClick, onComplete, adjustedServiceIds }: ServiceCalendarProps) {
+export default function ServiceCalendar({ services, onServiceClick, onServiceMove, onDateClick, onComplete, adjustedOccurrences }: ServiceCalendarProps) {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [view, setView] = useState<'month' | 'week' | 'day'>('month');
   const [selectedTeam, setSelectedTeam] = useState<string>('all');
@@ -217,7 +217,7 @@ export default function ServiceCalendar({ services, onServiceClick, onServiceMov
       >
         <div className="flex items-center justify-between gap-1">
           <div className="font-medium truncate flex-1">{service.client?.name || 'Unknown'}</div>
-          {adjustedServiceIds?.has(service.id) && (
+          {adjustedOccurrences?.has(`${service.id}:${format(displayDate, 'yyyy-MM-dd')}`) && (
             <span title="Consumable quantities were adjusted" className="shrink-0 text-orange-600">
               <AlertTriangle className="h-3 w-3" />
             </span>

@@ -2006,6 +2006,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
    */
   app.get('/api/field-reports/batch', isAuthenticated, async (req, res) => {
     try {
+      const user = await getUserWithRoles(req);
+      const userRoles = user?.roles || '';
+      const isManager = userRoles.includes('superuser') || userRoles.includes('manager');
+      if (!isManager) {
+        return res.status(403).json({ message: "Insufficient permissions" });
+      }
+
       const raw = req.query.serviceIds as string | undefined;
       if (!raw || !raw.trim()) {
         return res.json([]);

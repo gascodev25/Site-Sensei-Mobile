@@ -86,8 +86,10 @@ export default function Services() {
     staleTime: 30000,
   });
 
-  const adjustedServiceIds = new Set(
-    fieldReportFlags.filter(f => f.hasAdjustments).map(f => f.serviceId)
+  const adjustedOccurrences = new Map<string, boolean>(
+    fieldReportFlags
+      .filter(f => f.hasAdjustments)
+      .map(f => [`${f.serviceId}:${f.completionDate}`, true])
   );
 
   const deleteServiceMutation = useMutation({
@@ -716,7 +718,7 @@ export default function Services() {
                         <div className="flex-1">
                           <div className="flex items-center space-x-2 mb-2">
                             <CardTitle className="text-lg">{service.client?.name || 'Unknown Client'}</CardTitle>
-                            {adjustedServiceIds.has(service.id) && (
+                            {adjustedOccurrences.has(`${service.id}:${format(occurrenceDate, 'yyyy-MM-dd')}`) && (
                               <Badge className="bg-orange-100 border-orange-400 text-orange-800 text-xs shrink-0">
                                 <AlertTriangle className="h-3 w-3 mr-1" />
                                 Adjusted
@@ -858,7 +860,7 @@ export default function Services() {
               onServiceMove={handleServiceMove}
               onDateClick={handleDateClick}
               onComplete={(service, date) => handleServiceComplete(service, date)}
-              adjustedServiceIds={adjustedServiceIds}
+              adjustedOccurrences={adjustedOccurrences}
             />
           </TabsContent>
         </Tabs>
