@@ -15,6 +15,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useEffect, useState } from "react";
+import FieldReportPanel from "@/components/FieldReportPanel";
 
 interface ServiceFormProps {
   service?: Service;
@@ -280,6 +281,7 @@ export default function ServiceForm({ service, initialDate, onSuccess, onCancel,
   };
 
   return (
+    <div>
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -748,5 +750,10 @@ export default function ServiceForm({ service, initialDate, onSuccess, onCancel,
         </div>
       </form>
     </Form>
+
+    {isEditing && service?.id && (
+      <FieldReportPanel serviceId={service.id} />
+    )}
+  </div>
   );
 }

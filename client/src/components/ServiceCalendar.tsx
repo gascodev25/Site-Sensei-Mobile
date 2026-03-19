@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { ChevronLeft, ChevronRight, ChevronDown, Calendar, User, Clock, MapPin, Wrench, Package, CheckCircle } from "lucide-react";
+import { ChevronLeft, ChevronRight, ChevronDown, Calendar, User, Clock, MapPin, Wrench, Package, CheckCircle, AlertTriangle } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarPicker } from "@/components/ui/calendar";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, parseISO, addWeeks, subWeeks, startOfWeek, endOfWeek, startOfDay } from "date-fns";
@@ -17,9 +17,10 @@ interface ServiceCalendarProps {
   onServiceMove?: (serviceId: number, newDate: Date, originalDate?: Date) => void;
   onDateClick?: (date: Date) => void;
   onComplete?: (service: ServiceWithDetails, date: Date) => void;
+  adjustedServiceIds?: Set<number>;
 }
 
-export default function ServiceCalendar({ services, onServiceClick, onServiceMove, onDateClick, onComplete }: ServiceCalendarProps) {
+export default function ServiceCalendar({ services, onServiceClick, onServiceMove, onDateClick, onComplete, adjustedServiceIds }: ServiceCalendarProps) {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [view, setView] = useState<'month' | 'week' | 'day'>('month');
   const [selectedTeam, setSelectedTeam] = useState<string>('all');
@@ -216,6 +217,11 @@ export default function ServiceCalendar({ services, onServiceClick, onServiceMov
       >
         <div className="flex items-center justify-between gap-1">
           <div className="font-medium truncate flex-1">{service.client?.name || 'Unknown'}</div>
+          {adjustedServiceIds?.has(service.id) && (
+            <span title="Consumable quantities were adjusted" className="shrink-0 text-orange-600">
+              <AlertTriangle className="h-3 w-3" />
+            </span>
+          )}
           <button
             onClick={(e) => {
               e.stopPropagation();

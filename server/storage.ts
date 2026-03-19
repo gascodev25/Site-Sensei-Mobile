@@ -137,6 +137,7 @@ export interface IStorage {
   getFieldReport(serviceId: number, completionDate: string): Promise<FieldReport | undefined>;
   getLatestFieldReport(serviceId: number): Promise<FieldReport | undefined>;
   getFieldReportById(id: number): Promise<FieldReport | undefined>;
+  getLatestFieldReportFlags(serviceIds: number[]): Promise<{ serviceId: number; hasAdjustments: boolean; completionDate: string }[]>;
   getMobileServices(teamId: number, range: 'today' | 'week' | 'month'): Promise<any[]>;
 
   // Invoicing operations
@@ -1677,6 +1678,32 @@ export class DatabaseStorage implements IStorage {
   async getFieldReportById(id: number): Promise<FieldReport | undefined> {
     const [report] = await db.select().from(fieldReports).where(eq(fieldReports.id, id));
     return report;
+  }
+
+  async getLatestFieldReportFlags(serviceIds: number[]): Promise<{ serviceId: number; hasAdjustments: boolean; completionDate: string }[]> {
+    if (serviceIds.length === 0) return [];
+    const rows = await db
+      .select({
+        serviceId: fieldReports.serviceId,
+        hasAdjustments: fieldReports.hasAdjustments,
+        completionDate: fieldReports.completionDate,
+        id: fieldReports.id,
+      })
+      .from(fieldReports)
+      .where(inArray(fieldReports.serviceId, serviceIds))
+      .orderBy(desc(fieldReports.id));
+
+    const seen = new Map<number, { serviceId: number; hasAdjustments: boolean; completionDate: string }>();
+    for (const row of rows) {
+      if (!seen.has(row.serviceId)) {
+        seen.set(row.serviceId, {
+          serviceId: row.serviceId,
+          hasAdjustments: row.hasAdjustments ?? false,
+          completionDate: row.completionDate,
+        });
+      }
+    }
+    return Array.from(seen.values());
   }
 
   /**

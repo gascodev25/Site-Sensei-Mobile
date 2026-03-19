@@ -13,7 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Search, Edit, Trash2, Calendar, Clock, User, MapPin, List, Wrench, Package, Repeat, ChevronDown, CheckCircle } from "lucide-react";
+import { Plus, Search, Edit, Trash2, Calendar, Clock, User, MapPin, List, Wrench, Package, Repeat, ChevronDown, CheckCircle, AlertTriangle } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarPicker } from "@/components/ui/calendar";
 import type { ServiceWithDetails, ServiceTeam } from "@shared/schema";
@@ -72,6 +72,23 @@ export default function Services() {
   const { data: teams = [] } = useQuery<ServiceTeam[]>({
     queryKey: ["/api/service-teams"],
   });
+
+  const serviceIds = services.map(s => s.id);
+  const { data: fieldReportFlags = [] } = useQuery<{ serviceId: number; hasAdjustments: boolean; completionDate: string }[]>({
+    queryKey: ["/api/field-reports/batch", serviceIds.join(",")],
+    queryFn: async () => {
+      if (serviceIds.length === 0) return [];
+      const res = await fetch(`/api/field-reports/batch?serviceIds=${serviceIds.join(",")}`, { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: serviceIds.length > 0,
+    staleTime: 30000,
+  });
+
+  const adjustedServiceIds = new Set(
+    fieldReportFlags.filter(f => f.hasAdjustments).map(f => f.serviceId)
+  );
 
   const deleteServiceMutation = useMutation({
     mutationFn: async (serviceId: number) => {
@@ -699,6 +716,12 @@ export default function Services() {
                         <div className="flex-1">
                           <div className="flex items-center space-x-2 mb-2">
                             <CardTitle className="text-lg">{service.client?.name || 'Unknown Client'}</CardTitle>
+                            {adjustedServiceIds.has(service.id) && (
+                              <Badge className="bg-orange-100 border-orange-400 text-orange-800 text-xs shrink-0">
+                                <AlertTriangle className="h-3 w-3 mr-1" />
+                                Adjusted
+                              </Badge>
+                            )}
                           </div>
                           <div className="flex items-center text-sm text-muted-foreground mb-1">
                             <MapPin className="h-3 w-3 mr-1" />
@@ -835,6 +858,7 @@ export default function Services() {
               onServiceMove={handleServiceMove}
               onDateClick={handleDateClick}
               onComplete={(service, date) => handleServiceComplete(service, date)}
+              adjustedServiceIds={adjustedServiceIds}
             />
           </TabsContent>
         </Tabs>

@@ -1999,6 +1999,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   /**
+   * GET /api/field-reports/batch
+   * Returns hasAdjustments flags for multiple services in a single request.
+   * Query param: serviceIds — comma-separated list of service IDs.
+   * Returns: Array of { serviceId, hasAdjustments, completionDate }
+   */
+  app.get('/api/field-reports/batch', isAuthenticated, async (req, res) => {
+    try {
+      const raw = req.query.serviceIds as string | undefined;
+      if (!raw || !raw.trim()) {
+        return res.json([]);
+      }
+      const serviceIds = raw.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n));
+      if (serviceIds.length === 0) {
+        return res.json([]);
+      }
+      const results = await storage.getLatestFieldReportFlags(serviceIds);
+      res.json(results);
+    } catch (error) {
+      console.error("Error fetching field report batch flags:", error);
+      res.status(500).json({ message: "Failed to fetch field report flags" });
+    }
+  });
+
+  /**
    * POST /api/field-reports
    * Creates or updates a field report for a service occurrence.
    *

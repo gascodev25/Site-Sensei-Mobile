@@ -8,6 +8,27 @@ The system is built as a full-stack web application using modern technologies in
 
 ## Recent Changes
 
+**Manager Field Report Alerts (March 2026)**
+- Added `GET /api/field-reports/batch?serviceIds=...` endpoint for efficient batch flag retrieval
+- Added `getLatestFieldReportFlags(serviceIds)` storage method — returns latest `hasAdjustments` flag per service
+- Service cards in list view now show an orange "Adjusted" badge when the latest field report has quantity adjustments
+- Calendar items show an orange `AlertTriangle` icon when a service has adjustments
+- `ServiceCalendar` accepts optional `adjustedServiceIds` prop for badge display
+- Added `FieldReportPanel` component (`client/src/components/FieldReportPanel.tsx`) — collapsible section in the service detail (edit) dialog showing: actual vs planned consumables with differences highlighted in orange, team/client signature images, photo gallery (3-col thumbnail grid, click to expand), notes
+- FieldReportPanel is embedded in `ServiceForm` when editing an existing service; returns null if no field report exists (backward compatible)
+
+**Android Mobile App for Field Teams (March 2026)**
+- Full Expo/React Native app in `mobile-app/` subfolder
+- Screens: Login, ServiceList (Today/Week/Month), ServiceDetail, FieldCompletion (5-step), Success
+- FieldCompletion photos displayed in 2-column thumbnail grid with overlay remove button
+- GitHub Actions workflow at `.github/workflows/build-android-mobile.yml` for EAS Build
+- API: `GET /api/mobile/services`, `POST /api/field-reports`, `GET /api/field-reports/:serviceId`
+
+**Field Reports Backend (March 2026)**
+- `field_reports` table: serviceId, completionDate, actualConsumables, teamSignature, clientSignature, photos, hasAdjustments, stockDeducted, notes
+- `linkedTeamId` on users table for field team assignment
+- Shared completion helpers: `coreUpdateServiceStatus()`, `coreDeductConsumableStock()`, `reconcileConsumableStockDelta()`
+
 **Hybrid Authentication System with Username/Password (October 2025)**
 - Implemented custom username/password authentication as primary login method
 - Added bcrypt password hashing (12 rounds) for secure credential storage
