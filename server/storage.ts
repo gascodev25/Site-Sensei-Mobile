@@ -12,6 +12,7 @@ import {
   equipmentTemplates,
   templateConsumables,
   equipmentConsumables,
+  fieldReports,
   type User,
   type UpsertUser,
   type Client,
@@ -32,6 +33,8 @@ import {
   type InsertEquipmentTemplate,
   type EquipmentTemplateWithConsumables,
   type EquipmentWithConsumables,
+  type FieldReport,
+  type InsertFieldReport,
 } from "@shared/schema";
 import { generateOccurrences, isOccurrenceOnDay } from "@shared/recurrence";
 import { db } from "./db";
@@ -127,6 +130,14 @@ export interface IStorage {
 
   // Audit logging
   createAuditLog(entry: Omit<AuditLogEntry, 'id' | 'timestamp'>): Promise<void>;
+
+  // Field Reports (mobile app)
+  createFieldReport(report: InsertFieldReport): Promise<FieldReport>;
+  updateFieldReport(id: number, report: Partial<InsertFieldReport>): Promise<FieldReport>;
+  getFieldReport(serviceId: number, completionDate: string): Promise<FieldReport | undefined>;
+  getLatestFieldReport(serviceId: number): Promise<FieldReport | undefined>;
+  getFieldReportById(id: number): Promise<FieldReport | undefined>;
+  getMobileServices(teamId: number, range: 'today' | 'week' | 'month'): Promise<any[]>;
 
   // Warehouse operations
   getEquipmentStatus(): Promise<{ status: string; count: number }[]>;
@@ -1577,6 +1588,208 @@ export class DatabaseStorage implements IStorage {
       .returning();
 
     return updated;
+  }
+
+  // ── Field Report methods ──────────────────────────────────────────────────
+
+  async createFieldReport(report: InsertFieldReport): Promise<FieldReport> {
+    const [created] = await db.insert(fieldReports).values(report).returning();
+    return created;
+  }
+
+  async updateFieldReport(id: number, report: Partial<InsertFieldReport>): Promise<FieldReport> {
+    const [updated] = await db
+      .update(fieldReports)
+      .set({ ...report, updatedAt: new Date() })
+      .where(eq(fieldReports.id, id))
+      .returning();
+    return updated;
+  }
+
+  async getFieldReport(serviceId: number, completionDate: string): Promise<FieldReport | undefined> {
+    const [report] = await db
+      .select()
+      .from(fieldReports)
+      .where(
+        and(
+          eq(fieldReports.serviceId, serviceId),
+          eq(fieldReports.completionDate, completionDate)
+        )
+      )
+      .orderBy(desc(fieldReports.createdAt))
+      .limit(1);
+    return report;
+  }
+
+  async getLatestFieldReport(serviceId: number): Promise<FieldReport | undefined> {
+    const [report] = await db
+      .select()
+      .from(fieldReports)
+      .where(eq(fieldReports.serviceId, serviceId))
+      .orderBy(desc(fieldReports.createdAt))
+      .limit(1);
+    return report;
+  }
+
+  async getFieldReportById(id: number): Promise<FieldReport | undefined> {
+    const [report] = await db.select().from(fieldReports).where(eq(fieldReports.id, id));
+    return report;
+  }
+
+  /**
+   * Returns services assigned to a team, enriched with client info and
+   * pre-assigned consumables/equipment, filtered by date range.
+   */
+  async getMobileServices(teamId: number, range: 'today' | 'week' | 'month'): Promise<any[]> {
+    const now = new Date();
+    const startOfToday = new Date(now);
+    startOfToday.setHours(0, 0, 0, 0);
+
+    let rangeStart: Date;
+    let rangeEnd: Date;
+
+    if (range === 'today') {
+      rangeStart = startOfToday;
+      rangeEnd = new Date(startOfToday);
+      rangeEnd.setHours(23, 59, 59, 999);
+    } else if (range === 'week') {
+      rangeStart = startOfToday;
+      rangeEnd = new Date(startOfToday);
+      rangeEnd.setDate(rangeEnd.getDate() + 7);
+    } else {
+      rangeStart = startOfToday;
+      rangeEnd = new Date(startOfToday);
+      rangeEnd.setMonth(rangeEnd.getMonth() + 1);
+    }
+
+    // Fetch all services for this team
+    const teamServices = await db
+      .select({
+        service: services,
+        client: clients,
+        team: serviceTeams,
+      })
+      .from(services)
+      .innerJoin(clients, eq(services.clientId, clients.id))
+      .leftJoin(serviceTeams, eq(services.teamId, serviceTeams.id))
+      .where(eq(services.teamId, teamId))
+      .orderBy(asc(services.installationDate));
+
+    if (teamServices.length === 0) return [];
+
+    // Filter by date range using recurrence logic
+    const filteredServices: typeof teamServices = [];
+    for (const row of teamServices) {
+      const svc = row.service;
+      const installDate = svc.installationDate ? new Date(svc.installationDate) : null;
+      if (!installDate) continue;
+
+      const recurrencePattern = svc.recurrencePattern as { interval?: string; end_date?: string } | null;
+      const excludedDates = (svc.excludedDates || []) as string[];
+      const completedDates = (svc.completedDates || []) as string[];
+
+      if (!recurrencePattern?.interval) {
+        // One-off: include if install date is within range
+        if (installDate >= rangeStart && installDate <= rangeEnd) {
+          filteredServices.push(row);
+        }
+      } else {
+        // Recurring: include if any occurrence falls in range
+        const endDate = recurrencePattern.end_date ? new Date(recurrencePattern.end_date) : undefined;
+        const occurrences = generateOccurrences(installDate, recurrencePattern.interval, {
+          rangeStart,
+          rangeEnd,
+          endDate,
+          excludedDates,
+        });
+        if (occurrences.length > 0) {
+          filteredServices.push(row);
+        }
+      }
+    }
+
+    if (filteredServices.length === 0) return [];
+
+    const serviceIds = filteredServices.map(r => r.service.id);
+
+    // Fetch pre-assigned consumables for each service
+    const consumableRows = await db
+      .select({
+        serviceId: serviceStockIssued.serviceId,
+        stockItemId: serviceStockIssued.id,
+        consumableId: consumables.id,
+        consumableName: consumables.name,
+        stockCode: consumables.stockCode,
+        quantity: serviceStockIssued.quantity,
+      })
+      .from(serviceStockIssued)
+      .innerJoin(consumables, eq(serviceStockIssued.consumableId, consumables.id))
+      .where(inArray(serviceStockIssued.serviceId, serviceIds));
+
+    // Fetch pre-assigned equipment for each service
+    const equipmentRows = await db
+      .select({
+        serviceId: serviceStockIssued.serviceId,
+        stockItemId: serviceStockIssued.id,
+        equipmentId: equipment.id,
+        equipmentName: equipment.name,
+        stockCode: equipment.stockCode,
+        quantity: serviceStockIssued.quantity,
+      })
+      .from(serviceStockIssued)
+      .innerJoin(equipment, eq(serviceStockIssued.equipmentId, equipment.id))
+      .where(inArray(serviceStockIssued.serviceId, serviceIds));
+
+    // Build lookup maps
+    const consumablesByService = new Map<number, typeof consumableRows>();
+    for (const row of consumableRows) {
+      if (!consumablesByService.has(row.serviceId)) consumablesByService.set(row.serviceId, []);
+      consumablesByService.get(row.serviceId)!.push(row);
+    }
+
+    const equipmentByService = new Map<number, typeof equipmentRows>();
+    for (const row of equipmentRows) {
+      if (!equipmentByService.has(row.serviceId)) equipmentByService.set(row.serviceId, []);
+      equipmentByService.get(row.serviceId)!.push(row);
+    }
+
+    return filteredServices.map(({ service: svc, client, team }) => ({
+      id: svc.id,
+      type: svc.type,
+      status: svc.status,
+      installationDate: svc.installationDate,
+      recurrencePattern: svc.recurrencePattern,
+      completedDates: svc.completedDates,
+      excludedDates: svc.excludedDates,
+      servicePriority: svc.servicePriority,
+      estimatedDuration: svc.estimatedDuration,
+      client: client ? {
+        id: client.id,
+        name: client.name,
+        addressText: client.addressText,
+        city: client.city,
+        postcode: client.postcode,
+        latitude: client.latitude,
+        longitude: client.longitude,
+        contactPerson: client.contactPerson,
+        phone: client.phone,
+      } : null,
+      team: team ? { id: team.id, name: team.name } : null,
+      consumables: (consumablesByService.get(svc.id) || []).map(c => ({
+        stockItemId: c.stockItemId,
+        id: c.consumableId,
+        name: c.consumableName,
+        stockCode: c.stockCode,
+        plannedQty: c.quantity ?? 1,
+      })),
+      equipment: (equipmentByService.get(svc.id) || []).map(e => ({
+        stockItemId: e.stockItemId,
+        id: e.equipmentId,
+        name: e.equipmentName,
+        stockCode: e.stockCode,
+        quantity: e.quantity ?? 1,
+      })),
+    }));
   }
 }
 

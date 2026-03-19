@@ -13,7 +13,8 @@ import {
   insertEquipmentTemplateSchema,
   insertTemplateConsumableSchema,
   serviceCompletionSchema,
-  insertUserSchema
+  insertUserSchema,
+  insertFieldReportSchema,
 } from "@shared/schema";
 import { generateOccurrences } from "@shared/recurrence";
 import { z } from "zod";
@@ -1823,6 +1824,201 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error returning stock:", error);
       res.status(500).json({ message: "Failed to return stock" });
+    }
+  });
+
+  // ── Mobile API routes ────────────────────────────────────────────────────
+
+  /**
+   * GET /api/mobile/services
+   * Returns services for the authenticated user's team, filtered by date range.
+   * Query params:
+   *   - teamId: number (required)
+   *   - range: 'today' | 'week' | 'month' (default: 'today')
+   */
+  app.get('/api/mobile/services', isAuthenticated, async (req, res) => {
+    try {
+      const teamId = parseInt(req.query.teamId as string);
+      if (!teamId || isNaN(teamId)) {
+        return res.status(400).json({ message: "teamId query parameter is required" });
+      }
+
+      const rawRange = req.query.range as string;
+      const range: 'today' | 'week' | 'month' =
+        rawRange === 'week' ? 'week' :
+        rawRange === 'month' ? 'month' :
+        'today';
+
+      const mobileServices = await storage.getMobileServices(teamId, range);
+      res.json(mobileServices);
+    } catch (error) {
+      console.error("Error fetching mobile services:", error);
+      res.status(500).json({ message: "Failed to fetch mobile services" });
+    }
+  });
+
+  /**
+   * POST /api/field-reports
+   * Creates a field report for a service occurrence.
+   * Detects consumable quantity adjustments, sets hasAdjustments flag,
+   * and triggers service completion with actual consumable quantities.
+   *
+   * Body:
+   *   serviceId, completionDate, teamMemberId?, actualConsumables,
+   *   teamSignature, clientSignature, photos, notes?
+   */
+  app.post('/api/field-reports', isAuthenticated, async (req, res) => {
+    try {
+      const user = await getUserWithRoles(req);
+      const body = req.body as {
+        serviceId: number;
+        completionDate: string;
+        teamMemberId?: number;
+        actualConsumables?: { id: number; name: string; plannedQty: number; actualQty: number }[];
+        teamSignature?: string;
+        clientSignature?: string;
+        photos?: { dataUrl: string; comment: string; timestamp: string }[];
+        notes?: string;
+      };
+
+      if (!body.serviceId || !body.completionDate) {
+        return res.status(400).json({ message: "serviceId and completionDate are required" });
+      }
+
+      // Verify the service exists
+      const service = await storage.getService(body.serviceId);
+      if (!service) {
+        return res.status(404).json({ message: "Service not found" });
+      }
+
+      // Detect whether any consumable quantity differs from planned
+      const actualConsumables = body.actualConsumables || [];
+      const hasAdjustments = actualConsumables.some(c => c.actualQty !== c.plannedQty);
+
+      // Check if a field report already exists for this service + date
+      const existing = await storage.getFieldReport(body.serviceId, body.completionDate);
+
+      let fieldReport;
+      if (existing) {
+        fieldReport = await storage.updateFieldReport(existing.id, {
+          teamMemberId: body.teamMemberId ?? null,
+          actualConsumables,
+          teamSignature: body.teamSignature ?? null,
+          clientSignature: body.clientSignature ?? null,
+          photos: body.photos || [],
+          hasAdjustments,
+          notes: body.notes ?? null,
+        });
+      } else {
+        fieldReport = await storage.createFieldReport({
+          serviceId: body.serviceId,
+          completionDate: body.completionDate,
+          teamMemberId: body.teamMemberId ?? null,
+          actualConsumables,
+          teamSignature: body.teamSignature ?? null,
+          clientSignature: body.clientSignature ?? null,
+          photos: body.photos || [],
+          hasAdjustments,
+          notes: body.notes ?? null,
+        });
+      }
+
+      // Trigger service completion with actual consumable quantities
+      const consumableItems = actualConsumables.map(c => ({
+        id: c.id,
+        quantity: c.actualQty,
+      }));
+
+      const updateData: any = {
+        status: 'completed',
+        completedAt: new Date(),
+      };
+
+      // For recurring services, add to completedDates rather than marking fully complete
+      const recurrencePattern = service.recurrencePattern as { interval?: string } | null;
+      if (recurrencePattern?.interval) {
+        const completedDates = (service.completedDates || []) as string[];
+        if (!completedDates.includes(body.completionDate)) {
+          updateData.completedDates = [...completedDates, body.completionDate];
+        }
+        // Recurring services stay in scheduled status
+        delete updateData.status;
+        delete updateData.completedAt;
+      }
+
+      await storage.updateService(body.serviceId, updateData);
+
+      // Deduct actual consumable quantities from stock
+      if (consumableItems.length > 0) {
+        const allConsumables = await storage.getConsumables();
+        const consumableMap = new Map(allConsumables.map(c => [c.id, c]));
+
+        for (const item of consumableItems) {
+          if (item.quantity <= 0) continue;
+          const consumable = consumableMap.get(item.id);
+          if (consumable) {
+            const newStock = Math.max(0, (consumable.currentStock || 0) - item.quantity);
+            await storage.updateConsumable(item.id, { currentStock: newStock });
+          }
+        }
+      }
+
+      // Audit log
+      await storage.createAuditLog({
+        userId: user?.id,
+        action: 'field_report_submitted',
+        entityType: 'field_report',
+        entityId: fieldReport.id,
+        metadata: {
+          serviceId: body.serviceId,
+          completionDate: body.completionDate,
+          hasAdjustments,
+          consumableCount: actualConsumables.length,
+          photoCount: (body.photos || []).length,
+        }
+      });
+
+      res.status(201).json(fieldReport);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Validation error", errors: error.errors });
+      }
+      console.error("Error submitting field report:", error);
+      res.status(500).json({ message: "Failed to submit field report" });
+    }
+  });
+
+  /**
+   * GET /api/field-reports/:serviceId
+   * Retrieves the most recent field report for a given service.
+   * Query param: date (YYYY-MM-DD) — if provided, looks up that specific occurrence.
+   */
+  app.get('/api/field-reports/:serviceId', isAuthenticated, async (req, res) => {
+    try {
+      const serviceId = parseInt(req.params.serviceId);
+      if (isNaN(serviceId)) {
+        return res.status(400).json({ message: "Invalid serviceId" });
+      }
+
+      const date = req.query.date as string | undefined;
+
+      if (date) {
+        const report = await storage.getFieldReport(serviceId, date);
+        if (!report) {
+          return res.status(404).json({ message: "Field report not found" });
+        }
+        return res.json(report);
+      }
+
+      // Without a date, return the latest report for this service
+      const report = await storage.getLatestFieldReport(serviceId);
+      if (!report) {
+        return res.status(404).json({ message: "No field reports found for this service" });
+      }
+      res.json(report);
+    } catch (error) {
+      console.error("Error fetching field report:", error);
+      res.status(500).json({ message: "Failed to fetch field report" });
     }
   });
 

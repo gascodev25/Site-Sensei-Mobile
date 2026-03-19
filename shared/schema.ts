@@ -169,6 +169,31 @@ export const serviceStockIssued = pgTable("service_stock_issued", {
   returnedAt: timestamp("returned_at"),
 });
 
+// Field Reports (submitted by mobile app after on-site service completion)
+export const fieldReports = pgTable("field_reports", {
+  id: serial("id").primaryKey(),
+  serviceId: integer("service_id").references(() => services.id).notNull(),
+  completionDate: varchar("completion_date", { length: 20 }).notNull(), // YYYY-MM-DD
+  teamMemberId: integer("team_member_id").references(() => teamMembers.id),
+  actualConsumables: jsonb("actual_consumables").$type<{
+    id: number;
+    name: string;
+    plannedQty: number;
+    actualQty: number;
+  }[]>().default([]),
+  teamSignature: text("team_signature"),   // base64 data URL
+  clientSignature: text("client_signature"), // base64 data URL
+  photos: jsonb("photos").$type<{
+    dataUrl: string;
+    comment: string;
+    timestamp: string;
+  }[]>().default([]),
+  hasAdjustments: boolean("has_adjustments").default(false),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Audit Log
 export const auditLog = pgTable("audit_log", {
   id: serial("id").primaryKey(),
@@ -312,6 +337,12 @@ export const insertEquipmentTemplateSchema = createInsertSchema(equipmentTemplat
 
 export const insertTemplateConsumableSchema = createInsertSchema(templateConsumables);
 
+export const insertFieldReportSchema = createInsertSchema(fieldReports).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 // Service Completion Schema
 export const serviceCompletionSchema = z.object({
   equipmentItems: z.array(z.object({
@@ -364,3 +395,5 @@ export type ServiceTeam = typeof serviceTeams.$inferSelect;
 export type InsertServiceTeam = z.infer<typeof insertServiceTeamSchema>;
 export type ServiceCompletion = z.infer<typeof serviceCompletionSchema>;
 export type AuditLogEntry = typeof auditLog.$inferSelect;
+export type FieldReport = typeof fieldReports.$inferSelect;
+export type InsertFieldReport = z.infer<typeof insertFieldReportSchema>;
