@@ -752,7 +752,10 @@ export default function ServiceForm({ service, initialDate, onSuccess, onCancel,
     </Form>
 
     {isEditing && service?.id && (
-      <FieldReportPanel serviceId={service.id} />
+      <FieldReportPanel
+        serviceId={service.id}
+        occurrenceDate={initialDate ? `${initialDate.getFullYear()}-${String(initialDate.getMonth() + 1).padStart(2, '0')}-${String(initialDate.getDate()).padStart(2, '0')}` : undefined}
+      />
     )}
   </div>
   );

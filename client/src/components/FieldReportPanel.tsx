@@ -18,13 +18,13 @@ export default function FieldReportPanel({ serviceId, occurrenceDate }: FieldRep
     ? `/api/field-reports/${serviceId}?date=${occurrenceDate}`
     : `/api/field-reports/${serviceId}`;
 
-  const { data: report, isLoading, isError } = useQuery<FieldReport>({
+  const { data: report, isLoading, isError } = useQuery<FieldReport | null>({
     queryKey: ["/api/field-reports", serviceId, occurrenceDate ?? "latest"],
-    queryFn: async () => {
+    queryFn: async (): Promise<FieldReport | null> => {
       const res = await fetch(url, { credentials: "include" });
-      if (res.status === 404) return null as unknown as FieldReport;
+      if (res.status === 404) return null;
       if (!res.ok) throw new Error("Failed to fetch field report");
-      return res.json();
+      return res.json() as Promise<FieldReport>;
     },
     retry: false,
   });
@@ -54,11 +54,23 @@ export default function FieldReportPanel({ serviceId, occurrenceDate }: FieldRep
     timestamp: string;
   }[]) ?? [];
 
-  const completedAt = new Date(report.completionDate).toLocaleDateString("en-ZA", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
+  const completedAt = (() => {
+    const ts = report.createdAt ?? report.updatedAt;
+    if (!ts) {
+      return new Date(report.completionDate).toLocaleDateString("en-ZA", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      });
+    }
+    return new Date(ts).toLocaleString("en-ZA", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  })();
 
   return (
     <div className="border-t border-border pt-4 mt-4">
