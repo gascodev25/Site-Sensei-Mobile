@@ -336,6 +336,11 @@ function PhotoStep({
   onPickPhoto: () => void;
   onRemovePhoto: (i: number) => void;
 }) {
+  const rows: Photo[][] = [];
+  for (let i = 0; i < photos.length; i += 2) {
+    rows.push(photos.slice(i, i + 2));
+  }
+
   return (
     <View style={styles.padded}>
       <Text style={styles.sectionHeader}>Site Photos</Text>
@@ -357,22 +362,29 @@ function PhotoStep({
         <Text style={styles.cameraBtnText}>Take Photo ({photos.length}/10)</Text>
       </TouchableOpacity>
 
-      {photos.map((p, i) => (
-        <View key={i} style={styles.photoCard}>
-          <Image source={{ uri: p.dataUrl }} style={styles.thumbnail} resizeMode="cover" />
-          <View style={styles.photoInfo}>
-            {p.comment ? (
-              <Text style={styles.photoComment}>{p.comment}</Text>
-            ) : (
-              <Text style={styles.photoNoComment}>No comment</Text>
-            )}
-            <Text style={styles.photoTime}>
-              {new Date(p.timestamp).toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit' })}
-            </Text>
-          </View>
-          <TouchableOpacity onPress={() => onRemovePhoto(i)} style={styles.removeBtn}>
-            <Text style={styles.removeBtnText}>✕</Text>
-          </TouchableOpacity>
+      {rows.map((row, rowIdx) => (
+        <View key={rowIdx} style={styles.photoRow}>
+          {row.map((p, colIdx) => {
+            const idx = rowIdx * 2 + colIdx;
+            return (
+              <View key={idx} style={styles.photoGridCell}>
+                <Image source={{ uri: p.dataUrl }} style={styles.gridThumbnail} resizeMode="cover" />
+                <TouchableOpacity
+                  onPress={() => onRemovePhoto(idx)}
+                  style={styles.gridRemoveBtn}
+                >
+                  <Text style={styles.gridRemoveBtnText}>✕</Text>
+                </TouchableOpacity>
+                {p.comment ? (
+                  <Text style={styles.gridComment} numberOfLines={2}>{p.comment}</Text>
+                ) : null}
+                <Text style={styles.gridTime}>
+                  {new Date(p.timestamp).toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit' })}
+                </Text>
+              </View>
+            );
+          })}
+          {row.length === 1 && <View style={styles.photoGridCell} />}
         </View>
       ))}
     </View>
@@ -566,23 +578,49 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   cameraBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
-  photoCard: {
+  photoRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#fff',
+    gap: 8,
+    marginBottom: 8,
+  },
+  photoGridCell: {
+    flex: 1,
     borderRadius: 10,
-    padding: 10,
-    marginBottom: 10,
+    overflow: 'hidden',
+    backgroundColor: '#fff',
     borderWidth: 1,
     borderColor: '#e5e7eb',
+    position: 'relative',
   },
-  thumbnail: { width: 64, height: 64, borderRadius: 8 },
-  photoInfo: { flex: 1, marginLeft: 12 },
-  photoComment: { color: '#374151', fontSize: 13 },
-  photoNoComment: { color: '#9ca3af', fontSize: 13, fontStyle: 'italic' },
-  photoTime: { color: '#9ca3af', fontSize: 12, marginTop: 4 },
-  removeBtn: { padding: 8 },
-  removeBtnText: { color: '#ef4444', fontWeight: '700', fontSize: 16 },
+  gridThumbnail: {
+    width: '100%',
+    aspectRatio: 1,
+    borderRadius: 8,
+  },
+  gridRemoveBtn: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    borderRadius: 12,
+    width: 24,
+    height: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  gridRemoveBtnText: { color: '#fff', fontWeight: '700', fontSize: 13 },
+  gridComment: {
+    color: '#374151',
+    fontSize: 11,
+    paddingHorizontal: 6,
+    paddingTop: 4,
+  },
+  gridTime: {
+    color: '#9ca3af',
+    fontSize: 10,
+    paddingHorizontal: 6,
+    paddingBottom: 6,
+  },
   reviewCard: {
     backgroundColor: '#fff',
     borderRadius: 10,
