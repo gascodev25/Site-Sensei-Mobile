@@ -75,8 +75,10 @@ This produces a signed `.aab` file ready for Google Play internal testing.
 
 ### GitHub Actions (automatic builds)
 
-The workflow at `.github/workflows/build-android.yml` triggers on every push
-to `main` that touches the `mobile-app/` directory.
+The workflow at `.github/workflows/build-android-mobile.yml` (repo root) triggers
+on every push to `main` that touches the `mobile-app/` directory.
+GitHub Actions only auto-discovers workflows from the repo root `.github/workflows/`,
+not from subdirectory `.github/` folders.
 
 Required GitHub secrets:
 | Secret | Description |
@@ -93,7 +95,7 @@ mobile-app/
 ├── App.tsx                  # Entry point — providers + root navigator
 ├── app.json                 # Expo config (bundle ID, permissions)
 ├── eas.json                 # EAS Build profiles (dev / preview / production)
-├── .env                     # Local API_BASE_URL (gitignored)
+├── .env                     # Local EXPO_PUBLIC_API_BASE_URL (gitignored)
 ├── .env.example             # Template for .env
 ├── src/
 │   ├── api/

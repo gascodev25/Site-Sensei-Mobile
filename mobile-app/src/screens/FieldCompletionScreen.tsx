@@ -51,8 +51,8 @@ export default function FieldCompletionScreen() {
   const initialConsumables: ConsumableEntry[] = service.consumables.map(c => ({
     id: c.id,
     name: c.name,
-    plannedQty: c.quantity,
-    actualQty: c.quantity,
+    plannedQty: c.plannedQty,
+    actualQty: c.plannedQty,
   }));
 
   const [consumables, setConsumables] = useState<ConsumableEntry[]>(initialConsumables);

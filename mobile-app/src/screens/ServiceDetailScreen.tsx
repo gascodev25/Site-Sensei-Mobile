@@ -102,7 +102,7 @@ export default function ServiceDetailScreen() {
             <View key={i} style={styles.itemRow}>
               <Text style={styles.itemName}>{c.name}</Text>
               <View style={styles.qtyBadge}>
-                <Text style={styles.qtyText}>×{c.quantity}</Text>
+                <Text style={styles.qtyText}>×{c.plannedQty}</Text>
               </View>
             </View>
           ))}

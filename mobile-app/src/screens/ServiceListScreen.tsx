@@ -59,7 +59,7 @@ function ServiceCard({ service, onPress }: { service: ServiceListItem; onPress: 
         <View style={styles.pills}>
           {service.consumables.slice(0, 3).map((c, i) => (
             <View key={i} style={styles.pill}>
-              <Text style={styles.pillText}>{c.name} ×{c.quantity}</Text>
+              <Text style={styles.pillText}>{c.name} ×{c.plannedQty}</Text>
             </View>
           ))}
           {service.consumables.length > 3 && (

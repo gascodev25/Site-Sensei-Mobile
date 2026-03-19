@@ -55,7 +55,7 @@ export type MobileService = {
     phone: string | null;
   };
   team: { id: number; name: string } | null;
-  consumables: { id: number; name: string; quantity: number }[];
+  consumables: { id: number; name: string; plannedQty: number; stockCode?: string; stockItemId?: number }[];
   equipment: { id: number; name: string; quantity: number }[];
 };
 
