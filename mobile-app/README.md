@@ -16,15 +16,18 @@ Native Android app for field service teams. Built with Expo / React Native.
 
 ### API Base URL
 
-Copy `.env.example` to `.env` and set `API_BASE_URL`:
+Copy `.env.example` to `.env` and set `EXPO_PUBLIC_API_BASE_URL`:
 
 ```
 # Physical device on same local network as dev machine:
-API_BASE_URL=http://192.168.x.x:5000
+EXPO_PUBLIC_API_BASE_URL=http://192.168.x.x:5000
 
 # Production (deployed Replit app):
-API_BASE_URL=https://your-app.replit.app
+EXPO_PUBLIC_API_BASE_URL=https://your-app.replit.app
 ```
+
+Expo only exposes environment variables prefixed with `EXPO_PUBLIC_` to the
+client bundle at build time, so this prefix is required.
 
 ### Team Assignment
 

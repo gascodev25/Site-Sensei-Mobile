@@ -9,14 +9,13 @@ import {
   Image,
   Alert,
   ActivityIndicator,
-  Platform,
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RouteProp } from '@react-navigation/native';
 import SignatureCanvas from 'react-native-signature-canvas';
 import * as ImagePicker from 'expo-image-picker';
-import { submitFieldReport } from '../api/client';
+import { submitFieldReport, type MobileService } from '../api/client';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
 type Nav = NativeStackNavigationProp<RootStackParamList, 'FieldCompletion'>;
@@ -35,6 +34,10 @@ type Photo = {
   timestamp: string;
 };
 
+type SignatureCanvasRef = {
+  clearSignature: () => void;
+};
+
 const STEPS = ['Consumables', 'Team Signature', 'Client Signature', 'Photos', 'Review'];
 
 export default function FieldCompletionScreen() {
@@ -45,7 +48,7 @@ export default function FieldCompletionScreen() {
   const [step, setStep] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const initialConsumables: ConsumableEntry[] = (service.consumables || []).map(c => ({
+  const initialConsumables: ConsumableEntry[] = service.consumables.map(c => ({
     id: c.id,
     name: c.name,
     plannedQty: c.quantity,
@@ -59,8 +62,8 @@ export default function FieldCompletionScreen() {
   const [notes, setNotes] = useState('');
   const [newPhotoComment, setNewPhotoComment] = useState('');
 
-  const teamSigRef = useRef<any>(null);
-  const clientSigRef = useRef<any>(null);
+  const teamSigRef = useRef<SignatureCanvasRef>(null);
+  const clientSigRef = useRef<SignatureCanvasRef>(null);
 
   function updateActualQty(id: number, value: string) {
     const qty = parseInt(value) || 0;
@@ -120,8 +123,10 @@ export default function FieldCompletionScreen() {
         serviceId: service.id,
         clientName: service.client.name,
       });
-    } catch (err: any) {
-      const msg = err?.response?.data?.message || 'Failed to submit. Please try again.';
+    } catch (err: unknown) {
+      const msg =
+        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+        'Failed to submit. Please try again.';
       Alert.alert('Submission Failed', msg);
     } finally {
       setIsSubmitting(false);
@@ -136,12 +141,12 @@ export default function FieldCompletionScreen() {
     if (step > 0) setStep(s => s - 1);
   }
 
-  const progressPct = ((step + 1) / STEPS.length) * 100;
+  const progressPct = Math.round(((step + 1) / STEPS.length) * 100);
 
   return (
     <View style={styles.container}>
       <View style={styles.progressBar}>
-        <View style={[styles.progressFill, { width: `${progressPct}%` as any }]} />
+        <View style={[styles.progressFill, { width: `${progressPct}%` }]} />
       </View>
       <View style={styles.stepIndicator}>
         <Text style={styles.stepText}>Step {step + 1} of {STEPS.length}: {STEPS[step]}</Text>
@@ -149,10 +154,7 @@ export default function FieldCompletionScreen() {
 
       <ScrollView style={styles.content} keyboardShouldPersistTaps="handled">
         {step === 0 && (
-          <ConsumablesStep
-            consumables={consumables}
-            onUpdate={updateActualQty}
-          />
+          <ConsumablesStep consumables={consumables} onUpdate={updateActualQty} />
         )}
         {step === 1 && (
           <SignatureStep
@@ -213,7 +215,7 @@ export default function FieldCompletionScreen() {
           </TouchableOpacity>
         ) : (
           <TouchableOpacity
-            style={[styles.submitBtn, isSubmitting && { opacity: 0.6 }]}
+            style={[styles.submitBtn, isSubmitting && styles.disabledOpacity]}
             onPress={handleSubmit}
             disabled={isSubmitting}
           >
@@ -245,14 +247,14 @@ function ConsumablesStep({
     );
   }
   return (
-    <View style={{ padding: 16 }}>
+    <View style={styles.padded}>
       <Text style={styles.sectionHeader}>Adjust Consumable Quantities</Text>
       <Text style={styles.hint}>Change actual quantities used. Differences will be highlighted.</Text>
       {consumables.map(c => {
         const isDiff = c.actualQty !== c.plannedQty;
         return (
           <View key={c.id} style={[styles.consumableRow, isDiff && styles.consumableRowDiff]}>
-            <View style={{ flex: 1 }}>
+            <View style={styles.flex1}>
               <Text style={styles.consumableName}>{c.name}</Text>
               <Text style={styles.consumablePlanned}>Planned: {c.plannedQty}</Text>
             </View>
@@ -284,13 +286,13 @@ function SignatureStep({
   onClear,
 }: {
   title: string;
-  sigRef: React.RefObject<any>;
+  sigRef: React.RefObject<SignatureCanvasRef>;
   currentSig: string;
   onSign: (sig: string) => void;
   onClear: () => void;
 }) {
   return (
-    <View style={{ padding: 16 }}>
+    <View style={styles.padded}>
       <Text style={styles.sectionHeader}>{title}</Text>
       <Text style={styles.hint}>Sign in the box below using your finger.</Text>
       <View style={styles.signatureBox}>
@@ -306,7 +308,7 @@ function SignatureStep({
             .m-signature-pad--body { border: none; }
             .m-signature-pad--footer .button { background-color: #1e40af; color: white; }
           `}
-          style={{ flex: 1 }}
+          style={styles.flex1}
         />
       </View>
       {currentSig ? (
@@ -335,7 +337,7 @@ function PhotoStep({
   onRemovePhoto: (i: number) => void;
 }) {
   return (
-    <View style={{ padding: 16 }}>
+    <View style={styles.padded}>
       <Text style={styles.sectionHeader}>Site Photos</Text>
       <Text style={styles.hint}>Add a comment (optional), then capture a photo. Max 10 photos.</Text>
 
@@ -348,7 +350,7 @@ function PhotoStep({
         multiline
       />
       <TouchableOpacity
-        style={[styles.cameraBtn, photos.length >= 10 && { opacity: 0.4 }]}
+        style={[styles.cameraBtn, photos.length >= 10 && styles.disabledOpacity]}
         onPress={onPickPhoto}
         disabled={photos.length >= 10}
       >
@@ -358,7 +360,7 @@ function PhotoStep({
       {photos.map((p, i) => (
         <View key={i} style={styles.photoCard}>
           <Image source={{ uri: p.dataUrl }} style={styles.thumbnail} resizeMode="cover" />
-          <View style={{ flex: 1, marginLeft: 12 }}>
+          <View style={styles.photoInfo}>
             {p.comment ? (
               <Text style={styles.photoComment}>{p.comment}</Text>
             ) : (
@@ -387,7 +389,7 @@ function ReviewStep({
   notes,
   onNotesChange,
 }: {
-  service: any;
+  service: MobileService;
   occurrenceDate: string;
   consumables: ConsumableEntry[];
   hasTeamSig: boolean;
@@ -397,7 +399,7 @@ function ReviewStep({
   onNotesChange: (v: string) => void;
 }) {
   return (
-    <View style={{ padding: 16 }}>
+    <View style={styles.padded}>
       <Text style={styles.sectionHeader}>Review & Submit</Text>
 
       <View style={styles.reviewCard}>
@@ -418,8 +420,8 @@ function ReviewStep({
       </View>
 
       {consumables.some(c => c.actualQty !== c.plannedQty) && (
-        <View style={[styles.reviewCard, { borderLeftColor: '#f59e0b', borderLeftWidth: 4 }]}>
-          <Text style={[styles.reviewLabel, { color: '#b45309' }]}>Consumable Adjustments</Text>
+        <View style={styles.adjustmentsCard}>
+          <Text style={styles.adjustmentsLabel}>Consumable Adjustments</Text>
           {consumables
             .filter(c => c.actualQty !== c.plannedQty)
             .map(c => (
@@ -430,7 +432,7 @@ function ReviewStep({
         </View>
       )}
 
-      <Text style={[styles.sectionHeader, { marginTop: 16 }]}>Notes (optional)</Text>
+      <Text style={[styles.sectionHeader, styles.notesHeader]}>Notes (optional)</Text>
       <TextInput
         style={styles.notesInput}
         placeholder="Any additional notes for this service..."
@@ -457,6 +459,8 @@ const styles = StyleSheet.create({
   },
   stepText: { color: '#6b7280', fontSize: 13, fontWeight: '600' },
   content: { flex: 1 },
+  padded: { padding: 16 },
+  flex1: { flex: 1 },
   footer: {
     flexDirection: 'row',
     padding: 16,
@@ -490,6 +494,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   submitBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
+  disabledOpacity: { opacity: 0.6 },
   sectionHeader: { fontSize: 16, fontWeight: '700', color: '#111827', marginBottom: 6 },
   hint: { color: '#6b7280', fontSize: 13, marginBottom: 16 },
   emptyBox: { padding: 40, alignItems: 'center' },
@@ -526,8 +531,20 @@ const styles = StyleSheet.create({
   },
   qtyInputDiff: { borderColor: '#f59e0b', backgroundColor: '#fef9c3', color: '#92400e' },
   diffLabel: { color: '#d97706', fontSize: 12, fontWeight: '700', marginTop: 4 },
-  signatureBox: { height: 280, borderWidth: 1, borderColor: '#d1d5db', borderRadius: 10, overflow: 'hidden', backgroundColor: '#fff' },
-  sigPreview: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 10 },
+  signatureBox: {
+    height: 280,
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    borderRadius: 10,
+    overflow: 'hidden',
+    backgroundColor: '#fff',
+  },
+  sigPreview: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 10,
+  },
   sigSaved: { color: '#059669', fontWeight: '600' },
   clearLink: { color: '#ef4444', fontSize: 13 },
   commentInput: {
@@ -560,6 +577,7 @@ const styles = StyleSheet.create({
     borderColor: '#e5e7eb',
   },
   thumbnail: { width: 64, height: 64, borderRadius: 8 },
+  photoInfo: { flex: 1, marginLeft: 12 },
   photoComment: { color: '#374151', fontSize: 13 },
   photoNoComment: { color: '#9ca3af', fontSize: 13, fontStyle: 'italic' },
   photoTime: { color: '#9ca3af', fontSize: 12, marginTop: 4 },
@@ -573,8 +591,32 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#e5e7eb',
   },
-  reviewLabel: { color: '#6b7280', fontSize: 12, fontWeight: '600', marginTop: 8, textTransform: 'uppercase' },
+  adjustmentsCard: {
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    padding: 14,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    borderLeftColor: '#f59e0b',
+    borderLeftWidth: 4,
+  },
+  adjustmentsLabel: {
+    color: '#b45309',
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: 8,
+    textTransform: 'uppercase',
+  },
+  reviewLabel: {
+    color: '#6b7280',
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: 8,
+    textTransform: 'uppercase',
+  },
   reviewValue: { color: '#111827', fontSize: 14, marginTop: 2 },
+  notesHeader: { marginTop: 16 },
   notesInput: {
     borderWidth: 1,
     borderColor: '#d1d5db',

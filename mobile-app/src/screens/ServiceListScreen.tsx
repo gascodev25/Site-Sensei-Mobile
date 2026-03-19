@@ -16,8 +16,9 @@ import { getMobileServices, type MobileService } from '../api/client';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
 type Nav = NativeStackNavigationProp<RootStackParamList, 'ServiceList'>;
-
 type TabRange = 'today' | 'week' | 'month';
+
+type ServiceListItem = MobileService & { occurrenceDate: string };
 
 const TABS: { key: TabRange; label: string }[] = [
   { key: 'today', label: 'Today' },
@@ -30,8 +31,8 @@ function formatDate(dateStr: string) {
   return d.toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', weekday: 'short' });
 }
 
-function ServiceCard({ service, onPress }: { service: MobileService & { occurrenceDate?: string }; onPress: () => void }) {
-  const isPending = service.pendingOccurrenceDates && service.pendingOccurrenceDates.length > 0;
+function ServiceCard({ service, onPress }: { service: ServiceListItem; onPress: () => void }) {
+  const isPending = service.pendingOccurrenceDates.length > 0;
   const displayDate = service.occurrenceDate || service.installationDate || '';
 
   return (
@@ -47,16 +48,14 @@ function ServiceCard({ service, onPress }: { service: MobileService & { occurren
         {service.type === 'service_contract' ? 'Service Contract' : 'Installation'}
       </Text>
 
-      {displayDate ? (
-        <Text style={styles.dateText}>{formatDate(displayDate)}</Text>
-      ) : null}
+      {displayDate ? <Text style={styles.dateText}>{formatDate(displayDate)}</Text> : null}
 
       <Text style={styles.address} numberOfLines={2}>
         {service.client.addressText}
         {service.client.city ? `, ${service.client.city}` : ''}
       </Text>
 
-      {service.consumables && service.consumables.length > 0 && (
+      {service.consumables.length > 0 && (
         <View style={styles.pills}>
           {service.consumables.slice(0, 3).map((c, i) => (
             <View key={i} style={styles.pill}>
@@ -71,7 +70,7 @@ function ServiceCard({ service, onPress }: { service: MobileService & { occurren
         </View>
       )}
 
-      {service.equipment && service.equipment.length > 0 && (
+      {service.equipment.length > 0 && (
         <Text style={styles.equipText}>
           Equipment: {service.equipment.map(e => e.name).join(', ')}
         </Text>
@@ -94,8 +93,9 @@ export default function ServiceListScreen() {
     try {
       const data = await getMobileServices(range, user.linkedTeamId);
       setServices(data);
-    } catch (err: any) {
-      if (err?.response?.status === 401) {
+    } catch (err: unknown) {
+      const status = (err as { response?: { status?: number } })?.response?.status;
+      if (status === 401) {
         Alert.alert('Session expired', 'Please log in again.', [{ text: 'OK', onPress: logout }]);
       } else {
         Alert.alert('Error', 'Could not load services. Check your connection.');
@@ -122,11 +122,11 @@ export default function ServiceListScreen() {
     load(tab, true);
   }
 
-  const flatListData = services.flatMap(service => {
-    if (service.pendingOccurrenceDates && service.pendingOccurrenceDates.length > 0) {
+  const flatListData: ServiceListItem[] = services.flatMap(service => {
+    if (service.pendingOccurrenceDates.length > 0) {
       return service.pendingOccurrenceDates.map(date => ({ ...service, occurrenceDate: date }));
     }
-    return [{ ...service, occurrenceDate: service.installationDate || '' }];
+    return [{ ...service, occurrenceDate: service.installationDate ?? '' }];
   });
 
   if (!user?.linkedTeamId) {
@@ -146,9 +146,7 @@ export default function ServiceListScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.greeting}>
-          Hi, {user?.firstName || 'Team'}
-        </Text>
+        <Text style={styles.greeting}>Hi, {user?.firstName || 'Team'}</Text>
         <TouchableOpacity onPress={logout}>
           <Text style={styles.logoutLink}>Log out</Text>
         </TouchableOpacity>
@@ -174,16 +172,16 @@ export default function ServiceListScreen() {
           <Text style={styles.loadingText}>Loading services...</Text>
         </View>
       ) : (
-        <FlatList
+        <FlatList<ServiceListItem>
           data={flatListData}
-          keyExtractor={(item, idx) => `${item.id}-${(item as any).occurrenceDate || idx}`}
+          keyExtractor={(item, idx) => `${item.id}-${item.occurrenceDate || idx}`}
           renderItem={({ item }) => (
             <ServiceCard
-              service={item as any}
+              service={item}
               onPress={() =>
                 navigation.navigate('ServiceDetail', {
                   service: item,
-                  occurrenceDate: (item as any).occurrenceDate,
+                  occurrenceDate: item.occurrenceDate,
                 })
               }
             />
@@ -197,7 +195,7 @@ export default function ServiceListScreen() {
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#1e40af" />
           }
-          contentContainerStyle={flatListData.length === 0 ? { flex: 1 } : { paddingBottom: 24 }}
+          contentContainerStyle={flatListData.length === 0 ? styles.fillFlex : styles.listPadding}
         />
       )}
     </View>
@@ -213,7 +211,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#1e40af',
     paddingHorizontal: 20,
     paddingVertical: 14,
-    paddingTop: 14,
   },
   greeting: { color: '#fff', fontSize: 16, fontWeight: '600' },
   logoutLink: { color: '#93c5fd', fontSize: 14 },
@@ -223,11 +220,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderColor: '#e5e7eb',
   },
-  tab: {
-    flex: 1,
-    paddingVertical: 12,
-    alignItems: 'center',
-  },
+  tab: { flex: 1, paddingVertical: 12, alignItems: 'center' },
   tabActive: { borderBottomWidth: 2, borderBottomColor: '#1e40af' },
   tabText: { color: '#6b7280', fontWeight: '500', fontSize: 14 },
   tabTextActive: { color: '#1e40af', fontWeight: '700' },
@@ -266,6 +259,8 @@ const styles = StyleSheet.create({
   emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 48 },
   emptyTitle: { fontSize: 18, fontWeight: '700', color: '#374151', textAlign: 'center' },
   emptySubtitle: { color: '#9ca3af', textAlign: 'center', marginTop: 8, lineHeight: 20 },
+  fillFlex: { flex: 1 },
+  listPadding: { paddingBottom: 24 },
   logoutBtn: {
     marginTop: 20,
     backgroundColor: '#1e40af',

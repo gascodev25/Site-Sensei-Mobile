@@ -26,8 +26,10 @@ export default function LoginScreen() {
     setIsLoading(true);
     try {
       await login(email.trim().toLowerCase(), password);
-    } catch (err: any) {
-      const msg = err?.response?.data?.message || 'Invalid email or password. Please try again.';
+    } catch (err: unknown) {
+      const msg =
+        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+        'Invalid email or password. Please try again.';
       Alert.alert('Login Failed', msg);
     } finally {
       setIsLoading(false);
