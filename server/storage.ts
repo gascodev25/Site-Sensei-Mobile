@@ -139,6 +139,10 @@ export interface IStorage {
   getFieldReportById(id: number): Promise<FieldReport | undefined>;
   getMobileServices(teamId: number, range: 'today' | 'week' | 'month'): Promise<any[]>;
 
+  // Invoicing operations
+  getCompletedServices(interval?: string): Promise<(Service & { clientName: string })[]>;
+  markServiceInvoiced(id: number, invoicedById: string): Promise<Service>;
+
   // Warehouse operations
   getEquipmentStatus(): Promise<{ status: string; count: number }[]>;
   getConsumablesWithStockInfo(): Promise<Consumable[]>;
@@ -522,6 +526,45 @@ export class DatabaseStorage implements IStorage {
         )
       )
       .orderBy(desc(services.completedAt));
+  }
+
+  async getCompletedServices(interval?: string): Promise<(Service & { clientName: string })[]> {
+    const results = await db
+      .select({
+        service: services,
+        clientName: clients.name,
+      })
+      .from(services)
+      .leftJoin(clients, eq(services.clientId, clients.id))
+      .where(eq(services.status, 'completed'))
+      .orderBy(desc(services.completedAt));
+
+    return results
+      .filter(row => {
+        if (!interval || interval === 'all') return true;
+        const pattern = row.service.recurrencePattern as { interval?: string } | null;
+        if (interval === 'once') {
+          return !pattern || !pattern.interval;
+        }
+        return pattern?.interval === interval;
+      })
+      .map(row => ({
+        ...row.service,
+        clientName: row.clientName || 'Unknown',
+      }));
+  }
+
+  async markServiceInvoiced(id: number, invoicedById: string): Promise<Service> {
+    const [updated] = await db
+      .update(services)
+      .set({
+        invoicedStatus: 'invoiced',
+        invoicedBy: invoicedById,
+        lastInvoiceSync: new Date(),
+      })
+      .where(eq(services.id, id))
+      .returning();
+    return updated;
   }
 
   // Equipment operations

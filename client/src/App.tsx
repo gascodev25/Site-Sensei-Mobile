@@ -14,6 +14,7 @@ import Teams from "@/pages/Teams";
 import Reports from "@/pages/Reports";
 import Warehouse from "@/pages/Warehouse";
 import Users from "@/pages/Users";
+import Invoicing from "@/pages/Invoicing";
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -32,6 +33,7 @@ function Router() {
           <Route path="/warehouse" component={Warehouse} />
           <Route path="/reports" component={Reports} />
           <Route path="/users" component={Users} />
+          <Route path="/invoicing" component={Invoicing} />
         </>
       )}
       <Route component={NotFound} />

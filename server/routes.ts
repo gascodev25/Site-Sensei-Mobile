@@ -805,6 +805,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get('/api/services/ready-for-invoicing', isAuthenticated, async (req, res) => {
+    try {
+      const services = await storage.getServicesReadyForInvoicing();
+      res.json(services);
+    } catch (error) {
+      console.error("Error fetching services ready for invoicing:", error);
+      res.status(500).json({ message: "Failed to fetch services ready for invoicing" });
+    }
+  });
+
+  app.get('/api/services/completed', isAuthenticated, async (req, res) => {
+    try {
+      const interval = req.query.interval as string | undefined;
+      const completedServices = await storage.getCompletedServices(interval);
+      res.json(completedServices);
+    } catch (error) {
+      console.error("Error fetching completed services:", error);
+      res.status(500).json({ message: "Failed to fetch completed services" });
+    }
+  });
+
   app.get('/api/services/:id', isAuthenticated, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
@@ -819,13 +840,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/services/ready-for-invoicing', isAuthenticated, async (req, res) => {
+  app.patch('/api/services/:id/mark-invoiced', isAuthenticated, async (req, res) => {
     try {
-      const services = await storage.getServicesReadyForInvoicing();
-      res.json(services);
+      const id = parseInt(req.params.id);
+      if (!id || id <= 0) {
+        return res.status(400).json({ message: "Invalid service ID" });
+      }
+
+      const user = await getUserWithRoles(req);
+      if (!user) {
+        return res.status(401).json({ message: "User not found" });
+      }
+
+      const service = await storage.getService(id);
+      if (!service) {
+        return res.status(404).json({ message: "Service not found" });
+      }
+
+      if (service.status !== 'completed') {
+        return res.status(400).json({ message: "Only completed services can be invoiced" });
+      }
+
+      const updated = await storage.markServiceInvoiced(id, user.id);
+
+      await storage.createAuditLog({
+        userId: user.id,
+        action: 'mark_invoiced',
+        entityType: 'service',
+        entityId: id,
+        metadata: { invoicedBy: user.id },
+      });
+
+      res.json(updated);
     } catch (error) {
-      console.error("Error fetching services ready for invoicing:", error);
-      res.status(500).json({ message: "Failed to fetch services ready for invoicing" });
+      console.error("Error marking service as invoiced:", error);
+      res.status(500).json({ message: "Failed to mark service as invoiced" });
     }
   });
 

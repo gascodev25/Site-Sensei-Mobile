@@ -18,6 +18,7 @@ export default function Header() {
     { label: "Teams", href: "/teams", active: location === "/teams" },
     { label: "Warehouse", href: "/warehouse", active: location === "/warehouse" },
     { label: "Reports", href: "/reports", active: location === "/reports" },
+    { label: "Invoicing", href: "/invoicing", active: location === "/invoicing" },
   ];
 
   // Add Users link only for superuser and manager
