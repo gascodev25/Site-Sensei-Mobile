@@ -1687,23 +1687,15 @@ export class DatabaseStorage implements IStorage {
         serviceId: fieldReports.serviceId,
         hasAdjustments: fieldReports.hasAdjustments,
         completionDate: fieldReports.completionDate,
-        id: fieldReports.id,
       })
       .from(fieldReports)
-      .where(inArray(fieldReports.serviceId, serviceIds))
-      .orderBy(desc(fieldReports.id));
+      .where(inArray(fieldReports.serviceId, serviceIds));
 
-    const seen = new Map<number, { serviceId: number; hasAdjustments: boolean; completionDate: string }>();
-    for (const row of rows) {
-      if (!seen.has(row.serviceId)) {
-        seen.set(row.serviceId, {
-          serviceId: row.serviceId,
-          hasAdjustments: row.hasAdjustments ?? false,
-          completionDate: row.completionDate,
-        });
-      }
-    }
-    return Array.from(seen.values());
+    return rows.map(row => ({
+      serviceId: row.serviceId,
+      hasAdjustments: row.hasAdjustments ?? false,
+      completionDate: row.completionDate,
+    }));
   }
 
   /**

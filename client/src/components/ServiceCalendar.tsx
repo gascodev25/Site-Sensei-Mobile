@@ -218,9 +218,10 @@ export default function ServiceCalendar({ services, onServiceClick, onServiceMov
         <div className="flex items-center justify-between gap-1">
           <div className="font-medium truncate flex-1">{service.client?.name || 'Unknown'}</div>
           {adjustedOccurrences?.has(`${service.id}:${format(displayDate, 'yyyy-MM-dd')}`) && (
-            <span title="Consumable quantities were adjusted" className="shrink-0 text-orange-600">
-              <AlertTriangle className="h-3 w-3" />
-            </span>
+            <Badge className="bg-orange-100 border-orange-400 text-orange-800 text-xs shrink-0 px-1 py-0">
+              <AlertTriangle className="h-2.5 w-2.5 mr-0.5" />
+              {size === 'large' ? 'Adjusted' : '!'}
+            </Badge>
           )}
           <button
             onClick={(e) => {
