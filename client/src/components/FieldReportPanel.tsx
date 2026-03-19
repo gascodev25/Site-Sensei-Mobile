@@ -89,6 +89,9 @@ export default function FieldReportPanel({ serviceId, occurrenceDate }: FieldRep
             </Badge>
           )}
           <span className="text-xs text-muted-foreground ml-1">{completedAt}</span>
+          {!occurrenceDate && (
+            <span className="text-xs text-muted-foreground italic">(latest)</span>
+          )}
         </div>
         {expanded ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
       </Button>
