@@ -1639,6 +1639,16 @@ export class DatabaseStorage implements IStorage {
   /**
    * Returns services assigned to a team, enriched with client info and
    * pre-assigned consumables/equipment, filtered by date range.
+   *
+   * Date ranges are rolling windows from today (not strict calendar boundaries):
+   *   - 'today'  → current calendar day only (midnight–23:59:59)
+   *   - 'week'   → today + next 7 days (rolling, not Mon–Sun calendar week)
+   *   - 'month'  → today + next 30 days (rolling, not 1st–last of calendar month)
+   *
+   * Each service in the response includes:
+   *   - occurrenceDatesInRange: all occurrence dates (YYYY-MM-DD) within the window
+   *   - pendingOccurrenceDates: subset of occurrence dates not yet in completedDates
+   * The mobile app should use pendingOccurrenceDates to build its work queue.
    */
   async getMobileServices(teamId: number, range: 'today' | 'week' | 'month'): Promise<any[]> {
     const now = new Date();
@@ -1677,8 +1687,16 @@ export class DatabaseStorage implements IStorage {
 
     if (teamServices.length === 0) return [];
 
-    // Filter by date range using recurrence logic
-    const filteredServices: typeof teamServices = [];
+    // Filter by date range using recurrence logic.
+    // For recurring services, compute which dates within the range have not yet been completed.
+    // The mobile app should only show pending occurrences; completed ones get a `completedForDate` flag.
+    const filteredServices: (typeof teamServices[number] & {
+      pendingOccurrenceDates: string[];
+      allOccurrenceDates: string[];
+    })[] = [];
+
+    const toDateString = (d: Date) => d.toISOString().substring(0, 10);
+
     for (const row of teamServices) {
       const svc = row.service;
       const installDate = svc.installationDate ? new Date(svc.installationDate) : null;
@@ -1686,12 +1704,17 @@ export class DatabaseStorage implements IStorage {
 
       const recurrencePattern = svc.recurrencePattern as { interval?: string; end_date?: string } | null;
       const excludedDates = (svc.excludedDates || []) as string[];
-      const completedDates = (svc.completedDates || []) as string[];
+      const completedDates = new Set((svc.completedDates || []) as string[]);
 
       if (!recurrencePattern?.interval) {
         // One-off: include if install date is within range
         if (installDate >= rangeStart && installDate <= rangeEnd) {
-          filteredServices.push(row);
+          const dateStr = toDateString(installDate);
+          filteredServices.push({
+            ...row,
+            allOccurrenceDates: [dateStr],
+            pendingOccurrenceDates: completedDates.has(dateStr) ? [] : [dateStr],
+          });
         }
       } else {
         // Recurring: include if any occurrence falls in range
@@ -1703,7 +1726,13 @@ export class DatabaseStorage implements IStorage {
           excludedDates,
         });
         if (occurrences.length > 0) {
-          filteredServices.push(row);
+          const allDates = occurrences.map(toDateString);
+          const pendingDates = allDates.filter(d => !completedDates.has(d));
+          filteredServices.push({
+            ...row,
+            allOccurrenceDates: allDates,
+            pendingOccurrenceDates: pendingDates,
+          });
         }
       }
     }
@@ -1753,7 +1782,7 @@ export class DatabaseStorage implements IStorage {
       equipmentByService.get(row.serviceId)!.push(row);
     }
 
-    return filteredServices.map(({ service: svc, client, team }) => ({
+    return filteredServices.map(({ service: svc, client, team, pendingOccurrenceDates, allOccurrenceDates }) => ({
       id: svc.id,
       type: svc.type,
       status: svc.status,
@@ -1763,6 +1792,9 @@ export class DatabaseStorage implements IStorage {
       excludedDates: svc.excludedDates,
       servicePriority: svc.servicePriority,
       estimatedDuration: svc.estimatedDuration,
+      // Occurrence dates in the requested range (mobile app uses these to drive the work list)
+      occurrenceDatesInRange: allOccurrenceDates,
+      pendingOccurrenceDates, // Dates not yet completed — primary list for mobile work queue
       client: client ? {
         id: client.id,
         name: client.name,

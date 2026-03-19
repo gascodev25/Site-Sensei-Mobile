@@ -1970,20 +1970,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userRoles = user?.roles || '';
       const isManager = userRoles.includes('superuser') || userRoles.includes('manager');
 
-      const body = req.body as {
-        serviceId: number;
-        completionDate: string;
-        teamMemberId?: number;
-        actualConsumables?: { id: number; name: string; plannedQty: number; actualQty: number }[];
-        teamSignature?: string;
-        clientSignature?: string;
-        photos?: { dataUrl: string; comment: string; timestamp: string }[];
-        notes?: string;
-      };
+      // Validate request body
+      const fieldReportBodySchema = z.object({
+        serviceId: z.coerce.number().int().positive(),
+        completionDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "completionDate must be YYYY-MM-DD"),
+        teamMemberId: z.coerce.number().int().positive().optional().nullable(),
+        actualConsumables: z.array(z.object({
+          id: z.coerce.number().int().positive(),
+          name: z.string(),
+          plannedQty: z.coerce.number().int().min(0),
+          actualQty: z.coerce.number().int().min(0),
+        })).optional().default([]),
+        teamSignature: z.string().optional().nullable(),
+        clientSignature: z.string().optional().nullable(),
+        photos: z.array(z.object({
+          dataUrl: z.string(),
+          comment: z.string().default(''),
+          timestamp: z.string(),
+        })).optional().default([]),
+        notes: z.string().optional().nullable(),
+      });
 
-      if (!body.serviceId || !body.completionDate) {
-        return res.status(400).json({ message: "serviceId and completionDate are required" });
+      const parseResult = fieldReportBodySchema.safeParse(req.body);
+      if (!parseResult.success) {
+        return res.status(400).json({ message: "Validation error", errors: parseResult.error.errors });
       }
+      const body = parseResult.data;
 
       // Verify the service exists
       const service = await storage.getService(body.serviceId);
