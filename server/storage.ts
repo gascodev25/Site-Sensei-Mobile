@@ -137,7 +137,7 @@ export interface IStorage {
   getFieldReport(serviceId: number, completionDate: string): Promise<FieldReport | undefined>;
   getLatestFieldReport(serviceId: number): Promise<FieldReport | undefined>;
   getFieldReportById(id: number): Promise<FieldReport | undefined>;
-  getLatestFieldReportFlags(serviceIds: number[]): Promise<{ serviceId: number; hasAdjustments: boolean; completionDate: string }[]>;
+  getFieldReportOccurrenceFlags(serviceIds: number[]): Promise<{ serviceId: number; hasAdjustments: boolean; completionDate: string }[]>;
   getMobileServices(teamId: number, range: 'today' | 'week' | 'month'): Promise<any[]>;
 
   // Invoicing operations
@@ -1680,7 +1680,7 @@ export class DatabaseStorage implements IStorage {
     return report;
   }
 
-  async getLatestFieldReportFlags(serviceIds: number[]): Promise<{ serviceId: number; hasAdjustments: boolean; completionDate: string }[]> {
+  async getFieldReportOccurrenceFlags(serviceIds: number[]): Promise<{ serviceId: number; hasAdjustments: boolean; completionDate: string }[]> {
     if (serviceIds.length === 0) return [];
     const rows = await db
       .select({

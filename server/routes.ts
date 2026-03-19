@@ -2021,7 +2021,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (serviceIds.length === 0) {
         return res.json([]);
       }
-      const results = await storage.getLatestFieldReportFlags(serviceIds);
+      const results = await storage.getFieldReportOccurrenceFlags(serviceIds);
       res.json(results);
     } catch (error) {
       console.error("Error fetching field report batch flags:", error);
