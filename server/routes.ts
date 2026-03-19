@@ -88,6 +88,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           firstName: user.firstName,
           lastName: user.lastName,
           roles: user.roles,
+          linkedTeamId: user.linkedTeamId ?? null,
         });
       }
     } catch (error) {
@@ -192,11 +193,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.params.id;
       const updateData = insertUserSchema.partial().parse(req.body);
 
+      const rawBody = req.body as any;
       const updates: any = {
         firstName: updateData.firstName,
         lastName: updateData.lastName,
         roles: updateData.roles,
       };
+
+      // Allow managers/superusers to assign a user to a team (for mobile app field users)
+      if (rawBody.linkedTeamId !== undefined) {
+        updates.linkedTeamId = rawBody.linkedTeamId === null ? null : parseInt(rawBody.linkedTeamId);
+      }
 
       // If password is being changed, hash it
       if (updateData.password) {
@@ -211,6 +218,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         firstName: updatedUser.firstName,
         lastName: updatedUser.lastName,
         roles: updatedUser.roles,
+        linkedTeamId: updatedUser.linkedTeamId ?? null,
       });
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -1830,17 +1838,103 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ── Mobile API routes ────────────────────────────────────────────────────
 
   /**
+   * Shared helper: deduct (or reconcile) consumable stock from actual field usage.
+   * On first deduction (isFirstDeduction=true), subtract actualQty from stock.
+   * On update (isFirstDeduction=false), compute delta vs previous quantities and
+   * only apply the difference — preventing double-deduction on resubmission.
+   */
+  async function applyConsumableStockDelta(
+    actualConsumables: { id: number; actualQty: number }[],
+    previousConsumables: { id: number; actualQty: number }[],
+    isFirstDeduction: boolean
+  ) {
+    if (actualConsumables.length === 0) return;
+
+    const allConsumables = await storage.getConsumables();
+    const consumableMap = new Map(allConsumables.map(c => [c.id, c]));
+    const prevMap = new Map(previousConsumables.map(c => [c.id, c.actualQty]));
+
+    for (const item of actualConsumables) {
+      if (item.actualQty < 0) continue;
+      const consumable = consumableMap.get(item.id);
+      if (!consumable) continue;
+
+      let delta: number;
+      if (isFirstDeduction) {
+        delta = item.actualQty;
+      } else {
+        const prevQty = prevMap.get(item.id) ?? 0;
+        delta = item.actualQty - prevQty; // positive = more used, negative = less used
+      }
+
+      if (delta !== 0) {
+        const newStock = Math.max(0, (consumable.currentStock || 0) - delta);
+        await storage.updateConsumable(item.id, { currentStock: newStock });
+      }
+    }
+  }
+
+  /**
+   * Shared helper: mark a service occurrence as complete.
+   * Mirrors the core status-update logic from /api/services/:id/complete
+   * without the equipment/conversion steps (those are web-only).
+   */
+  async function markServiceOccurrenceComplete(serviceId: number, completionDate: string) {
+    const service = await storage.getService(serviceId);
+    if (!service) return;
+
+    const recurrencePattern = service.recurrencePattern as { interval?: string } | null;
+    const updateData: any = {};
+
+    if (recurrencePattern?.interval) {
+      // Recurring: add completionDate to completedDates, keep status as 'scheduled'
+      const completedDates = (service.completedDates || []) as string[];
+      if (!completedDates.includes(completionDate)) {
+        updateData.completedDates = [...completedDates, completionDate];
+      }
+      updateData.status = 'scheduled';
+    } else {
+      // One-off: mark fully complete
+      updateData.status = 'completed';
+      updateData.completedAt = new Date();
+    }
+
+    await storage.updateService(serviceId, updateData);
+  }
+
+  /**
    * GET /api/mobile/services
-   * Returns services for the authenticated user's team, filtered by date range.
+   * Returns services for a team, filtered by date range.
+   *
+   * Authorization:
+   *   - Managers / superusers may pass any teamId.
+   *   - Users with team_member role may only request their own linkedTeamId.
+   *
    * Query params:
    *   - teamId: number (required)
    *   - range: 'today' | 'week' | 'month' (default: 'today')
    */
   app.get('/api/mobile/services', isAuthenticated, async (req, res) => {
     try {
-      const teamId = parseInt(req.query.teamId as string);
-      if (!teamId || isNaN(teamId)) {
+      const user = await getUserWithRoles(req);
+      const userRoles = user?.roles || '';
+
+      const requestedTeamId = parseInt(req.query.teamId as string);
+      if (!requestedTeamId || isNaN(requestedTeamId)) {
         return res.status(400).json({ message: "teamId query parameter is required" });
+      }
+
+      const isManager = userRoles.includes('superuser') || userRoles.includes('manager');
+
+      if (!isManager) {
+        // Non-managers may only access their own linked team
+        const linkedTeamId = user?.linkedTeamId ?? null;
+        if (!linkedTeamId) {
+          return res.status(403).json({ message: "No team assigned to this user. Contact a manager." });
+        }
+        if (linkedTeamId !== requestedTeamId) {
+          return res.status(403).json({ message: "Access denied: you may only view your own team's services." });
+        }
       }
 
       const rawRange = req.query.range as string;
@@ -1849,7 +1943,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         rawRange === 'month' ? 'month' :
         'today';
 
-      const mobileServices = await storage.getMobileServices(teamId, range);
+      const mobileServices = await storage.getMobileServices(requestedTeamId, range);
       res.json(mobileServices);
     } catch (error) {
       console.error("Error fetching mobile services:", error);
@@ -1859,13 +1953,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   /**
    * POST /api/field-reports
-   * Creates a field report for a service occurrence.
-   * Detects consumable quantity adjustments, sets hasAdjustments flag,
-   * and triggers service completion with actual consumable quantities.
+   * Creates or updates a field report for a service occurrence.
    *
-   * Body:
-   *   serviceId, completionDate, teamMemberId?, actualConsumables,
-   *   teamSignature, clientSignature, photos, notes?
+   * Stock deduction is idempotent:
+   *   - On first submission: deducts actualQty from consumable stock, marks stockDeducted=true.
+   *   - On resubmission: only applies the delta (newActualQty - oldActualQty) to stock.
+   *
+   * Service completion is triggered via the shared markServiceOccurrenceComplete helper,
+   * using the same status/completedDates logic as /api/services/:id/complete.
+   *
+   * Body: serviceId, completionDate, teamMemberId?, actualConsumables,
+   *       teamSignature, clientSignature, photos, notes?
    */
   app.post('/api/field-reports', isAuthenticated, async (req, res) => {
     try {
@@ -1891,7 +1989,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Service not found" });
       }
 
-      // Detect whether any consumable quantity differs from planned
       const actualConsumables = body.actualConsumables || [];
       const hasAdjustments = actualConsumables.some(c => c.actualQty !== c.plannedQty);
 
@@ -1900,6 +1997,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       let fieldReport;
       if (existing) {
+        // UPDATE: apply stock delta vs previous submission (idempotent)
+        const prevConsumables = (existing.actualConsumables || []) as { id: number; actualQty: number }[];
+        await applyConsumableStockDelta(
+          actualConsumables.map(c => ({ id: c.id, actualQty: c.actualQty })),
+          prevConsumables,
+          false // not first deduction
+        );
+
         fieldReport = await storage.updateFieldReport(existing.id, {
           teamMemberId: body.teamMemberId ?? null,
           actualConsumables,
@@ -1910,6 +2015,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           notes: body.notes ?? null,
         });
       } else {
+        // CREATE: first submission — deduct stock and mark service complete
         fieldReport = await storage.createFieldReport({
           serviceId: body.serviceId,
           completionDate: body.completionDate,
@@ -1919,54 +2025,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
           clientSignature: body.clientSignature ?? null,
           photos: body.photos || [],
           hasAdjustments,
+          stockDeducted: true,
           notes: body.notes ?? null,
         });
-      }
 
-      // Trigger service completion with actual consumable quantities
-      const consumableItems = actualConsumables.map(c => ({
-        id: c.id,
-        quantity: c.actualQty,
-      }));
+        // Deduct stock using actual quantities (first-time only)
+        await applyConsumableStockDelta(
+          actualConsumables.map(c => ({ id: c.id, actualQty: c.actualQty })),
+          [],
+          true // first deduction
+        );
 
-      const updateData: any = {
-        status: 'completed',
-        completedAt: new Date(),
-      };
-
-      // For recurring services, add to completedDates rather than marking fully complete
-      const recurrencePattern = service.recurrencePattern as { interval?: string } | null;
-      if (recurrencePattern?.interval) {
-        const completedDates = (service.completedDates || []) as string[];
-        if (!completedDates.includes(body.completionDate)) {
-          updateData.completedDates = [...completedDates, body.completionDate];
-        }
-        // Recurring services stay in scheduled status
-        delete updateData.status;
-        delete updateData.completedAt;
-      }
-
-      await storage.updateService(body.serviceId, updateData);
-
-      // Deduct actual consumable quantities from stock
-      if (consumableItems.length > 0) {
-        const allConsumables = await storage.getConsumables();
-        const consumableMap = new Map(allConsumables.map(c => [c.id, c]));
-
-        for (const item of consumableItems) {
-          if (item.quantity <= 0) continue;
-          const consumable = consumableMap.get(item.id);
-          if (consumable) {
-            const newStock = Math.max(0, (consumable.currentStock || 0) - item.quantity);
-            await storage.updateConsumable(item.id, { currentStock: newStock });
-          }
-        }
+        // Mark service occurrence as complete (mirrors /api/services/:id/complete logic)
+        await markServiceOccurrenceComplete(body.serviceId, body.completionDate);
       }
 
       // Audit log
       await storage.createAuditLog({
         userId: user?.id,
-        action: 'field_report_submitted',
+        action: existing ? 'field_report_updated' : 'field_report_submitted',
         entityType: 'field_report',
         entityId: fieldReport.id,
         metadata: {
@@ -1978,7 +2055,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       });
 
-      res.status(201).json(fieldReport);
+      res.status(existing ? 200 : 201).json(fieldReport);
     } catch (error) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Validation error", errors: error.errors });
@@ -1990,8 +2067,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   /**
    * GET /api/field-reports/:serviceId
-   * Retrieves the most recent field report for a given service.
+   * Retrieves a field report for a given service.
    * Query param: date (YYYY-MM-DD) — if provided, looks up that specific occurrence.
+   * Without a date, returns the most recent report for that service.
    */
   app.get('/api/field-reports/:serviceId', isAuthenticated, async (req, res) => {
     try {

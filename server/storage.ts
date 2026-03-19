@@ -47,7 +47,7 @@ export interface IStorage {
   getAllUsers(): Promise<User[]>;
   upsertUser(user: UpsertUser): Promise<User>;
   createPasswordUser(userData: { email: string; passwordHash: string; firstName: string; lastName: string; roles: string }): Promise<User>;
-  updateUser(id: string, userData: Partial<{ firstName: string; lastName: string; roles: string; passwordHash: string }>): Promise<User>;
+  updateUser(id: string, userData: Partial<{ firstName: string; lastName: string; roles: string; passwordHash: string; linkedTeamId: number | null }>): Promise<User>;
   deleteUser(id: string): Promise<void>;
 
   // Client operations
@@ -217,7 +217,7 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
-  async updateUser(id: string, userData: Partial<{ firstName: string; lastName: string; roles: string; passwordHash: string }>): Promise<User> {
+  async updateUser(id: string, userData: Partial<{ firstName: string; lastName: string; roles: string; passwordHash: string; linkedTeamId: number | null }>): Promise<User> {
     const [user] = await db
       .update(users)
       .set({

@@ -34,6 +34,7 @@ export const users = pgTable("users", {
   profileImageUrl: varchar("profile_image_url"),
   passwordHash: varchar("password_hash"), // bcrypt hash for local auth, null for OAuth users
   roles: text("roles").default("team_member"), // comma-separated roles
+  linkedTeamId: integer("linked_team_id"), // optional FK to service_teams (for mobile field users)
   roleAssignmentSource: varchar("role_assignment_source").default("manual"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -189,6 +190,7 @@ export const fieldReports = pgTable("field_reports", {
     timestamp: string;
   }[]>().default([]),
   hasAdjustments: boolean("has_adjustments").default(false),
+  stockDeducted: boolean("stock_deducted").default(false), // Tracks whether consumable stock has been deducted
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
