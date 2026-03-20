@@ -141,8 +141,8 @@ export interface IStorage {
   getMobileServices(teamId: number, range: 'today' | 'week' | 'month'): Promise<any[]>;
 
   // Invoicing operations
-  getCompletedServices(interval?: string): Promise<(Service & { clientName: string })[]>;
-  markServiceInvoiced(id: number, invoicedById: string): Promise<Service>;
+  getCompletedServices(interval?: string): Promise<(Service & { clientName: string; occurrenceDate?: string })[]>;
+  markServiceInvoiced(id: number, invoicedById: string, occurrenceDate?: string): Promise<Service>;
 
   // Warehouse operations
   getEquipmentStatus(): Promise<{ status: string; count: number }[]>;
@@ -529,7 +529,7 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(services.completedAt));
   }
 
-  async getCompletedServices(interval?: string): Promise<(Service & { clientName: string })[]> {
+  async getCompletedServices(interval?: string): Promise<(Service & { clientName: string; occurrenceDate?: string })[]> {
     const results = await db
       .select({
         service: services,
@@ -537,25 +537,71 @@ export class DatabaseStorage implements IStorage {
       })
       .from(services)
       .leftJoin(clients, eq(services.clientId, clients.id))
-      .where(eq(services.status, 'completed'))
+      .where(
+        or(
+          eq(services.status, 'completed'),
+          sql`jsonb_array_length(COALESCE(${services.completedDates}, '[]'::jsonb)) > 0`
+        )
+      )
       .orderBy(desc(services.completedAt));
 
-    return results
-      .filter(row => {
-        if (!interval || interval === 'all') return true;
-        const pattern = row.service.recurrencePattern as { interval?: string } | null;
-        if (interval === 'once') {
-          return !pattern || !pattern.interval;
+    const rows = results.filter(row => {
+      if (!interval || interval === 'all') return true;
+      const pattern = row.service.recurrencePattern as { interval?: string } | null;
+      if (interval === 'once') {
+        return !pattern || !pattern.interval;
+      }
+      return pattern?.interval === interval;
+    });
+
+    const expanded: (Service & { clientName: string; occurrenceDate?: string })[] = [];
+    for (const row of rows) {
+      const completedDates = (row.service.completedDates as string[] | null) || [];
+      const isRecurring = !!(
+        row.service.recurrencePattern &&
+        typeof row.service.recurrencePattern === 'object' &&
+        'interval' in (row.service.recurrencePattern as object)
+      );
+
+      if (isRecurring && completedDates.length > 0) {
+        const invoicedDates = (row.service.invoicedDates as string[] | null) || [];
+        for (const date of [...completedDates].sort((a, b) => b.localeCompare(a))) {
+          const isInvoiced = invoicedDates.includes(date);
+          expanded.push({
+            ...row.service,
+            clientName: row.clientName || 'Unknown',
+            occurrenceDate: date,
+            invoicedStatus: isInvoiced ? 'invoiced' : 'not_ready',
+          });
         }
-        return pattern?.interval === interval;
-      })
-      .map(row => ({
-        ...row.service,
-        clientName: row.clientName || 'Unknown',
-      }));
+      } else {
+        expanded.push({
+          ...row.service,
+          clientName: row.clientName || 'Unknown',
+        });
+      }
+    }
+
+    return expanded;
   }
 
-  async markServiceInvoiced(id: number, invoicedById: string): Promise<Service> {
+  async markServiceInvoiced(id: number, invoicedById: string, occurrenceDate?: string): Promise<Service> {
+    if (occurrenceDate) {
+      const [existing] = await db.select().from(services).where(eq(services.id, id));
+      const currentInvoicedDates = (existing?.invoicedDates as string[] | null) || [];
+      const updatedInvoicedDates = currentInvoicedDates.includes(occurrenceDate)
+        ? currentInvoicedDates
+        : [...currentInvoicedDates, occurrenceDate];
+      const [updated] = await db
+        .update(services)
+        .set({
+          invoicedDates: updatedInvoicedDates,
+          lastInvoiceSync: new Date(),
+        })
+        .where(eq(services.id, id))
+        .returning();
+      return updated;
+    }
     const [updated] = await db
       .update(services)
       .set({

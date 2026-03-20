@@ -852,16 +852,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "User not found" });
       }
 
+      const occurrenceDate = req.body?.occurrenceDate as string | undefined;
+
       const service = await storage.getService(id);
       if (!service) {
         return res.status(404).json({ message: "Service not found" });
       }
 
-      if (service.status !== 'completed') {
+      const isRecurring = !!(
+        service.recurrencePattern &&
+        typeof service.recurrencePattern === 'object' &&
+        'interval' in (service.recurrencePattern as object)
+      );
+
+      if (isRecurring) {
+        const completedDates = (service.completedDates as string[] | null) || [];
+        if (occurrenceDate && !completedDates.includes(occurrenceDate)) {
+          return res.status(400).json({ message: "Occurrence date not found in completed dates" });
+        }
+        if (!occurrenceDate && completedDates.length === 0) {
+          return res.status(400).json({ message: "No completed occurrences to invoice" });
+        }
+      } else if (service.status !== 'completed') {
         return res.status(400).json({ message: "Only completed services can be invoiced" });
       }
 
-      const updated = await storage.markServiceInvoiced(id, user.id);
+      const updated = await storage.markServiceInvoiced(id, user.id, occurrenceDate);
 
       await storage.createAuditLog({
         userId: user.id,

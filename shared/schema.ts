@@ -143,6 +143,7 @@ export const services = pgTable("services", {
   splitFromDate: varchar("split_from_date", { length: 20 }), // ISO date string when this service was split from parent
   excludedDates: jsonb("excluded_dates").$type<string[]>().default([]), // Array of ISO date strings to skip
   completedDates: jsonb("completed_dates").$type<string[]>().default([]), // Array of ISO date strings for completed occurrences
+  invoicedDates: jsonb("invoiced_dates").$type<string[]>().default([]), // Array of ISO date strings for invoiced occurrences (recurring services)
   contractLengthMonths: integer("contract_length_months"),
   createdAt: timestamp("created_at").defaultNow(),
   completedAt: timestamp("completed_at"),

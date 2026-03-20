@@ -9,14 +9,14 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { CheckCircle, FileText, Clock, Receipt } from "lucide-react";
-import { format } from "date-fns";
+import { format, parseISO } from "date-fns";
 import type { Service } from "@shared/schema";
 
-type CompletedService = Service & { clientName: string };
+type CompletedService = Service & { clientName: string; occurrenceDate?: string };
 
 const INTERVAL_OPTIONS = [
-  { value: "once", label: "Once-off" },
   { value: "all", label: "All Intervals" },
+  { value: "once", label: "Once-off" },
   { value: "7d", label: "Weekly (7d)" },
   { value: "14d", label: "Fortnightly (14d)" },
   { value: "30d", label: "Monthly (30d)" },
@@ -24,8 +24,12 @@ const INTERVAL_OPTIONS = [
   { value: "90d", label: "Quarterly (90d)" },
 ];
 
+function rowKey(service: CompletedService): string {
+  return service.occurrenceDate ? `${service.id}:${service.occurrenceDate}` : String(service.id);
+}
+
 export default function Invoicing() {
-  const [intervalFilter, setIntervalFilter] = useState("once");
+  const [intervalFilter, setIntervalFilter] = useState("all");
   const { toast } = useToast();
 
   const { data: allCompleted = [], isLoading: allLoading } = useQuery<CompletedService[]>({
@@ -44,8 +48,8 @@ export default function Invoicing() {
   });
 
   const markInvoicedMutation = useMutation({
-    mutationFn: async (serviceId: number) => {
-      return await apiRequest("PATCH", `/api/services/${serviceId}/mark-invoiced`);
+    mutationFn: async ({ serviceId, occurrenceDate }: { serviceId: number; occurrenceDate?: string }) => {
+      return await apiRequest("PATCH", `/api/services/${serviceId}/mark-invoiced`, occurrenceDate ? { occurrenceDate } : undefined);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/services/completed"] });
@@ -69,10 +73,11 @@ export default function Invoicing() {
 
   const isLoading = allLoading || filteredLoading;
 
-  const formatDate = (date: string | Date | null) => {
+  const formatDate = (date: string | Date | null | undefined) => {
     if (!date) return "—";
     try {
-      return format(new Date(date), "dd MMM yyyy");
+      const d = typeof date === "string" ? parseISO(date) : date;
+      return format(d, "dd MMM yyyy");
     } catch {
       return "—";
     }
@@ -185,10 +190,14 @@ export default function Invoicing() {
                 </TableHeader>
                 <TableBody>
                   {filteredServices.map(service => (
-                    <TableRow key={service.id}>
+                    <TableRow key={rowKey(service)}>
                       <TableCell className="font-medium">{service.clientName}</TableCell>
                       <TableCell className="capitalize">{service.type?.replace(/_/g, " ") ?? "—"}</TableCell>
-                      <TableCell>{formatDate(service.completedAt)}</TableCell>
+                      <TableCell>
+                        {service.occurrenceDate
+                          ? formatDate(service.occurrenceDate)
+                          : formatDate(service.completedAt)}
+                      </TableCell>
                       <TableCell>{getInvoicedBadge(service.invoicedStatus)}</TableCell>
                       <TableCell className="text-right">
                         {service.invoicedStatus !== "invoiced" ? (
@@ -196,8 +205,11 @@ export default function Invoicing() {
                             size="sm"
                             variant="outline"
                             disabled={markInvoicedMutation.isPending}
-                            onClick={() => markInvoicedMutation.mutate(service.id)}
-                            data-testid={`button-mark-invoiced-${service.id}`}
+                            onClick={() => markInvoicedMutation.mutate({
+                              serviceId: service.id,
+                              occurrenceDate: service.occurrenceDate,
+                            })}
+                            data-testid={`button-mark-invoiced-${rowKey(service)}`}
                           >
                             <CheckCircle className="h-4 w-4 mr-1" />
                             Mark as Invoiced
