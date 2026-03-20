@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -24,6 +25,7 @@ import BulkUploadDialog from "@/components/Dialogs/BulkUploadDialog";
 export default function Inventory() {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState("equipment");
+  const [activeModal, setActiveModal] = useState<string | null>(null);
   const [isCreateEquipmentOpen, setIsCreateEquipmentOpen] = useState(false);
   const [isCreateConsumableOpen, setIsCreateConsumableOpen] = useState(false);
   const [editingEquipment, setEditingEquipment] = useState<Equipment | null>(null);
@@ -586,7 +588,7 @@ export default function Inventory() {
 
         {/* Statistics Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-          <Card>
+          <Card className="cursor-pointer hover:shadow-md transition-all active:scale-[0.98]" onClick={() => setActiveModal("total-equipment")}>
             <CardContent className="p-4">
               <div className="flex items-center space-x-2">
                 <Package className="h-4 w-4 text-blue-600" />
@@ -598,7 +600,7 @@ export default function Inventory() {
             </CardContent>
           </Card>
           
-          <Card>
+          <Card className="cursor-pointer hover:shadow-md transition-all active:scale-[0.98]" onClick={() => setActiveModal("in-field")}>
             <CardContent className="p-4">
               <div className="flex items-center space-x-2">
                 <Package className="h-4 w-4 text-green-600" />
@@ -612,7 +614,7 @@ export default function Inventory() {
             </CardContent>
           </Card>
           
-          <Card>
+          <Card className="cursor-pointer hover:shadow-md transition-all active:scale-[0.98]" onClick={() => setActiveModal("total-consumables")}>
             <CardContent className="p-4">
               <div className="flex items-center space-x-2">
                 <Package className="h-4 w-4 text-purple-600" />
@@ -624,7 +626,7 @@ export default function Inventory() {
             </CardContent>
           </Card>
           
-          <Card>
+          <Card className="cursor-pointer hover:shadow-md transition-all active:scale-[0.98]" onClick={() => setActiveModal("low-stock")}>
             <CardContent className="p-4">
               <div className="flex items-center space-x-2">
                 <AlertTriangle className="h-4 w-4 text-red-600" />
@@ -636,6 +638,72 @@ export default function Inventory() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Stat tile modal */}
+        <Dialog open={activeModal !== null} onOpenChange={() => setActiveModal(null)}>
+          <DialogContent className="max-w-3xl max-h-[80vh] flex flex-col">
+            <DialogHeader>
+              <DialogTitle>
+                {activeModal === "total-equipment" && "All Equipment"}
+                {activeModal === "in-field" && "Equipment In Field"}
+                {activeModal === "total-consumables" && "All Consumables"}
+                {activeModal === "low-stock" && "Low Stock Items"}
+              </DialogTitle>
+            </DialogHeader>
+            <div className="mt-2 overflow-y-auto flex-1">
+              {(activeModal === "total-equipment" || activeModal === "in-field") && (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Stock Code</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Stock</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {(activeModal === "in-field" ? equipment.filter(e => e.status === 'in_field') : equipment).map((e) => (
+                      <TableRow key={e.id} className="hover:!bg-blue-50 dark:hover:!bg-blue-950 transition-colors">
+                        <TableCell className="font-medium">{e.name}</TableCell>
+                        <TableCell>{e.stockCode}</TableCell>
+                        <TableCell><Badge variant="outline">{e.status?.replace(/_/g, ' ')}</Badge></TableCell>
+                        <TableCell>{e.currentStock ?? '-'}</TableCell>
+                      </TableRow>
+                    ))}
+                    {(activeModal === "in-field" ? equipment.filter(e => e.status === 'in_field') : equipment).length === 0 && (
+                      <TableRow><TableCell colSpan={4} className="text-center py-6 text-muted-foreground">No equipment found</TableCell></TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              )}
+              {(activeModal === "total-consumables" || activeModal === "low-stock") && (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Stock Code</TableHead>
+                      <TableHead>Current Stock</TableHead>
+                      <TableHead>Min Level</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {(activeModal === "low-stock" ? lowStockConsumables : consumables).map((c) => (
+                      <TableRow key={c.id} className="hover:!bg-blue-50 dark:hover:!bg-blue-950 transition-colors">
+                        <TableCell className="font-medium">{c.name}</TableCell>
+                        <TableCell>{c.stockCode}</TableCell>
+                        <TableCell className={activeModal === "low-stock" ? "text-destructive font-bold" : ""}>{c.currentStock ?? '-'}</TableCell>
+                        <TableCell>{c.minStockLevel ?? '-'}</TableCell>
+                      </TableRow>
+                    ))}
+                    {(activeModal === "low-stock" ? lowStockConsumables : consumables).length === 0 && (
+                      <TableRow><TableCell colSpan={4} className="text-center py-6 text-muted-foreground">No items found</TableCell></TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
 
         {/* Search */}
         <div className="relative max-w-md mb-6">

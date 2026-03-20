@@ -8,6 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Package, AlertTriangle, TrendingUp, Download, RotateCcw, CalendarIcon } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { format, addDays } from "date-fns";
@@ -16,6 +17,7 @@ import Header from "@/components/Layout/Header";
 
 export default function Warehouse() {
   const { toast } = useToast();
+  const [activeModal, setActiveModal] = useState<string | null>(null);
   const [forecastStartDate, setForecastStartDate] = useState<Date>(new Date());
   const [forecastView, setForecastView] = useState<'daily' | 'weekly'>('weekly');
   const [selectedTeamId, setSelectedTeamId] = useState<number | null>(null);
@@ -150,7 +152,7 @@ export default function Warehouse() {
 
       {/* Summary Cards */}
       <div className="grid gap-4 md:grid-cols-4">
-        <Card data-testid="card-equipment-total">
+        <Card data-testid="card-equipment-total" className="cursor-pointer hover:shadow-md transition-all active:scale-[0.98]" onClick={() => setActiveModal("total-equipment")}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Equipment</CardTitle>
             <Package className="h-4 w-4 text-muted-foreground" />
@@ -160,7 +162,7 @@ export default function Warehouse() {
           </CardContent>
         </Card>
 
-        <Card data-testid="card-equipment-warehouse">
+        <Card data-testid="card-equipment-warehouse" className="cursor-pointer hover:shadow-md transition-all active:scale-[0.98]" onClick={() => setActiveModal("in-warehouse")}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">In Warehouse</CardTitle>
             <Package className="h-4 w-4 text-green-600" />
@@ -170,7 +172,7 @@ export default function Warehouse() {
           </CardContent>
         </Card>
 
-        <Card data-testid="card-equipment-field">
+        <Card data-testid="card-equipment-field" className="cursor-pointer hover:shadow-md transition-all active:scale-[0.98]" onClick={() => setActiveModal("in-field")}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">In Field</CardTitle>
             <Package className="h-4 w-4 text-blue-600" />
@@ -180,7 +182,7 @@ export default function Warehouse() {
           </CardContent>
         </Card>
 
-        <Card data-testid="card-low-stock">
+        <Card data-testid="card-low-stock" className="cursor-pointer hover:shadow-md transition-all active:scale-[0.98]" onClick={() => setActiveModal("low-stock")}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Low Stock Items</CardTitle>
             <AlertTriangle className="h-4 w-4 text-amber-600" />
@@ -190,6 +192,84 @@ export default function Warehouse() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Stat tile modal */}
+      <Dialog open={activeModal !== null} onOpenChange={() => setActiveModal(null)}>
+        <DialogContent className="max-w-3xl max-h-[80vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>
+              {activeModal === "total-equipment" && "All Equipment"}
+              {activeModal === "in-warehouse" && "Equipment In Warehouse"}
+              {activeModal === "in-field" && "Equipment In Field"}
+              {activeModal === "low-stock" && "Low Stock Items"}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="mt-2 overflow-y-auto flex-1">
+            {(activeModal === "total-equipment" || activeModal === "in-warehouse" || activeModal === "in-field") && (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Stock Code</TableHead>
+                    <TableHead>Total</TableHead>
+                    <TableHead>In Warehouse</TableHead>
+                    <TableHead>In Field</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {(equipmentInventory ?? [])
+                    .filter(e => {
+                      if (activeModal === "in-warehouse") return e.inWarehouseCount > 0;
+                      if (activeModal === "in-field") return e.inFieldCount > 0;
+                      return true;
+                    })
+                    .map((e) => (
+                      <TableRow key={e.id} className="hover:!bg-blue-50 dark:hover:!bg-blue-950 transition-colors">
+                        <TableCell className="font-medium">{e.name}</TableCell>
+                        <TableCell>{e.stockCode}</TableCell>
+                        <TableCell>{e.currentStock}</TableCell>
+                        <TableCell>{e.inWarehouseCount}</TableCell>
+                        <TableCell>{e.inFieldCount}</TableCell>
+                      </TableRow>
+                    ))}
+                  {(equipmentInventory ?? []).filter(e => {
+                    if (activeModal === "in-warehouse") return e.inWarehouseCount > 0;
+                    if (activeModal === "in-field") return e.inFieldCount > 0;
+                    return true;
+                  }).length === 0 && (
+                    <TableRow><TableCell colSpan={5} className="text-center py-6 text-muted-foreground">No equipment found</TableCell></TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            )}
+            {activeModal === "low-stock" && (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Stock Code</TableHead>
+                    <TableHead>Current Stock</TableHead>
+                    <TableHead>Min Level</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {lowStockItems.map((c: any) => (
+                    <TableRow key={c.id} className="hover:!bg-amber-50 dark:hover:!bg-amber-950 transition-colors">
+                      <TableCell className="font-medium">{c.name}</TableCell>
+                      <TableCell>{c.stockCode}</TableCell>
+                      <TableCell className="text-amber-600 font-bold">{c.currentStock ?? '-'}</TableCell>
+                      <TableCell>{c.minStockLevel ?? '-'}</TableCell>
+                    </TableRow>
+                  ))}
+                  {lowStockItems.length === 0 && (
+                    <TableRow><TableCell colSpan={4} className="text-center py-6 text-muted-foreground">No low stock items</TableCell></TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Tabs */}
       <Tabs defaultValue="equipment" className="space-y-4">

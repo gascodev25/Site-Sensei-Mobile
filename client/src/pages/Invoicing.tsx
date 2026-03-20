@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { CheckCircle, FileText, Clock, Receipt, Search } from "lucide-react";
 import {
   format, parseISO,
@@ -43,6 +44,7 @@ export default function Invoicing() {
   const [intervalFilter, setIntervalFilter] = useState("all");
   const [teamFilter, setTeamFilter] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [activeModal, setActiveModal] = useState<string | null>(null);
   const [dateView, setDateView] = useState<"month" | "week" | "day">("month");
   const [currentDate, setCurrentDate] = useState(new Date());
   const { toast } = useToast();
@@ -233,7 +235,7 @@ export default function Invoicing() {
 
         {/* Stat Tiles */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <Card>
+          <Card className="cursor-pointer hover:shadow-md transition-all active:scale-[0.98]" onClick={() => setActiveModal("all-completed")}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">Completed Services</CardTitle>
               <CheckCircle className="h-5 w-5 text-muted-foreground" />
@@ -246,7 +248,7 @@ export default function Invoicing() {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="cursor-pointer hover:shadow-md transition-all active:scale-[0.98]" onClick={() => setActiveModal("invoiced")}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">Invoiced Services</CardTitle>
               <Receipt className="h-5 w-5 text-green-600" />
@@ -259,7 +261,7 @@ export default function Invoicing() {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="cursor-pointer hover:shadow-md transition-all active:scale-[0.98]" onClick={() => setActiveModal("not-invoiced")}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">Completed but not Invoiced</CardTitle>
               <Clock className="h-5 w-5 text-amber-500" />
@@ -272,6 +274,54 @@ export default function Invoicing() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Stat tile modal */}
+        <Dialog open={activeModal !== null} onOpenChange={() => setActiveModal(null)}>
+          <DialogContent className="max-w-3xl max-h-[80vh] flex flex-col">
+            <DialogHeader>
+              <DialogTitle>
+                {activeModal === "all-completed" && "All Completed Services"}
+                {activeModal === "invoiced" && "Invoiced Services"}
+                {activeModal === "not-invoiced" && "Pending Invoicing"}
+              </DialogTitle>
+            </DialogHeader>
+            <div className="mt-2 overflow-y-auto flex-1">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Client</TableHead>
+                    <TableHead>Service Type</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {allCompleted
+                    .filter(s => {
+                      if (activeModal === "invoiced") return s.invoicedStatus === "invoiced";
+                      if (activeModal === "not-invoiced") return s.invoicedStatus !== "invoiced";
+                      return true;
+                    })
+                    .map((s) => (
+                      <TableRow key={rowKey(s)} className="hover:!bg-blue-50 dark:hover:!bg-blue-950 transition-colors">
+                        <TableCell className="font-medium">{s.clientName || 'Unknown'}</TableCell>
+                        <TableCell className="capitalize">{s.type?.replace(/_/g, ' ')}</TableCell>
+                        <TableCell>{s.occurrenceDate ? s.occurrenceDate : (s.scheduledDate ? s.scheduledDate.toString().slice(0, 10) : '-')}</TableCell>
+                        <TableCell>{getInvoicedBadge(s.invoicedStatus)}</TableCell>
+                      </TableRow>
+                    ))}
+                  {allCompleted.filter(s => {
+                    if (activeModal === "invoiced") return s.invoicedStatus === "invoiced";
+                    if (activeModal === "not-invoiced") return s.invoicedStatus !== "invoiced";
+                    return true;
+                  }).length === 0 && (
+                    <TableRow><TableCell colSpan={4} className="text-center py-6 text-muted-foreground">No services found</TableCell></TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </DialogContent>
+        </Dialog>
 
         {/* Interval Filter + Table */}
         <Card>

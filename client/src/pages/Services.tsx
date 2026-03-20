@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -25,6 +26,7 @@ export default function Services() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTeamId, setSelectedTeamId] = useState<string>("all");
   const [activeTab, setActiveTab] = useState("list");
+  const [activeModal, setActiveModal] = useState<string | null>(null);
   const [listDateView, setListDateView] = useState<'month' | 'week' | 'day'>('month');
   const [listCurrentDate, setListCurrentDate] = useState(new Date());
   const [calendarPopoverOpen, setCalendarPopoverOpen] = useState(false);
@@ -625,7 +627,7 @@ export default function Services() {
 
             {/* Service Stats Cards */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <Card>
+              <Card className="cursor-pointer hover:shadow-md transition-all active:scale-[0.98]" onClick={() => setActiveModal("all-services")}>
                 <CardContent className="p-4">
                   <div className="flex items-center space-x-2">
                     <Calendar className="h-4 w-4 text-blue-600" />
@@ -641,7 +643,7 @@ export default function Services() {
                 </CardContent>
               </Card>
               
-              <Card>
+              <Card className="cursor-pointer hover:shadow-md transition-all active:scale-[0.98]" onClick={() => setActiveModal("completed")}>
                 <CardContent className="p-4">
                   <div className="flex items-center space-x-2">
                     <Clock className="h-4 w-4 text-green-600" />
@@ -655,7 +657,7 @@ export default function Services() {
                 </CardContent>
               </Card>
               
-              <Card>
+              <Card className="cursor-pointer hover:shadow-md transition-all active:scale-[0.98]" onClick={() => setActiveModal("scheduled")}>
                 <CardContent className="p-4">
                   <div className="flex items-center space-x-2">
                     <Calendar className="h-4 w-4 text-orange-600" />
@@ -669,7 +671,7 @@ export default function Services() {
                 </CardContent>
               </Card>
               
-              <Card>
+              <Card className="cursor-pointer hover:shadow-md transition-all active:scale-[0.98]" onClick={() => setActiveModal("missed")}>
                 <CardContent className="p-4">
                   <div className="flex items-center space-x-2">
                     <Clock className="h-4 w-4 text-red-600" />
@@ -683,6 +685,60 @@ export default function Services() {
                 </CardContent>
               </Card>
             </div>
+
+            {/* Stat tile modal */}
+            <Dialog open={activeModal !== null} onOpenChange={() => setActiveModal(null)}>
+              <DialogContent className="max-w-3xl max-h-[80vh] flex flex-col">
+                <DialogHeader>
+                  <DialogTitle>
+                    {activeModal === "all-services" && (listDateView === 'day' ? "Today's Services" : listDateView === 'week' ? "This Week's Services" : "This Month's Services")}
+                    {activeModal === "completed" && "Completed Services"}
+                    {activeModal === "scheduled" && "Scheduled Services"}
+                    {activeModal === "missed" && "Missed Services"}
+                  </DialogTitle>
+                </DialogHeader>
+                <div className="mt-2 overflow-y-auto flex-1">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Client</TableHead>
+                        <TableHead>Service Type</TableHead>
+                        <TableHead>Date</TableHead>
+                        <TableHead>Status</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {expandedOccurrences
+                        .filter(({ service, occurrenceDate }) => {
+                          if (activeModal === "all-services") return true;
+                          return getEffectiveStatus(service, occurrenceDate) === activeModal;
+                        })
+                        .map(({ service, occurrenceDate }) => (
+                          <TableRow
+                            key={`${service.id}-${occurrenceDate.toISOString()}`}
+                            className="cursor-pointer hover:!bg-blue-50 dark:hover:!bg-blue-950 transition-colors"
+                            onClick={() => { setActiveModal(null); setSelectedServiceDate(occurrenceDate); setEditingService(service); }}
+                          >
+                            <TableCell className="font-medium">{service.client?.name || 'Unknown'}</TableCell>
+                            <TableCell className="capitalize">{service.type?.replace(/_/g, ' ')}</TableCell>
+                            <TableCell>{format(occurrenceDate, 'dd MMM yyyy')}</TableCell>
+                            <TableCell>
+                              <Badge variant={getEffectiveStatus(service, occurrenceDate) === 'completed' ? 'default' : 'outline'}>
+                                {getEffectiveStatus(service, occurrenceDate)}
+                              </Badge>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      {expandedOccurrences.filter(({ service, occurrenceDate }) =>
+                        activeModal === "all-services" || getEffectiveStatus(service, occurrenceDate) === activeModal
+                      ).length === 0 && (
+                        <TableRow><TableCell colSpan={4} className="text-center py-6 text-muted-foreground">No services found</TableCell></TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              </DialogContent>
+            </Dialog>
 
             {/* Services Grid */}
             {expandedOccurrences.length === 0 ? (

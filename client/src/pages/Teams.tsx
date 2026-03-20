@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -26,6 +27,7 @@ interface TeamWithMembers extends ServiceTeam {
 export default function Teams() {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState("teams");
+  const [activeModal, setActiveModal] = useState<string | null>(null);
   const [isCreateTeamOpen, setIsCreateTeamOpen] = useState(false);
   const [isCreateMemberOpen, setIsCreateMemberOpen] = useState(false);
   const [editingTeam, setEditingTeam] = useState<ServiceTeam | null>(null);
@@ -263,7 +265,7 @@ export default function Teams() {
 
         {/* Statistics Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-          <Card>
+          <Card className="cursor-pointer hover:shadow-md transition-all active:scale-[0.98]" onClick={() => setActiveModal("total-teams")}>
             <CardContent className="p-4">
               <div className="flex items-center space-x-2">
                 <Users className="h-4 w-4 text-blue-600" />
@@ -275,7 +277,7 @@ export default function Teams() {
             </CardContent>
           </Card>
           
-          <Card>
+          <Card className="cursor-pointer hover:shadow-md transition-all active:scale-[0.98]" onClick={() => setActiveModal("team-members")}>
             <CardContent className="p-4">
               <div className="flex items-center space-x-2">
                 <User className="h-4 w-4 text-green-600" />
@@ -287,7 +289,7 @@ export default function Teams() {
             </CardContent>
           </Card>
           
-          <Card>
+          <Card className="cursor-pointer hover:shadow-md transition-all active:scale-[0.98]" onClick={() => setActiveModal("active-assignments")}>
             <CardContent className="p-4">
               <div className="flex items-center space-x-2">
                 <Briefcase className="h-4 w-4 text-purple-600" />
@@ -299,6 +301,90 @@ export default function Teams() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Stat tile modal */}
+        <Dialog open={activeModal !== null} onOpenChange={() => setActiveModal(null)}>
+          <DialogContent className="max-w-3xl max-h-[80vh] flex flex-col">
+            <DialogHeader>
+              <DialogTitle>
+                {activeModal === "total-teams" && "All Service Teams"}
+                {activeModal === "team-members" && "All Team Members"}
+                {activeModal === "active-assignments" && "Active Assignments"}
+              </DialogTitle>
+            </DialogHeader>
+            <div className="mt-2 overflow-y-auto flex-1">
+              {activeModal === "total-teams" && (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Team Name</TableHead>
+                      <TableHead>Members</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {teams.map((team) => (
+                      <TableRow key={team.id} className="hover:!bg-blue-50 dark:hover:!bg-blue-950 transition-colors">
+                        <TableCell className="font-medium">{team.name}</TableCell>
+                        <TableCell>{assignments.filter((a: any) => a.teamId === team.id).length} member(s)</TableCell>
+                      </TableRow>
+                    ))}
+                    {teams.length === 0 && (
+                      <TableRow><TableCell colSpan={2} className="text-center py-6 text-muted-foreground">No teams found</TableCell></TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              )}
+              {activeModal === "team-members" && (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Phone</TableHead>
+                      <TableHead>Skill</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {members.map((m) => (
+                      <TableRow key={m.id} className="hover:!bg-blue-50 dark:hover:!bg-blue-950 transition-colors">
+                        <TableCell className="font-medium">{m.name}</TableCell>
+                        <TableCell>{m.phone || '-'}</TableCell>
+                        <TableCell>{m.skill || '-'}</TableCell>
+                      </TableRow>
+                    ))}
+                    {members.length === 0 && (
+                      <TableRow><TableCell colSpan={3} className="text-center py-6 text-muted-foreground">No members found</TableCell></TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              )}
+              {activeModal === "active-assignments" && (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Team</TableHead>
+                      <TableHead>Member</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {(assignments as any[]).map((a, idx) => {
+                      const team = teams.find(t => t.id === a.teamId);
+                      const member = members.find(m => m.id === a.memberId);
+                      return (
+                        <TableRow key={idx} className="hover:!bg-blue-50 dark:hover:!bg-blue-950 transition-colors">
+                          <TableCell className="font-medium">{team?.name || '-'}</TableCell>
+                          <TableCell>{member?.name || '-'}</TableCell>
+                        </TableRow>
+                      );
+                    })}
+                    {assignments.length === 0 && (
+                      <TableRow><TableCell colSpan={2} className="text-center py-6 text-muted-foreground">No assignments found</TableCell></TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
 
         {/* Search */}
         <div className="relative max-w-md mb-6">
