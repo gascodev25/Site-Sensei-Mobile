@@ -34,10 +34,12 @@ export default function Invoicing() {
 
   const { data: allCompleted = [], isLoading: allLoading } = useQuery<CompletedService[]>({
     queryKey: ["/api/services/completed"],
+    staleTime: 0,
   });
 
   const { data: filteredServices = [], isLoading: filteredLoading } = useQuery<CompletedService[]>({
     queryKey: ["/api/services/completed", intervalFilter],
+    staleTime: 0,
     queryFn: async () => {
       const res = await fetch(`/api/services/completed?interval=${intervalFilter}`, {
         credentials: "include",
