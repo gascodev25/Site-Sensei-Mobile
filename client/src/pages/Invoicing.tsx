@@ -10,10 +10,20 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { CheckCircle, FileText, Clock, Receipt, Search } from "lucide-react";
-import { format, parseISO } from "date-fns";
-import type { Service, Team } from "@shared/schema";
+import {
+  format, parseISO,
+  startOfMonth, endOfMonth,
+  startOfWeek, endOfWeek,
+  startOfDay, endOfDay,
+  subMonths, addMonths,
+  subWeeks, addWeeks,
+  subDays, addDays,
+  isWithinInterval,
+} from "date-fns";
+import type { Service } from "@shared/schema";
 
 type CompletedService = Service & { clientName: string; occurrenceDate?: string };
+type Team = { id: number; name: string };
 
 const INTERVAL_OPTIONS = [
   { value: "all", label: "All Intervals" },
@@ -33,10 +43,12 @@ export default function Invoicing() {
   const [intervalFilter, setIntervalFilter] = useState("all");
   const [teamFilter, setTeamFilter] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [dateView, setDateView] = useState<"month" | "week" | "day">("month");
+  const [currentDate, setCurrentDate] = useState(new Date());
   const { toast } = useToast();
 
   const { data: teams = [] } = useQuery<Team[]>({
-    queryKey: ["/api/teams"],
+    queryKey: ["/api/service-teams"],
   });
 
   const { data: allCompleted = [], isLoading: allLoading } = useQuery<CompletedService[]>({
@@ -56,8 +68,41 @@ export default function Invoicing() {
     },
   });
 
+  // Date range helpers
+  const getDateRange = () => {
+    if (dateView === "month") return { start: startOfMonth(currentDate), end: endOfMonth(currentDate) };
+    if (dateView === "week") return { start: startOfWeek(currentDate, { weekStartsOn: 1 }), end: endOfWeek(currentDate, { weekStartsOn: 1 }) };
+    return { start: startOfDay(currentDate), end: endOfDay(currentDate) };
+  };
+
+  const getPeriodLabel = () => {
+    if (dateView === "month") return format(currentDate, "MMMM yyyy");
+    if (dateView === "week") {
+      const s = startOfWeek(currentDate, { weekStartsOn: 1 });
+      const e = endOfWeek(currentDate, { weekStartsOn: 1 });
+      return `${format(s, "MMM d")} – ${format(e, "MMM d, yyyy")}`;
+    }
+    return format(currentDate, "MMMM d, yyyy");
+  };
+
+  const navigatePrev = () => {
+    if (dateView === "month") setCurrentDate(d => subMonths(d, 1));
+    else if (dateView === "week") setCurrentDate(d => subWeeks(d, 1));
+    else setCurrentDate(d => subDays(d, 1));
+  };
+
+  const navigateNext = () => {
+    if (dateView === "month") setCurrentDate(d => addMonths(d, 1));
+    else if (dateView === "week") setCurrentDate(d => addWeeks(d, 1));
+    else setCurrentDate(d => addDays(d, 1));
+  };
+
+  // Client-side filtering
   const filteredServices = fetchedServices.filter(service => {
+    // Team filter
     if (teamFilter !== "all" && String(service.teamId) !== teamFilter) return false;
+
+    // Search filter
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       const matchesClient = service.clientName?.toLowerCase().includes(q);
@@ -65,6 +110,18 @@ export default function Invoicing() {
       const matchesStatus = service.invoicedStatus?.toLowerCase().includes(q);
       if (!matchesClient && !matchesType && !matchesStatus) return false;
     }
+
+    // Date range filter
+    const { start, end } = getDateRange();
+    const dateStr = service.occurrenceDate ?? (service.completedAt ? String(service.completedAt) : null);
+    if (!dateStr) return false;
+    try {
+      const d = typeof dateStr === "string" ? parseISO(dateStr) : new Date(dateStr);
+      if (!isWithinInterval(d, { start, end })) return false;
+    } catch {
+      return false;
+    }
+
     return true;
   });
 
@@ -74,24 +131,16 @@ export default function Invoicing() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/services/completed"] });
-      toast({
-        title: "Success",
-        description: "Service marked as invoiced",
-      });
+      toast({ title: "Success", description: "Service marked as invoiced" });
     },
     onError: (error: Error) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to mark service as invoiced",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: error.message || "Failed to mark service as invoiced", variant: "destructive" });
     },
   });
 
   const totalCompleted = allCompleted.length;
   const invoicedCount = allCompleted.filter(s => s.invoicedStatus === "invoiced").length;
   const notInvoicedCount = allCompleted.filter(s => s.invoicedStatus !== "invoiced").length;
-
   const isLoading = allLoading || filteredLoading;
 
   const formatDate = (date: string | Date | null | undefined) => {
@@ -105,12 +154,8 @@ export default function Invoicing() {
   };
 
   const getInvoicedBadge = (status: string | null) => {
-    if (status === "invoiced") {
-      return <Badge className="bg-green-100 border-green-400 text-green-800">Invoiced</Badge>;
-    }
-    if (status === "ready") {
-      return <Badge className="bg-blue-100 border-blue-400 text-blue-800">Ready</Badge>;
-    }
+    if (status === "invoiced") return <Badge className="bg-green-100 border-green-400 text-green-800">Invoiced</Badge>;
+    if (status === "ready") return <Badge className="bg-blue-100 border-blue-400 text-blue-800">Ready</Badge>;
     return <Badge className="bg-amber-100 border-amber-400 text-amber-800">Not Invoiced</Badge>;
   };
 
@@ -119,36 +164,71 @@ export default function Invoicing() {
       <Header />
 
       <div className="container mx-auto px-6 py-8">
-        <div className="flex items-center justify-between mb-6">
+
+        {/* Page title + filter bar on the right (matches Services layout) */}
+        <div className="flex items-center justify-between mb-8">
           <h1 className="text-3xl font-bold text-foreground">Invoicing</h1>
+
+          <div className="flex items-center gap-4">
+            <Select value={teamFilter} onValueChange={setTeamFilter}>
+              <SelectTrigger className="w-[200px]" data-testid="select-team-filter">
+                <SelectValue placeholder="All Teams" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Teams</SelectItem>
+                {teams.map(team => (
+                  <SelectItem key={team.id} value={team.id.toString()}>
+                    {team.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground h-4 w-4" />
+              <Input
+                placeholder="Search by client, status, or type..."
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                className="pl-10 w-64"
+                data-testid="input-search-invoicing"
+              />
+            </div>
+
+            <div className="flex items-center gap-1 border rounded-md">
+              <Button
+                variant={dateView === "month" ? "default" : "ghost"}
+                size="sm"
+                className="rounded-r-none"
+                onClick={() => setDateView("month")}
+              >
+                Month
+              </Button>
+              <Button
+                variant={dateView === "week" ? "default" : "ghost"}
+                size="sm"
+                className="rounded-none border-x"
+                onClick={() => setDateView("week")}
+              >
+                Week
+              </Button>
+              <Button
+                variant={dateView === "day" ? "default" : "ghost"}
+                size="sm"
+                className="rounded-l-none"
+                onClick={() => setDateView("day")}
+              >
+                Day
+              </Button>
+            </div>
+          </div>
         </div>
 
-        {/* Search and Filter Bar */}
-        <div className="flex items-center gap-4 mb-8">
-          <Select value={teamFilter} onValueChange={setTeamFilter}>
-            <SelectTrigger className="w-[200px]" data-testid="select-team-filter">
-              <SelectValue placeholder="All Teams" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Teams</SelectItem>
-              {teams.map(team => (
-                <SelectItem key={team.id} value={team.id.toString()}>
-                  {team.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <div className="relative max-w-md w-full">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground h-4 w-4" />
-            <Input
-              placeholder="Search by client, status, or type..."
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              className="pl-10"
-              data-testid="input-search-invoicing"
-            />
-          </div>
+        {/* Period navigation */}
+        <div className="flex items-center gap-3 mb-6">
+          <Button variant="outline" size="icon" onClick={navigatePrev} className="h-8 w-8">{"<"}</Button>
+          <span className="font-semibold text-base min-w-[180px] text-center">{getPeriodLabel()}</span>
+          <Button variant="outline" size="icon" onClick={navigateNext} className="h-8 w-8">{">"}</Button>
         </div>
 
         {/* Stat Tiles */}
@@ -193,7 +273,7 @@ export default function Invoicing() {
           </Card>
         </div>
 
-        {/* Filter + Table */}
+        {/* Interval Filter + Table */}
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
@@ -226,7 +306,7 @@ export default function Invoicing() {
               <div className="text-center py-12 text-muted-foreground">
                 {searchQuery || teamFilter !== "all"
                   ? "No services match your search or filter."
-                  : "No completed services found for the selected interval."}
+                  : `No completed services found for ${getPeriodLabel()}.`}
               </div>
             ) : (
               <Table>
