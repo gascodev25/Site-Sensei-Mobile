@@ -6,11 +6,12 @@ import Header from "@/components/Layout/Header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { CheckCircle, FileText, Clock, Receipt } from "lucide-react";
+import { CheckCircle, FileText, Clock, Receipt, Search } from "lucide-react";
 import { format, parseISO } from "date-fns";
-import type { Service } from "@shared/schema";
+import type { Service, Team } from "@shared/schema";
 
 type CompletedService = Service & { clientName: string; occurrenceDate?: string };
 
@@ -30,14 +31,20 @@ function rowKey(service: CompletedService): string {
 
 export default function Invoicing() {
   const [intervalFilter, setIntervalFilter] = useState("all");
+  const [teamFilter, setTeamFilter] = useState("all");
+  const [searchQuery, setSearchQuery] = useState("");
   const { toast } = useToast();
+
+  const { data: teams = [] } = useQuery<Team[]>({
+    queryKey: ["/api/teams"],
+  });
 
   const { data: allCompleted = [], isLoading: allLoading } = useQuery<CompletedService[]>({
     queryKey: ["/api/services/completed"],
     staleTime: 0,
   });
 
-  const { data: filteredServices = [], isLoading: filteredLoading } = useQuery<CompletedService[]>({
+  const { data: fetchedServices = [], isLoading: filteredLoading } = useQuery<CompletedService[]>({
     queryKey: ["/api/services/completed", intervalFilter],
     staleTime: 0,
     queryFn: async () => {
@@ -47,6 +54,18 @@ export default function Invoicing() {
       if (!res.ok) throw new Error("Failed to fetch completed services");
       return res.json();
     },
+  });
+
+  const filteredServices = fetchedServices.filter(service => {
+    if (teamFilter !== "all" && String(service.teamId) !== teamFilter) return false;
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      const matchesClient = service.clientName?.toLowerCase().includes(q);
+      const matchesType = service.type?.replace(/_/g, " ").toLowerCase().includes(q);
+      const matchesStatus = service.invoicedStatus?.toLowerCase().includes(q);
+      if (!matchesClient && !matchesType && !matchesStatus) return false;
+    }
+    return true;
   });
 
   const markInvoicedMutation = useMutation({
@@ -100,8 +119,36 @@ export default function Invoicing() {
       <Header />
 
       <div className="container mx-auto px-6 py-8">
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center justify-between mb-6">
           <h1 className="text-3xl font-bold text-foreground">Invoicing</h1>
+        </div>
+
+        {/* Search and Filter Bar */}
+        <div className="flex items-center gap-4 mb-8">
+          <Select value={teamFilter} onValueChange={setTeamFilter}>
+            <SelectTrigger className="w-[200px]" data-testid="select-team-filter">
+              <SelectValue placeholder="All Teams" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Teams</SelectItem>
+              {teams.map(team => (
+                <SelectItem key={team.id} value={team.id.toString()}>
+                  {team.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <div className="relative max-w-md w-full">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground h-4 w-4" />
+            <Input
+              placeholder="Search by client, status, or type..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              className="pl-10"
+              data-testid="input-search-invoicing"
+            />
+          </div>
         </div>
 
         {/* Stat Tiles */}
@@ -177,7 +224,9 @@ export default function Invoicing() {
               </div>
             ) : filteredServices.length === 0 ? (
               <div className="text-center py-12 text-muted-foreground">
-                No completed services found for the selected interval.
+                {searchQuery || teamFilter !== "all"
+                  ? "No services match your search or filter."
+                  : "No completed services found for the selected interval."}
               </div>
             ) : (
               <Table>
