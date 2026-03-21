@@ -2,7 +2,7 @@
   "expo": {
     "name": "ACGWorks Field",
     "slug": "site-sensei-mobile",
-    "version": "1.0.5",
+    "version": "1.0.6",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -19,7 +19,7 @@
         "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO"
       ],
-      "versionCode": 6
+      "versionCode": 7
     },
     "plugins": [
       [
