@@ -345,7 +345,7 @@ const features = [
 
 export default function Showcase() {
   useEffect(() => {
-    document.title = "Field Service Management – ACG Works";
+    document.title = "Field Service Management – Site Sensei";
   }, []);
 
   return (
@@ -354,9 +354,9 @@ export default function Showcase() {
       <nav style={{ borderBottom: "1px solid #f1f5f9", padding: "0 40px", display: "flex", alignItems: "center", justifyContent: "space-between", height: 60, position: "sticky", top: 0, background: "rgba(255,255,255,0.95)", backdropFilter: "blur(8px)", zIndex: 50 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <div style={{ width: 32, height: 32, borderRadius: 8, background: "linear-gradient(135deg,#2563eb,#7c3aed)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <span style={{ color: "#fff", fontWeight: 800, fontSize: 14 }}>A</span>
+            <span style={{ color: "#fff", fontWeight: 800, fontSize: 14 }}>S</span>
           </div>
-          <span style={{ fontWeight: 700, fontSize: 16, color: "#1e293b" }}>ACG Works</span>
+          <span style={{ fontWeight: 700, fontSize: 16, color: "#1e293b" }}>Site Sensei</span>
         </div>
         <div style={{ display: "flex", gap: 28 }}>
           {features.map(f => (
@@ -456,7 +456,7 @@ export default function Showcase() {
                       ))}
                     </div>
                     <div style={{ flex: 1, background: "#fff", borderRadius: 6, height: 22, border: "1px solid #e2e8f0", display: "flex", alignItems: "center", paddingLeft: 8 }}>
-                      <span style={{ fontSize: 9, color: "#94a3b8" }}>acgworks.app / {feature.id}</span>
+                      <span style={{ fontSize: 9, color: "#94a3b8" }}>sitesensei.app / {feature.id}</span>
                     </div>
                   </div>
                   {/* Feature mockup */}
@@ -485,9 +485,9 @@ export default function Showcase() {
       <footer style={{ borderTop: "1px solid #f1f5f9", padding: "40px 40px", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 16 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <div style={{ width: 28, height: 28, borderRadius: 6, background: "linear-gradient(135deg,#2563eb,#7c3aed)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <span style={{ color: "#fff", fontWeight: 800, fontSize: 12 }}>A</span>
+            <span style={{ color: "#fff", fontWeight: 800, fontSize: 12 }}>S</span>
           </div>
-          <span style={{ fontWeight: 700, color: "#1e293b", fontSize: 14 }}>ACG Works</span>
+          <span style={{ fontWeight: 700, color: "#1e293b", fontSize: 14 }}>Site Sensei</span>
           <span style={{ color: "#cbd5e1", fontSize: 14 }}>·</span>
           <span style={{ fontSize: 13, color: "#64748b" }}>Field Service Management Platform</span>
         </div>
