@@ -263,7 +263,7 @@ export default function Invoicing() {
 
           <Card className="cursor-pointer hover:shadow-md transition-all active:scale-[0.98]" onClick={() => setActiveModal("not-invoiced")}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Completed but not Invoiced</CardTitle>
+              <CardTitle className="text-sm font-medium text-muted-foreground">Ready to Invoice</CardTitle>
               <Clock className="h-5 w-5 text-amber-500" />
             </CardHeader>
             <CardContent>
