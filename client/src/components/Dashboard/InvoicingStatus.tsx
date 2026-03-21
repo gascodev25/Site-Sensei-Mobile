@@ -1,8 +1,5 @@
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { useToast } from "@/hooks/use-toast";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { FileText } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import type { Service } from "@shared/schema";
@@ -10,8 +7,6 @@ import type { Service } from "@shared/schema";
 type CompletedService = Service & { clientName: string; occurrenceDate?: string };
 
 export default function InvoicingStatus() {
-  const { toast } = useToast();
-
   const { data: allCompleted = [], isLoading } = useQuery<CompletedService[]>({
     queryKey: ["/api/services/completed"],
     staleTime: 0,
@@ -30,30 +25,6 @@ export default function InvoicingStatus() {
   });
 
   const totalPending = notInvoiced.reduce((sum, service) => sum + (service.price || 0), 0);
-
-  const markInvoicedMutation = useMutation({
-    mutationFn: async (service: CompletedService) => {
-      return apiRequest("PATCH", "/api/services/mark-invoiced", {
-        serviceId: service.id,
-        occurrenceDate: service.occurrenceDate,
-      });
-    },
-    onSuccess: () => {
-      toast({
-        title: "Marked as invoiced",
-        description: "Service has been marked as invoiced.",
-      });
-      queryClient.invalidateQueries({ queryKey: ["/api/services/completed"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/metrics"] });
-    },
-    onError: (err: any) => {
-      toast({
-        title: "Error",
-        description: err.message || "Failed to mark as invoiced",
-        variant: "destructive",
-      });
-    },
-  });
 
   const getCompletedTime = (date: string) => {
     try {
@@ -102,16 +73,6 @@ export default function InvoicingStatus() {
                   <div className="text-sm font-medium text-foreground">
                     R{(service.price || 0).toFixed(2)}
                   </div>
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    className="text-xs text-primary hover:text-primary/80 h-auto p-0"
-                    onClick={() => markInvoicedMutation.mutate(service)}
-                    disabled={markInvoicedMutation.isPending}
-                    data-testid={`button-mark-invoiced-${service.id}`}
-                  >
-                    {markInvoicedMutation.isPending ? "..." : "Mark Invoiced"}
-                  </Button>
                 </div>
               </div>
             ))
