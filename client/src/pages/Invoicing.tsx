@@ -270,7 +270,7 @@ export default function Invoicing() {
               <div className="text-3xl font-bold text-amber-600" data-testid="stat-not-invoiced">
                 {allLoading ? "—" : notInvoicedCount}
               </div>
-              <p className="text-xs text-muted-foreground mt-1">Pending invoicing</p>
+              <p className="text-xs text-muted-foreground mt-1">Ready to Invoice</p>
             </CardContent>
           </Card>
         </div>
