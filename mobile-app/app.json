@@ -19,10 +19,7 @@
         "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO"
       ],
-      "versionCode": 5,
-      "targetSdkVersion": 35,
-      "compileSdkVersion": 35,
-      "minSdkVersion": 21
+      "versionCode": 5
     },
     "plugins": [
       [
@@ -31,7 +28,17 @@
           "cameraPermission": "Allow ACGWorks Field to access your camera for capturing job site photos."
         }
       ],
-      "expo-asset"
+      "expo-asset",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "compileSdkVersion": 35,
+            "targetSdkVersion": 35,
+            "minSdkVersion": 21
+          }
+        }
+      ]
     ],
     "extra": {
       "eas": {
