@@ -7,11 +7,13 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "splash": {
+      "image": "./assets/icon.png",
       "resizeMode": "contain",
       "backgroundColor": "#1e40af"
     },
     "android": {
       "adaptiveIcon": {
+        "foregroundImage": "./assets/icon.png",
         "backgroundColor": "#1e40af"
       },
       "package": "digital.gasco.acgworks.field",
@@ -19,10 +21,12 @@
         "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO"
       ],
-      "versionCode": 3,
+      "versionCode": 4,
       "targetSdkVersion": 35,
       "compileSdkVersion": 35,
-      "minSdkVersion": 21
+      "minSdkVersion": 21,
+      "newArchEnabled": false,
+      "usesCleartextTraffic": true
     },
     "plugins": [
       [
@@ -31,7 +35,8 @@
           "cameraPermission": "Allow ACGWorks Field to access your camera for capturing job site photos."
         }
       ],
-      "expo-asset"
+      "expo-asset",
+      "expo-splash-screen"
     ],
     "extra": {
       "eas": {
