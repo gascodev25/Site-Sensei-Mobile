@@ -8,8 +8,6 @@ import Header from "@/components/Layout/Header";
 import KPICard from "@/components/Dashboard/KPICard";
 import ServicesOverview from "@/components/Dashboard/ServicesOverview";
 import RecentServices from "@/components/Dashboard/RecentServices";
-import StockLevels from "@/components/Dashboard/StockLevels";
-import TeamStatus from "@/components/Dashboard/TeamStatus";
 import InvoicingStatus from "@/components/Dashboard/InvoicingStatus";
 import ContractAlerts from "@/components/Dashboard/ContractAlerts";
 import ServiceForm from "@/components/Forms/ServiceForm";
@@ -340,8 +338,6 @@ export default function Dashboard() {
 
           {/* Sidebar Widgets */}
           <div className="space-y-6">
-            <StockLevels />
-            <TeamStatus />
             <InvoicingStatus />
             <ContractAlerts />
           </div>
