@@ -444,6 +444,15 @@ export default function Services() {
     return service.status === 'completed';
   };
 
+  const calculateDaysUntilExpiry = (service: ServiceWithDetails): number => {
+    if (!service.createdAt || !service.contractLengthMonths) return -1;
+    const createdDate = new Date(service.createdAt);
+    const contractEndDate = new Date(createdDate);
+    contractEndDate.setMonth(contractEndDate.getMonth() + service.contractLengthMonths);
+    const now = new Date();
+    return Math.ceil((contractEndDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+  };
+
   const formatDate = (dateString: string | Date | null) => {
     if (!dateString) return "Not scheduled";
     return new Date(dateString).toLocaleDateString('en-ZA', {
@@ -626,7 +635,7 @@ export default function Services() {
             </div>
 
             {/* Service Stats Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
               <Card className="cursor-pointer hover:shadow-md transition-all active:scale-[0.98]" onClick={() => setActiveModal("all-services")}>
                 <CardContent className="p-4">
                   <div className="flex items-center space-x-2">
@@ -684,6 +693,20 @@ export default function Services() {
                   </div>
                 </CardContent>
               </Card>
+
+              <Card className="cursor-pointer hover:shadow-md transition-all active:scale-[0.98]" onClick={() => setActiveModal("contract-alerts")}>
+                <CardContent className="p-4">
+                  <div className="flex items-center space-x-2">
+                    <AlertTriangle className="h-4 w-4 text-amber-600" />
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">Contract Alerts</p>
+                      <p className="text-2xl font-bold text-amber-600">
+                        {services.filter(s => s.type === 'service_contract' && s.contractLengthMonths && calculateDaysUntilExpiry(s) <= 90 && calculateDaysUntilExpiry(s) > 0).length}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
             </div>
 
             {/* Stat tile modal */}
@@ -695,47 +718,84 @@ export default function Services() {
                     {activeModal === "completed" && "Completed Services"}
                     {activeModal === "scheduled" && "Scheduled Services"}
                     {activeModal === "missed" && "Missed Services"}
+                    {activeModal === "contract-alerts" && "Contract Alerts"}
                   </DialogTitle>
                 </DialogHeader>
                 <div className="mt-2 overflow-y-auto flex-1">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Client</TableHead>
-                        <TableHead>Service Type</TableHead>
-                        <TableHead>Date</TableHead>
-                        <TableHead>Status</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {expandedOccurrences
-                        .filter(({ service, occurrenceDate }) => {
-                          if (activeModal === "all-services") return true;
-                          return getEffectiveStatus(service, occurrenceDate) === activeModal;
-                        })
-                        .map(({ service, occurrenceDate }) => (
-                          <TableRow
-                            key={`${service.id}-${occurrenceDate.toISOString()}`}
-                            className="cursor-pointer hover:!bg-blue-50 dark:hover:!bg-blue-950 transition-colors"
-                            onClick={() => { setActiveModal(null); setSelectedServiceDate(occurrenceDate); setEditingService(service); }}
-                          >
-                            <TableCell className="font-medium">{service.client?.name || 'Unknown'}</TableCell>
-                            <TableCell className="capitalize">{service.type?.replace(/_/g, ' ')}</TableCell>
-                            <TableCell>{format(occurrenceDate, 'dd MMM yyyy')}</TableCell>
-                            <TableCell>
-                              <Badge variant={getEffectiveStatus(service, occurrenceDate) === 'completed' ? 'default' : 'outline'}>
-                                {getEffectiveStatus(service, occurrenceDate)}
-                              </Badge>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      {expandedOccurrences.filter(({ service, occurrenceDate }) =>
-                        activeModal === "all-services" || getEffectiveStatus(service, occurrenceDate) === activeModal
-                      ).length === 0 && (
-                        <TableRow><TableCell colSpan={4} className="text-center py-6 text-muted-foreground">No services found</TableCell></TableRow>
-                      )}
-                    </TableBody>
-                  </Table>
+                  {activeModal === "contract-alerts" ? (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Client</TableHead>
+                          <TableHead>Contract Length</TableHead>
+                          <TableHead>Expires In</TableHead>
+                          <TableHead>Status</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {services
+                          .filter(s => s.type === 'service_contract' && s.contractLengthMonths && calculateDaysUntilExpiry(s) <= 90 && calculateDaysUntilExpiry(s) > 0)
+                          .sort((a, b) => calculateDaysUntilExpiry(a) - calculateDaysUntilExpiry(b))
+                          .map((service) => {
+                            const daysLeft = calculateDaysUntilExpiry(service);
+                            return (
+                              <TableRow key={service.id} className="cursor-pointer hover:!bg-blue-50 dark:hover:!bg-blue-950 transition-colors" onClick={() => { setActiveModal(null); setEditingService(service); }}>
+                                <TableCell className="font-medium">{service.client?.name || 'Unknown'}</TableCell>
+                                <TableCell>{service.contractLengthMonths} months</TableCell>
+                                <TableCell>{daysLeft} days</TableCell>
+                                <TableCell>
+                                  <Badge className={daysLeft <= 30 ? 'bg-red-100 border-red-400 text-red-800' : 'bg-amber-100 border-amber-400 text-amber-800'}>
+                                    {daysLeft <= 30 ? 'Critical' : 'Warning'}
+                                  </Badge>
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                        {services.filter(s => s.type === 'service_contract' && s.contractLengthMonths && calculateDaysUntilExpiry(s) <= 90 && calculateDaysUntilExpiry(s) > 0).length === 0 && (
+                          <TableRow><TableCell colSpan={4} className="text-center py-6 text-muted-foreground">No contracts expiring soon</TableCell></TableRow>
+                        )}
+                      </TableBody>
+                    </Table>
+                  ) : (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Client</TableHead>
+                          <TableHead>Service Type</TableHead>
+                          <TableHead>Date</TableHead>
+                          <TableHead>Status</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {expandedOccurrences
+                          .filter(({ service, occurrenceDate }) => {
+                            if (activeModal === "all-services") return true;
+                            return getEffectiveStatus(service, occurrenceDate) === activeModal;
+                          })
+                          .map(({ service, occurrenceDate }) => (
+                            <TableRow
+                              key={`${service.id}-${occurrenceDate.toISOString()}`}
+                              className="cursor-pointer hover:!bg-blue-50 dark:hover:!bg-blue-950 transition-colors"
+                              onClick={() => { setActiveModal(null); setSelectedServiceDate(occurrenceDate); setEditingService(service); }}
+                            >
+                              <TableCell className="font-medium">{service.client?.name || 'Unknown'}</TableCell>
+                              <TableCell className="capitalize">{service.type?.replace(/_/g, ' ')}</TableCell>
+                              <TableCell>{format(occurrenceDate, 'dd MMM yyyy')}</TableCell>
+                              <TableCell>
+                                <Badge variant={getEffectiveStatus(service, occurrenceDate) === 'completed' ? 'default' : 'outline'}>
+                                  {getEffectiveStatus(service, occurrenceDate)}
+                                </Badge>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        {expandedOccurrences.filter(({ service, occurrenceDate }) =>
+                          activeModal === "all-services" || getEffectiveStatus(service, occurrenceDate) === activeModal
+                        ).length === 0 && (
+                          <TableRow><TableCell colSpan={4} className="text-center py-6 text-muted-foreground">No services found</TableCell></TableRow>
+                        )}
+                      </TableBody>
+                    </Table>
+                  )}
                 </div>
               </DialogContent>
             </Dialog>
