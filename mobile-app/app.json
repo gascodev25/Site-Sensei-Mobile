@@ -26,7 +26,8 @@
         {
           "cameraPermission": "Allow ACGWorks Field to access your camera for capturing job site photos."
         }
-      ]
+      ],
+      "expo-asset"
     ],
     "extra": {
       "eas": {
