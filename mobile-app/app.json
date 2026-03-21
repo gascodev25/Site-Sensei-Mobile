@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "ACGWorks Field",
-    "slug": "acgworks-field",
+    "slug": "site-sensei-mobile",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -16,7 +16,8 @@
       },
       "package": "digital.gasco.acgworks.field",
       "permissions": [
-        "android.permission.CAMERA"
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
       ]
     },
     "plugins": [
@@ -29,8 +30,9 @@
     ],
     "extra": {
       "eas": {
-        "projectId": "YOUR_EAS_PROJECT_ID"
+        "projectId": "b34c69e0-ddc3-449e-b21d-a954220afb09"
       }
-    }
+    },
+    "owner": "gbgreen"
   }
 }
