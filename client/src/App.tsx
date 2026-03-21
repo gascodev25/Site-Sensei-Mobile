@@ -22,12 +22,15 @@ function Router() {
 
   return (
     <Switch>
-      <Route path="/showcase" component={Showcase} />
       {isLoading || !isAuthenticated ? (
-        <Route path="/" component={Login} />
+        <>
+          <Route path="/" component={Showcase} />
+          <Route path="/login" component={Login} />
+        </>
       ) : (
         <>
           <Route path="/" component={Dashboard} />
+          <Route path="/showcase" component={Showcase} />
           <Route path="/clients" component={Clients} />
           <Route path="/services" component={Services} />
           <Route path="/inventory" component={Inventory} />

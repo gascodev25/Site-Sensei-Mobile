@@ -1,4 +1,5 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { apiRequest } from "@/lib/queryClient";
 
 const features = [
   {
@@ -344,12 +345,94 @@ const features = [
 ];
 
 export default function Showcase() {
+  const [loginOpen, setLoginOpen] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [loginError, setLoginError] = useState("");
+
   useEffect(() => {
     document.title = "Field Service Management – Site Sensei";
   }, []);
 
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setLoginError("");
+    try {
+      const response = await apiRequest("POST", "/api/login/local", { email, password });
+      const data = await response.json();
+      if (data.success) {
+        setTimeout(() => { window.location.replace("/"); }, 300);
+      }
+    } catch (err: any) {
+      setLoginError(err.message || "Invalid credentials. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleReplitLogin = () => { window.location.href = "/api/login/replit"; };
+
   return (
     <div style={{ fontFamily: "'Inter', system-ui, -apple-system, sans-serif", background: "#fff", color: "#111827", lineHeight: 1.5, minHeight: "100vh" }}>
+
+      {/* ─── LOGIN MODAL ─── */}
+      {loginOpen && (
+        <div
+          style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.55)", backdropFilter: "blur(4px)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}
+          onClick={e => { if (e.target === e.currentTarget) setLoginOpen(false); }}
+        >
+          <div style={{ background: "#fff", borderRadius: 20, boxShadow: "0 24px 64px rgba(0,0,0,0.18)", width: "100%", maxWidth: 400, padding: "40px 36px", position: "relative" }}>
+            <button onClick={() => setLoginOpen(false)} style={{ position: "absolute", top: 16, right: 16, background: "none", border: "none", cursor: "pointer", color: "#94a3b8", fontSize: 20, lineHeight: 1, padding: 4 }}>✕</button>
+            <div style={{ textAlign: "center", marginBottom: 28 }}>
+              <div style={{ display: "inline-flex", width: 48, height: 48, borderRadius: 12, background: "linear-gradient(135deg,#2563eb,#7c3aed)", alignItems: "center", justifyContent: "center", marginBottom: 14 }}>
+                <span style={{ color: "#fff", fontWeight: 800, fontSize: 20 }}>S</span>
+              </div>
+              <div style={{ fontSize: 20, fontWeight: 800, color: "#0f172a" }}>Sign in to Site Sensei</div>
+              <div style={{ fontSize: 13, color: "#64748b", marginTop: 4 }}>Enter your credentials to continue</div>
+            </div>
+            <form onSubmit={handleLogin}>
+              <div style={{ marginBottom: 16 }}>
+                <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 6 }}>Email</label>
+                <input
+                  type="email" required value={email} onChange={e => setEmail(e.target.value)} disabled={isLoading}
+                  placeholder="your@email.com"
+                  style={{ width: "100%", padding: "10px 14px", borderRadius: 8, border: "1px solid #e2e8f0", fontSize: 14, outline: "none", boxSizing: "border-box", color: "#0f172a" }}
+                />
+              </div>
+              <div style={{ marginBottom: loginError ? 12 : 20 }}>
+                <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 6 }}>Password</label>
+                <input
+                  type="password" required value={password} onChange={e => setPassword(e.target.value)} disabled={isLoading}
+                  placeholder="••••••••"
+                  style={{ width: "100%", padding: "10px 14px", borderRadius: 8, border: "1px solid #e2e8f0", fontSize: 14, outline: "none", boxSizing: "border-box", color: "#0f172a" }}
+                />
+              </div>
+              {loginError && (
+                <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 8, padding: "10px 14px", fontSize: 13, color: "#dc2626", marginBottom: 16 }}>{loginError}</div>
+              )}
+              <button
+                type="submit" disabled={isLoading}
+                style={{ width: "100%", padding: "11px", borderRadius: 10, background: "linear-gradient(135deg,#2563eb,#7c3aed)", color: "#fff", fontWeight: 700, fontSize: 15, border: "none", cursor: isLoading ? "not-allowed" : "pointer", opacity: isLoading ? 0.7 : 1, boxShadow: "0 4px 16px rgba(37,99,235,0.3)", marginBottom: 16 }}
+              >
+                {isLoading ? "Signing in…" : "Sign In"}
+              </button>
+            </form>
+            <div style={{ position: "relative", textAlign: "center", marginBottom: 16 }}>
+              <div style={{ height: 1, background: "#f1f5f9", position: "absolute", top: "50%", left: 0, right: 0 }} />
+              <span style={{ position: "relative", background: "#fff", padding: "0 12px", fontSize: 12, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.05em" }}>or</span>
+            </div>
+            <button
+              onClick={handleReplitLogin}
+              style={{ width: "100%", padding: "11px", borderRadius: 10, background: "#fff", color: "#374151", fontWeight: 600, fontSize: 14, border: "1px solid #e2e8f0", cursor: "pointer", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}
+            >
+              Sign in with Replit
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* ─── NAV ─── */}
       <nav style={{ borderBottom: "1px solid #f1f5f9", padding: "0 40px", display: "flex", alignItems: "center", justifyContent: "space-between", height: 60, position: "sticky", top: 0, background: "rgba(255,255,255,0.95)", backdropFilter: "blur(8px)", zIndex: 50 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -358,13 +441,19 @@ export default function Showcase() {
           </div>
           <span style={{ fontWeight: 700, fontSize: 16, color: "#1e293b" }}>Site Sensei</span>
         </div>
-        <div style={{ display: "flex", gap: 28 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 28 }}>
           {features.map(f => (
             <a key={f.id} href={`#${f.id}`} style={{ fontSize: 13, color: "#64748b", textDecoration: "none", fontWeight: 500 }}
               onMouseEnter={e => (e.currentTarget.style.color = "#1e293b")}
               onMouseLeave={e => (e.currentTarget.style.color = "#64748b")}
             >{f.badge}</a>
           ))}
+          <button
+            onClick={() => setLoginOpen(true)}
+            style={{ padding: "8px 20px", borderRadius: 8, background: "linear-gradient(135deg,#2563eb,#7c3aed)", color: "#fff", fontWeight: 600, fontSize: 13, border: "none", cursor: "pointer", boxShadow: "0 2px 8px rgba(37,99,235,0.3)" }}
+          >
+            Sign In
+          </button>
         </div>
       </nav>
 
@@ -385,9 +474,9 @@ export default function Showcase() {
           A unified platform for scheduling recurring field services, managing warehouse stock, tracking field teams, and keeping billing completely in sync.
         </p>
         <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
-          <a href="/" style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "#2563eb", color: "#fff", padding: "12px 28px", borderRadius: 10, fontWeight: 600, fontSize: 14, textDecoration: "none", boxShadow: "0 4px 16px rgba(37,99,235,0.3)" }}>
-            Open Application
-          </a>
+          <button onClick={() => setLoginOpen(true)} style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "#2563eb", color: "#fff", padding: "12px 28px", borderRadius: 10, fontWeight: 600, fontSize: 14, border: "none", cursor: "pointer", boxShadow: "0 4px 16px rgba(37,99,235,0.3)" }}>
+            Sign In to App
+          </button>
           <a href="#dashboard" style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "#fff", color: "#374151", padding: "12px 28px", borderRadius: 10, fontWeight: 600, fontSize: 14, textDecoration: "none", border: "1px solid #e2e8f0", boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}>
             See Features ↓
           </a>
@@ -476,9 +565,9 @@ export default function Showcase() {
         <p style={{ fontSize: 17, color: "#94a3b8", margin: "0 0 36px" }}>
           Start managing services, stock, and field teams from one unified platform.
         </p>
-        <a href="/" style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "#2563eb", color: "#fff", padding: "14px 36px", borderRadius: 12, fontWeight: 700, fontSize: 15, textDecoration: "none", boxShadow: "0 4px 24px rgba(37,99,235,0.4)" }}>
-          Open the Application →
-        </a>
+        <button onClick={() => setLoginOpen(true)} style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "#2563eb", color: "#fff", padding: "14px 36px", borderRadius: 12, fontWeight: 700, fontSize: 15, border: "none", cursor: "pointer", boxShadow: "0 4px 24px rgba(37,99,235,0.4)" }}>
+          Sign In to App →
+        </button>
       </section>
 
       {/* ─── FOOTER / CREDITS ─── */}

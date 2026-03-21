@@ -59,10 +59,10 @@ export default function Login() {
             <Building2 className="h-8 w-8 text-primary-foreground" />
           </div>
           <h1 className="text-2xl font-bold text-slate-900">
-            ACG Works
+            Site Sensei
           </h1>
           <p className="text-slate-600">
-            Warehouse & Service Management
+            Field Service Management
           </p>
         </div>
 
