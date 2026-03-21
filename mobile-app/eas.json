@@ -19,7 +19,7 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_BASE_URL": "https://acgworks.replit.app"
+        "EXPO_PUBLIC_API_BASE_URL": "https://stock-schedule-gavinbgreen.replit.app"
       }
     },
     "production": {
@@ -27,7 +27,7 @@
         "buildType": "app-bundle"
       },
       "env": {
-        "EXPO_PUBLIC_API_BASE_URL": "https://acgworks.replit.app"
+        "EXPO_PUBLIC_API_BASE_URL": "https://stock-schedule-gavinbgreen.replit.app"
       }
     }
   },

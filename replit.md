@@ -23,6 +23,14 @@ The system is built as a full-stack web application using modern technologies in
 - FieldCompletion photos displayed in 2-column thumbnail grid with overlay remove button
 - GitHub Actions workflow at `.github/workflows/build-android-mobile.yml` for EAS Build
 - API: `GET /api/mobile/services`, `POST /api/field-reports`, `GET /api/field-reports/:serviceId`
+- Production backend URL: `https://stock-schedule-gavinbgreen.replit.app`
+
+**Mobile App Production Fixes (March 2026)**
+- Disabled New Architecture (`newArchEnabled: false`) in `app.json` — `react-native-signature-canvas` is incompatible with RN 0.76 New Architecture, causing silent crash on startup
+- Added `usesCleartextTraffic: true` to Android config — prevents Android from blocking API calls
+- Added splash screen image and `expo-splash-screen` plugin — fixes blank screen on launch
+- Set `EXPO_PUBLIC_API_BASE_URL` in `eas.json` env sections for all build profiles — production points to deployed Replit backend
+- Bumped `versionCode` to 4 for new Play Store submission
 
 **Field Reports Backend (March 2026)**
 - `field_reports` table: serviceId, completionDate, actualConsumables, teamSignature, clientSignature, photos, hasAdjustments, stockDeducted, notes
