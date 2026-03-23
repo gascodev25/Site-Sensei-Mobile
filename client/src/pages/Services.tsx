@@ -848,7 +848,7 @@ export default function Services() {
                           <div className="flex items-center text-sm text-muted-foreground">
                             <Calendar className="h-3 w-3 mr-1" />
                             <span className="font-medium text-foreground/70 mr-1">Scheduled:</span>
-                            <span>{formatDate(occurrenceDate)}</span>
+                            <span>{format(occurrenceDate, 'dd MMM yyyy')}</span>
                           </div>
                           {getEffectiveStatus(service, occurrenceDate) === 'completed' && service.completedAt && (
                             <div className="flex items-center text-sm text-green-600 mt-0.5">
