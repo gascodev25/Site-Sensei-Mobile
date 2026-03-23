@@ -1,0 +1,11 @@
+--- a/android/app/src/main/AndroidManifest.xml
++++ b/android/app/src/main/AndroidManifest.xml
+@@ -1,7 +1,7 @@
+ <manifest xmlns:android="http://schemas.android.com/apk/res/android"
+     package="your.package.name">
+
+-    <uses-sdk android:minSdkVersion="21" android:targetSdkVersion="34" />
++    <uses-sdk android:minSdkVersion="21" android:targetSdkVersion="35" />
+
+     <uses-permission android:name="android.permission.INTERNET" />
+     ...
