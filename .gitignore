@@ -6,3 +6,4 @@ vite.config.ts.*
 *.tar.gz
 mobile-app/.env
 mobile-app/play-store-key.json
+mobile-app/.expo
