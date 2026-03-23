@@ -847,8 +847,16 @@ export default function Services() {
                           </div>
                           <div className="flex items-center text-sm text-muted-foreground">
                             <Calendar className="h-3 w-3 mr-1" />
+                            <span className="font-medium text-foreground/70 mr-1">Scheduled:</span>
                             <span>{formatDate(occurrenceDate)}</span>
                           </div>
+                          {getEffectiveStatus(service, occurrenceDate) === 'completed' && service.completedAt && (
+                            <div className="flex items-center text-sm text-green-600 mt-0.5">
+                              <CheckCircle className="h-3 w-3 mr-1" />
+                              <span className="font-medium mr-1">Completed:</span>
+                              <span>{new Date(service.completedAt).toLocaleDateString('en-ZA', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
+                            </div>
+                          )}
                         </div>
                         <div className="flex space-x-1">
                           <Button

@@ -260,6 +260,20 @@ export default function ServiceCalendar({ services, onServiceClick, onServiceMov
                 <span>{service.estimatedDuration}min</span>
               </div>
             )}
+            {service.installationDate && (
+              <div className="flex items-center text-xs mt-1 opacity-75">
+                <Calendar className="h-3 w-3 mr-1" />
+                <span className="font-medium mr-1">Scheduled:</span>
+                <span>{format(typeof service.installationDate === 'string' ? parseISO(service.installationDate) : service.installationDate, 'dd MMM yyyy')}</span>
+              </div>
+            )}
+            {effectiveStatus === 'completed' && service.completedAt && (
+              <div className="flex items-center text-xs mt-1 text-green-700">
+                <CheckCircle className="h-3 w-3 mr-1" />
+                <span className="font-medium mr-1">Completed:</span>
+                <span>{format(typeof service.completedAt === 'string' ? parseISO(service.completedAt) : new Date(service.completedAt), 'dd MMM yyyy')}</span>
+              </div>
+            )}
             {(service as any).stockSummary?.equipmentNames?.length > 0 && (
               <div className="flex items-center text-xs mt-1 opacity-75">
                 <Wrench className="h-3 w-3 mr-1 shrink-0" />

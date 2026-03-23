@@ -523,6 +523,7 @@ export default function Invoicing() {
                   <TableRow>
                     <TableHead>Client</TableHead>
                     <TableHead>Service Type</TableHead>
+                    <TableHead>Scheduled Date</TableHead>
                     <TableHead>Completion Date</TableHead>
                     <TableHead>Invoice Status</TableHead>
                     <TableHead className="text-right">Action</TableHead>
@@ -537,6 +538,7 @@ export default function Invoicing() {
                     >
                       <TableCell className="font-medium">{service.clientName}</TableCell>
                       <TableCell className="capitalize">{service.type?.replace(/_/g, " ") ?? "—"}</TableCell>
+                      <TableCell>{formatDate(service.installationDate)}</TableCell>
                       <TableCell>
                         {service.occurrenceDate
                           ? formatDate(service.occurrenceDate)
