@@ -5,8 +5,8 @@
   "scripts": {
     "start": "expo start",
     "android": "expo start --android",
-    "build:android": "./scripts/force-sdk.sh && eas build --platform android --profile production",
-    "build:android:clean": "./scripts/force-sdk.sh && eas build --platform android --profile production --clean"
+    "build:android": "eas build --platform android --profile production",
+    "build:android:clean": "eas build --platform android --profile production --clear-cache"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "1.23.1",
