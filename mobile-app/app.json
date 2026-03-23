@@ -2,7 +2,7 @@
   "expo": {
     "name": "ACGWorks Field",
     "slug": "site-sensei-mobile",
-    "version": "1.0.2",
+    "version": "1.0.7",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -21,10 +21,7 @@
         "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO"
       ],
-      "versionCode": 4,
-      "targetSdkVersion": 35,
-      "compileSdkVersion": 35,
-      "minSdkVersion": 21,
+      "versionCode": 8,
       "newArchEnabled": false,
       "usesCleartextTraffic": true
     },
@@ -36,7 +33,17 @@
         }
       ],
       "expo-asset",
-      "expo-splash-screen"
+      "expo-splash-screen",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "compileSdkVersion": 35,
+            "targetSdkVersion": 35,
+            "minSdkVersion": 24
+          }
+        }
+      ]
     ],
     "extra": {
       "eas": {

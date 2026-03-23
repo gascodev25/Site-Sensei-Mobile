@@ -29,6 +29,7 @@ interface ServiceFormProps {
 const serviceTypes = [
   { value: "installation", label: "Installation" },
   { value: "service_contract", label: "Service Contract" },
+  { value: "once_off", label: "Once-Off" },
 ];
 
 const servicePriorities = [

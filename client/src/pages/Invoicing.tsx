@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { CheckCircle, FileText, Clock, Receipt, Search } from "lucide-react";
+import { CheckCircle, FileText, Clock, Receipt, Search, MapPin, Calendar, User, Repeat, Wrench, Package } from "lucide-react";
 import {
   format, parseISO,
   startOfMonth, endOfMonth,
@@ -21,7 +21,7 @@ import {
   subDays, addDays,
   isWithinInterval,
 } from "date-fns";
-import type { Service } from "@shared/schema";
+import type { Service, ServiceWithDetails } from "@shared/schema";
 
 type CompletedService = Service & { clientName: string; occurrenceDate?: string };
 type Team = { id: number; name: string };
@@ -45,6 +45,7 @@ export default function Invoicing() {
   const [teamFilter, setTeamFilter] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [activeModal, setActiveModal] = useState<string | null>(null);
+  const [selectedServiceRow, setSelectedServiceRow] = useState<CompletedService | null>(null);
   const [dateView, setDateView] = useState<"month" | "week" | "day">("month");
   const [currentDate, setCurrentDate] = useState(new Date());
   const { toast } = useToast();
@@ -66,6 +67,22 @@ export default function Invoicing() {
         credentials: "include",
       });
       if (!res.ok) throw new Error("Failed to fetch completed services");
+      return res.json();
+    },
+  });
+
+  type ServiceDetail = ServiceWithDetails & {
+    equipmentItems?: { id: number; quantity: number; equipment: { name: string } }[];
+    consumableItems?: { id: number; quantity: number; consumable: { name: string } }[];
+  };
+
+  const { data: serviceDetail, isLoading: detailLoading } = useQuery<ServiceDetail>({
+    queryKey: ["/api/services", selectedServiceRow?.id],
+    enabled: selectedServiceRow !== null,
+    staleTime: 30000,
+    queryFn: async () => {
+      const res = await fetch(`/api/services/${selectedServiceRow!.id}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch service details");
       return res.json();
     },
   });
@@ -140,9 +157,23 @@ export default function Invoicing() {
     },
   });
 
-  const totalCompleted = allCompleted.length;
-  const invoicedCount = allCompleted.filter(s => s.invoicedStatus === "invoiced").length;
-  const notInvoicedCount = allCompleted.filter(s => s.invoicedStatus !== "invoiced").length;
+  // Filter allCompleted by the current period and team for tile counts
+  const periodFiltered = allCompleted.filter(service => {
+    if (teamFilter !== "all" && String(service.teamId) !== teamFilter) return false;
+    const { start, end } = getDateRange();
+    const dateStr = service.occurrenceDate ?? (service.completedAt ? String(service.completedAt) : null);
+    if (!dateStr) return false;
+    try {
+      const d = typeof dateStr === "string" ? parseISO(dateStr) : new Date(dateStr);
+      return isWithinInterval(d, { start, end });
+    } catch {
+      return false;
+    }
+  });
+
+  const totalCompleted = periodFiltered.length;
+  const invoicedCount = periodFiltered.filter(s => s.invoicedStatus === "invoiced").length;
+  const notInvoicedCount = periodFiltered.filter(s => s.invoicedStatus !== "invoiced").length;
   const isLoading = allLoading || filteredLoading;
 
   const formatDate = (date: string | Date | null | undefined) => {
@@ -323,6 +354,134 @@ export default function Invoicing() {
           </DialogContent>
         </Dialog>
 
+        {/* Service Detail Dialog */}
+        <Dialog open={selectedServiceRow !== null} onOpenChange={() => setSelectedServiceRow(null)}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Service Details</DialogTitle>
+            </DialogHeader>
+            {detailLoading ? (
+              <div className="space-y-3 py-4">
+                {[...Array(6)].map((_, i) => (
+                  <div key={i} className="h-5 bg-muted rounded animate-pulse" />
+                ))}
+              </div>
+            ) : serviceDetail ? (
+              <div className="space-y-1 text-sm pt-2">
+                <div className="flex items-center gap-2 mb-3">
+                  <h2 className="text-xl font-bold">{serviceDetail.client?.name || selectedServiceRow?.clientName || "Unknown Client"}</h2>
+                  {getInvoicedBadge(selectedServiceRow?.invoicedStatus ?? null)}
+                </div>
+                {serviceDetail.client?.city && (
+                  <div className="flex items-center text-muted-foreground mb-1">
+                    <MapPin className="h-3.5 w-3.5 mr-1.5 shrink-0" />
+                    <span>{serviceDetail.client.city}</span>
+                  </div>
+                )}
+                <div className="flex items-center text-muted-foreground mb-3">
+                  <Calendar className="h-3.5 w-3.5 mr-1.5 shrink-0" />
+                  <span>
+                    {selectedServiceRow?.occurrenceDate
+                      ? formatDate(selectedServiceRow.occurrenceDate)
+                      : formatDate(selectedServiceRow?.completedAt)}
+                  </span>
+                </div>
+                <div className="border-t pt-3 space-y-2">
+                  <div>
+                    <span className="font-medium">Type:</span>{" "}
+                    <span className="capitalize">{serviceDetail.type?.replace(/_/g, " ") || "Not specified"}</span>
+                  </div>
+                  {serviceDetail.team && (
+                    <div className="flex items-center">
+                      <User className="h-3.5 w-3.5 mr-1.5 shrink-0" />
+                      <span className="font-medium">Team:</span>
+                      <span className="ml-1">{(serviceDetail.team as any).name}</span>
+                    </div>
+                  )}
+                  <div>
+                    <span className="font-medium">Priority:</span>{" "}
+                    {serviceDetail.servicePriority || "Routine"}
+                  </div>
+                  {serviceDetail.estimatedDuration && (
+                    <div className="flex items-center">
+                      <Clock className="h-3.5 w-3.5 mr-1.5 shrink-0" />
+                      <span className="font-medium">Duration:</span>
+                      <span className="ml-1">{serviceDetail.estimatedDuration} minutes</span>
+                    </div>
+                  )}
+                  {serviceDetail.contractLengthMonths && (
+                    <div>
+                      <span className="font-medium">Contract:</span>{" "}
+                      {serviceDetail.contractLengthMonths} months
+                    </div>
+                  )}
+                  {(serviceDetail.recurrencePattern as any)?.interval && (
+                    <div className="flex items-center">
+                      <Repeat className="h-3.5 w-3.5 mr-1.5 shrink-0" />
+                      <span className="font-medium">Frequency:</span>
+                      <span className="ml-1">
+                        {(() => {
+                          const interval = (serviceDetail.recurrencePattern as any).interval;
+                          const labels: Record<string, string> = { "7d": "Weekly", "14d": "Bi-weekly", "30d": "Monthly", "60d": "Bi-monthly", "90d": "Quarterly", "180d": "Semi-annually" };
+                          return labels[interval] || `Every ${interval}`;
+                        })()}
+                      </span>
+                    </div>
+                  )}
+                  {serviceDetail.equipmentItems && serviceDetail.equipmentItems.length > 0 && (
+                    <div className="flex items-start">
+                      <Wrench className="h-3.5 w-3.5 mr-1.5 mt-0.5 shrink-0" />
+                      <div>
+                        <span className="font-medium">Equipment:</span>
+                        <span className="ml-1 text-muted-foreground">
+                          {serviceDetail.equipmentItems.slice(0, 3).map(item =>
+                            item.quantity > 1 ? `${item.equipment.name} ×${item.quantity}` : item.equipment.name
+                          ).join(", ")}
+                          {serviceDetail.equipmentItems.length > 3 &&
+                            ` +${serviceDetail.equipmentItems.length - 3} more`}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                  {serviceDetail.consumableItems && serviceDetail.consumableItems.length > 0 && (
+                    <div className="flex items-start">
+                      <Package className="h-3.5 w-3.5 mr-1.5 mt-0.5 shrink-0" />
+                      <div>
+                        <span className="font-medium">Consumables:</span>
+                        <span className="ml-1 text-muted-foreground">
+                          {serviceDetail.consumableItems.slice(0, 3).map(item =>
+                            item.quantity > 1 ? `${item.consumable.name} ×${item.quantity}` : item.consumable.name
+                          ).join(", ")}
+                          {serviceDetail.consumableItems.length > 3 &&
+                            ` +${serviceDetail.consumableItems.length - 3} more`}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                {selectedServiceRow?.invoicedStatus !== "invoiced" && (
+                  <div className="border-t pt-4 mt-2">
+                    <Button
+                      size="sm"
+                      disabled={markInvoicedMutation.isPending}
+                      onClick={() => {
+                        markInvoicedMutation.mutate({
+                          serviceId: selectedServiceRow!.id,
+                          occurrenceDate: selectedServiceRow!.occurrenceDate,
+                        });
+                        setSelectedServiceRow(null);
+                      }}
+                    >
+                      <CheckCircle className="h-4 w-4 mr-2" />
+                      Mark as Invoiced
+                    </Button>
+                  </div>
+                )}
+              </div>
+            ) : null}
+          </DialogContent>
+        </Dialog>
+
         {/* Interval Filter + Table */}
         <Card>
           <CardHeader>
@@ -371,7 +530,11 @@ export default function Invoicing() {
                 </TableHeader>
                 <TableBody>
                   {filteredServices.map(service => (
-                    <TableRow key={rowKey(service)}>
+                    <TableRow
+                      key={rowKey(service)}
+                      className="cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-950 transition-colors"
+                      onClick={() => setSelectedServiceRow(service)}
+                    >
                       <TableCell className="font-medium">{service.clientName}</TableCell>
                       <TableCell className="capitalize">{service.type?.replace(/_/g, " ") ?? "—"}</TableCell>
                       <TableCell>
@@ -386,10 +549,13 @@ export default function Invoicing() {
                             size="sm"
                             variant="outline"
                             disabled={markInvoicedMutation.isPending}
-                            onClick={() => markInvoicedMutation.mutate({
-                              serviceId: service.id,
-                              occurrenceDate: service.occurrenceDate,
-                            })}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              markInvoicedMutation.mutate({
+                                serviceId: service.id,
+                                occurrenceDate: service.occurrenceDate,
+                              });
+                            }}
                             data-testid={`button-mark-invoiced-${rowKey(service)}`}
                           >
                             <CheckCircle className="h-4 w-4 mr-1" />
