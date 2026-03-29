@@ -217,6 +217,20 @@ export default function ServiceCalendar({ services, onServiceClick, onServiceMov
       >
         <div className="flex items-center justify-between gap-1">
           <div className="font-medium truncate flex-1">{service.client?.name || 'Unknown'}</div>
+          {service.serviceTag && (
+            <span
+              className={`shrink-0 inline-flex items-center justify-center rounded-full font-bold text-xs w-4 h-4 ${
+                service.serviceTag === 'Hygiene'
+                  ? 'bg-blue-200 text-blue-800'
+                  : service.serviceTag === 'Pest Control'
+                  ? 'bg-orange-200 text-orange-800'
+                  : 'bg-green-200 text-green-800'
+              }`}
+              title={service.serviceTag}
+            >
+              {service.serviceTag === 'Hygiene' ? 'H' : service.serviceTag === 'Pest Control' ? 'P' : 'D'}
+            </span>
+          )}
           {adjustedOccurrences?.has(`${service.id}:${format(displayDate, 'yyyy-MM-dd')}`) && (
             <Badge className="bg-orange-100 border-orange-400 text-orange-800 text-xs shrink-0 px-1 py-0">
               <AlertTriangle className="h-2.5 w-2.5 mr-0.5" />
