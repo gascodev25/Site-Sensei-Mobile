@@ -25,6 +25,7 @@ import ServiceCompletionDialog from "@/components/Dialogs/ServiceCompletionDialo
 export default function Services() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTeamId, setSelectedTeamId] = useState<string>("all");
+  const [selectedTag, setSelectedTag] = useState<string>("all");
   const [activeTab, setActiveTab] = useState("list");
   const [activeModal, setActiveModal] = useState<string | null>(null);
   const [listDateView, setListDateView] = useState<'month' | 'week' | 'day'>('month');
@@ -352,6 +353,7 @@ export default function Services() {
     );
     
     const matchesTeam = selectedTeamId === "all" || service.teamId?.toString() === selectedTeamId;
+    const matchesTag = selectedTag === "all" || service.serviceTag === selectedTag;
 
     const dateRange = getListDateRange();
     const serviceDate = service.installationDate
@@ -376,7 +378,7 @@ export default function Services() {
       }
     }
 
-    return matchesSearch && matchesTeam && matchesDateRange;
+    return matchesSearch && matchesTeam && matchesTag && matchesDateRange;
   });
 
   // Expand filtered services into individual occurrence rows (matches calendar view)
@@ -540,6 +542,18 @@ export default function Services() {
             {/* Search and Filters - show on list view only */}
             {activeTab === "list" && (
               <div className="flex items-center gap-4">
+                <Select value={selectedTag} onValueChange={setSelectedTag}>
+                  <SelectTrigger className="w-[180px]" data-testid="select-tag-filter">
+                    <SelectValue placeholder="All Tags" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Tags</SelectItem>
+                    <SelectItem value="Hygiene">Hygiene</SelectItem>
+                    <SelectItem value="Pest Control">Pest Control</SelectItem>
+                    <SelectItem value="Deep Clean">Deep Clean</SelectItem>
+                  </SelectContent>
+                </Select>
+
                 <Select value={selectedTeamId} onValueChange={setSelectedTeamId}>
                   <SelectTrigger className="w-[200px]" data-testid="select-team-filter">
                     <SelectValue placeholder="All Teams" />
@@ -919,6 +933,22 @@ export default function Services() {
                         <div>
                           <span className="font-medium">Priority:</span> {service.servicePriority || 'Routine'}
                         </div>
+                        {service.serviceTag && (
+                          <div className="flex items-center">
+                            <Badge
+                              className={
+                                service.serviceTag === "Hygiene"
+                                  ? "bg-blue-100 text-blue-800 border-blue-300"
+                                  : service.serviceTag === "Pest Control"
+                                  ? "bg-orange-100 text-orange-800 border-orange-300"
+                                  : "bg-green-100 text-green-800 border-green-300"
+                              }
+                              variant="outline"
+                            >
+                              {service.serviceTag}
+                            </Badge>
+                          </div>
+                        )}
                         {service.estimatedDuration && (
                           <div className="flex items-center">
                             <Clock className="h-3 w-3 mr-1" />

@@ -38,6 +38,12 @@ const servicePriorities = [
   { value: "Emergency", label: "Emergency" },
 ];
 
+const serviceTags = [
+  { value: "Hygiene", label: "Hygiene" },
+  { value: "Pest Control", label: "Pest Control" },
+  { value: "Deep Clean", label: "Deep Clean" },
+];
+
 const recurrenceIntervals = [
   { value: "7d", label: "Weekly (7 days)" },
   { value: "14d", label: "Bi-weekly (14 days)" },
@@ -83,6 +89,7 @@ export default function ServiceForm({ service, initialDate, onSuccess, onCancel,
       teamId: service?.teamId || 0,
       status: service?.status || "scheduled",
       servicePriority: service?.servicePriority || "Routine",
+      serviceTag: service?.serviceTag || undefined,
       estimatedDuration: service?.estimatedDuration || 60,
       contractLengthMonths: service?.contractLengthMonths || undefined,
       recurrencePattern: service?.recurrencePattern || null,
@@ -472,6 +479,32 @@ export default function ServiceForm({ service, initialDate, onSuccess, onCancel,
             )}
           />
         </div>
+
+        <FormField
+          control={form.control}
+          name="serviceTag"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Tag</FormLabel>
+              <FormControl>
+                <Select value={field.value ?? "none"} onValueChange={(val) => field.onChange(val === "none" ? null : val)}>
+                  <SelectTrigger data-testid="select-service-tag">
+                    <SelectValue placeholder="Select a tag" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No tag</SelectItem>
+                    {serviceTags.map((tag) => (
+                      <SelectItem key={tag.value} value={tag.value}>
+                        {tag.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
 
         {watchType === "service_contract" && (
           <div className="space-y-4 border-t border-border pt-4">

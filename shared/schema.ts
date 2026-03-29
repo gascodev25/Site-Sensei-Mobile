@@ -152,6 +152,7 @@ export const services = pgTable("services", {
   invoicedBy: varchar("invoiced_by").references(() => users.id),
   lastInvoiceSync: timestamp("last_invoice_sync"),
   servicePriority: varchar("service_priority", { length: 20 }).default("Routine"),
+  serviceTag: varchar("service_tag", { length: 50 }), // 'Hygiene', 'Pest Control', 'Deep Clean'
   estimatedDuration: integer("estimated_duration").default(60),
   checkInTime: timestamp("check_in_time"),
   checkOutTime: timestamp("check_out_time"),
