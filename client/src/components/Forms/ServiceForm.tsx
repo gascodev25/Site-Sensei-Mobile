@@ -178,19 +178,22 @@ export default function ServiceForm({ service, initialDate, onSuccess, onCancel,
       splitDate, 
       newInterval, 
       newEquipmentItems, 
-      newConsumableItems 
+      newConsumableItems,
+      newServiceTag
     }: { 
       serviceId: number; 
       splitDate: string; 
       newInterval: string;
       newEquipmentItems?: { id: number; quantity: number }[];
       newConsumableItems?: { id: number; quantity: number }[];
+      newServiceTag?: string | null;
     }) => {
       return await apiRequest("POST", `/api/services/${serviceId}/split`, { 
         splitDate, 
         newInterval,
         newEquipmentItems,
-        newConsumableItems
+        newConsumableItems,
+        newServiceTag
       });
     },
     onSuccess: () => {
@@ -223,10 +226,23 @@ export default function ServiceForm({ service, initialDate, onSuccess, onCancel,
       const intervalChanged = originalPattern?.interval && 
           newPattern?.interval && 
           originalPattern.interval !== newPattern.interval;
+
+      const originalTag = service.serviceTag ?? null;
+      const newTag = data.serviceTag ?? null;
+      const tagChanged = originalTag !== newTag;
       
-      if (originalPattern?.interval && intervalChanged) {
+      if (originalPattern?.interval && (intervalChanged || tagChanged)) {
+        let changeDescription = '';
+        if (intervalChanged && tagChanged) {
+          changeDescription = `You're changing the service interval and tag.`;
+        } else if (intervalChanged) {
+          changeDescription = `You're changing the service interval from ${originalPattern.interval} to ${newPattern?.interval}.`;
+        } else {
+          changeDescription = `You're changing the service tag from "${originalTag || 'none'}" to "${newTag || 'none'}".`;
+        }
+
         const shouldSplit = confirm(
-          `You're changing the service interval from ${originalPattern.interval} to ${newPattern?.interval}.\n\n` +
+          `${changeDescription}\n\n` +
           `Would you like to:\n` +
           `- YES: Apply changes from ${format(initialDate, 'PPP')} forward only (recommended)\n` +
           `- NO: Change for entire series (affects past dates)`
@@ -263,7 +279,8 @@ export default function ServiceForm({ service, initialDate, onSuccess, onCancel,
           splitServiceMutation.mutate({
             serviceId: service.id,
             splitDate,
-            newInterval: newPattern?.interval || originalPattern.interval,
+            newInterval: (newPattern?.interval || originalPattern.interval)!,
+            newServiceTag: tagChanged ? newTag : undefined,
             newEquipmentItems: equipmentChanged ? newEquipment : undefined,
             newConsumableItems: consumablesChanged ? newConsumables : undefined
           });

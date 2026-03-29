@@ -1161,7 +1161,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/services/:id/split', isAuthenticated, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      const { splitDate, newInterval, newEquipmentItems, newConsumableItems } = req.body;
+      const { splitDate, newInterval, newEquipmentItems, newConsumableItems, newServiceTag } = req.body;
 
       if (!splitDate || !newInterval) {
         return res.status(400).json({ message: "Split date and new interval are required" });
@@ -1247,6 +1247,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         },
         contractLengthMonths: originalService.contractLengthMonths,
         servicePriority: originalService.servicePriority,
+        serviceTag: newServiceTag !== undefined ? newServiceTag : originalService.serviceTag,
         estimatedDuration: originalService.estimatedDuration,
         originalServiceId: id,
         splitFromDate: splitDate,
