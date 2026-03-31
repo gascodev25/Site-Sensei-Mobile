@@ -63,7 +63,7 @@ outputType = "console"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "cd mobile-app && npm install && npx expo start --tunnel"
+args = "cd mobile-app && npm install && REACT_NATIVE_PACKAGER_HOSTNAME=$REPLIT_EXPO_DEV_DOMAIN npx expo start --clear"
 
 [[workflows.workflow]]
 name = "Build Android Dev APK"
