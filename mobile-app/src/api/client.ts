@@ -91,9 +91,9 @@ export async function getCurrentUser() {
   return response.data;
 }
 
-export async function getMobileServices(range: 'today' | 'week' | 'month', teamId: number): Promise<MobileService[]> {
+export async function getMobileServices(range: 'today' | 'week' | 'month', teamId?: number | null): Promise<MobileService[]> {
   const response = await apiClient.get('/api/mobile/services', {
-    params: { range, teamId },
+    params: teamId ? { range, teamId } : { range },
   });
   return response.data;
 }

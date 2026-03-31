@@ -87,11 +87,13 @@ export default function ServiceListScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
+  const isSuperuser = user?.roles?.includes('superuser') || user?.roles?.includes('manager');
+
   async function load(range: TabRange, silent = false) {
-    if (!user?.linkedTeamId) return;
+    if (!isSuperuser && !user?.linkedTeamId) return;
     if (!silent) setIsLoading(true);
     try {
-      const data = await getMobileServices(range, user.linkedTeamId);
+      const data = await getMobileServices(range, user?.linkedTeamId ?? null);
       setServices(data);
     } catch (err: unknown) {
       const status = (err as { response?: { status?: number } })?.response?.status;
@@ -129,7 +131,7 @@ export default function ServiceListScreen() {
     return [{ ...service, occurrenceDate: service.installationDate ?? '' }];
   });
 
-  if (!user?.linkedTeamId) {
+  if (!isSuperuser && !user?.linkedTeamId) {
     return (
       <View style={styles.centered}>
         <Text style={styles.emptyTitle}>No team assigned</Text>

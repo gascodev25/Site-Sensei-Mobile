@@ -1983,12 +1983,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const user = await getUserWithRoles(req);
       const userRoles = user?.roles || '';
 
-      const requestedTeamId = parseInt(req.query.teamId as string);
-      if (!requestedTeamId || isNaN(requestedTeamId)) {
-        return res.status(400).json({ message: "teamId query parameter is required" });
-      }
-
       const isManager = userRoles.includes('superuser') || userRoles.includes('manager');
+
+      const rawTeamId = req.query.teamId as string;
+      const requestedTeamId = rawTeamId ? parseInt(rawTeamId) : null;
 
       if (!isManager) {
         // Non-managers may only access their own linked team
@@ -1996,9 +1994,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (!linkedTeamId) {
           return res.status(403).json({ message: "No team assigned to this user. Contact a manager." });
         }
-        if (linkedTeamId !== requestedTeamId) {
+        if (requestedTeamId !== null && linkedTeamId !== requestedTeamId) {
           return res.status(403).json({ message: "Access denied: you may only view your own team's services." });
         }
+      }
+
+      if (!isManager && (requestedTeamId === null || isNaN(requestedTeamId))) {
+        return res.status(400).json({ message: "teamId query parameter is required" });
       }
 
       const rawRange = req.query.range as string;
@@ -2007,7 +2009,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         rawRange === 'month' ? 'month' :
         'today';
 
-      const mobileServices = await storage.getMobileServices(requestedTeamId, range);
+      const mobileServices = await storage.getMobileServices(
+        (requestedTeamId !== null && !isNaN(requestedTeamId)) ? requestedTeamId : null,
+        range
+      );
       res.json(mobileServices);
     } catch (error) {
       console.error("Error fetching mobile services:", error);

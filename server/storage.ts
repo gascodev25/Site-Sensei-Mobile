@@ -138,7 +138,7 @@ export interface IStorage {
   getLatestFieldReport(serviceId: number): Promise<FieldReport | undefined>;
   getFieldReportById(id: number): Promise<FieldReport | undefined>;
   getFieldReportOccurrenceFlags(serviceIds: number[]): Promise<{ serviceId: number; hasAdjustments: boolean; completionDate: string }[]>;
-  getMobileServices(teamId: number, range: 'today' | 'week' | 'month'): Promise<any[]>;
+  getMobileServices(teamId: number | null, range: 'today' | 'week' | 'month'): Promise<any[]>;
 
   // Invoicing operations
   getCompletedServices(interval?: string): Promise<(Service & { clientName: string; occurrenceDate?: string })[]>;
@@ -1758,7 +1758,7 @@ export class DatabaseStorage implements IStorage {
    *   - pendingOccurrenceDates: subset of occurrence dates not yet in completedDates
    * The mobile app should use pendingOccurrenceDates to build its work queue.
    */
-  async getMobileServices(teamId: number, range: 'today' | 'week' | 'month'): Promise<any[]> {
+  async getMobileServices(teamId: number | null, range: 'today' | 'week' | 'month'): Promise<any[]> {
     const now = new Date();
     const startOfToday = new Date(now);
     startOfToday.setHours(0, 0, 0, 0);
@@ -1780,8 +1780,8 @@ export class DatabaseStorage implements IStorage {
       rangeEnd.setMonth(rangeEnd.getMonth() + 1);
     }
 
-    // Fetch all services for this team
-    const teamServices = await db
+    // Fetch all services for this team (or all teams if teamId is null)
+    const baseQuery = db
       .select({
         service: services,
         client: clients,
@@ -1789,9 +1789,11 @@ export class DatabaseStorage implements IStorage {
       })
       .from(services)
       .innerJoin(clients, eq(services.clientId, clients.id))
-      .leftJoin(serviceTeams, eq(services.teamId, serviceTeams.id))
-      .where(eq(services.teamId, teamId))
-      .orderBy(asc(services.installationDate));
+      .leftJoin(serviceTeams, eq(services.teamId, serviceTeams.id));
+
+    const teamServices = teamId !== null
+      ? await baseQuery.where(eq(services.teamId, teamId)).orderBy(asc(services.installationDate))
+      : await baseQuery.orderBy(asc(services.installationDate));
 
     if (teamServices.length === 0) return [];
 
