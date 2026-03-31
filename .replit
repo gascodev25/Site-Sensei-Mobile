@@ -69,12 +69,12 @@ args = "cd mobile-app && npm install && npx expo start --tunnel"
 name = "Build Android Dev APK"
 author = "agent"
 
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "cd mobile-app && npx eas-cli build --platform android --profile development --non-interactive"
-
 [workflows.workflow.metadata]
 outputType = "console"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd mobile-app && eas build --platform android --profile development --non-interactive"
 
 [agent]
 integrations = ["javascript_database:1.0.0", "javascript_log_in_with_replit:1.0.0"]
