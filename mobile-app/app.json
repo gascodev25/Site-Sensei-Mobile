@@ -18,8 +18,7 @@
       },
       "package": "digital.gasco.acgworks.field",
       "permissions": [
-        "android.permission.CAMERA",
-        "android.permission.RECORD_AUDIO"
+        "android.permission.CAMERA"
       ],
       "versionCode": 13,
       "newArchEnabled": false,

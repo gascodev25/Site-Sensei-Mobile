@@ -1,6 +1,7 @@
 {
   "cli": {
-    "version": ">= 10.0.0"
+    "version": ">= 10.0.0",
+    "appVersionSource": "remote"
   },
   "build": {
     "development": {
@@ -29,8 +30,7 @@
       "env": {
         "EXPO_PUBLIC_API_BASE_URL": "https://stock-schedule-gavinbgreen.replit.app",
         "EXPO_ANDROID_TARGET_SDK_VERSION": "35",
-        "EXPO_ANDROID_COMPILE_SDK_VERSION": "35",
-        "EXPO_ANDROID_MIN_SDK_VERSION": "21"
+        "EXPO_ANDROID_COMPILE_SDK_VERSION": "35"
       }
     }
   },
