@@ -2,7 +2,7 @@
   "expo": {
     "name": "ACGWorks Field",
     "slug": "site-sensei-mobile",
-    "version": "1.0.14",
+    "version": "1.0.15",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -20,7 +20,7 @@
       "permissions": [
         "android.permission.CAMERA"
       ],
-      "versionCode": 15,
+      "versionCode": 16,
       "newArchEnabled": false,
       "usesCleartextTraffic": true
     },
