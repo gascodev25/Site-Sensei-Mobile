@@ -20,7 +20,7 @@
       "permissions": [
         "android.permission.CAMERA"
       ],
-      "versionCode": 14,
+      "versionCode": 17,
       "newArchEnabled": false,
       "usesCleartextTraffic": true
     },
