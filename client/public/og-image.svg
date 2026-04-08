@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <rect width="1200" height="630" fill="#0f172a"/>
+  <rect x="0" y="0" width="1200" height="630" fill="url(#grad)"/>
+  <defs>
+    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1e3a5f;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#0f172a;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  <!-- Icon background -->
+  <rect x="540" y="80" width="120" height="120" rx="24" fill="#2563eb"/>
+  <!-- Building icon -->
+  <rect x="570" y="120" width="60" height="60" fill="none" stroke="white" stroke-width="4" rx="2"/>
+  <rect x="582" y="148" width="12" height="32" fill="white"/>
+  <rect x="606" y="148" width="12" height="32" fill="white"/>
+  <rect x="558" y="120" width="84" height="8" fill="white" rx="2"/>
+  <!-- Title -->
+  <text x="600" y="270" font-family="Arial, sans-serif" font-size="72" font-weight="800" fill="white" text-anchor="middle">Site Sensei</text>
+  <!-- Subtitle -->
+  <text x="600" y="340" font-family="Arial, sans-serif" font-size="32" fill="#94a3b8" text-anchor="middle">Field Service Management Platform</text>
+  <!-- Features row -->
+  <text x="240" y="440" font-family="Arial, sans-serif" font-size="22" fill="#60a5fa" text-anchor="middle">Service Scheduling</text>
+  <text x="480" y="440" font-family="Arial, sans-serif" font-size="22" fill="#60a5fa" text-anchor="middle">Inventory Control</text>
+  <text x="720" y="440" font-family="Arial, sans-serif" font-size="22" fill="#60a5fa" text-anchor="middle">Team Management</text>
+  <text x="960" y="440" font-family="Arial, sans-serif" font-size="22" fill="#60a5fa" text-anchor="middle">Live Dashboard</text>
+  <!-- Divider lines -->
+  <line x1="360" y1="410" x2="360" y2="460" stroke="#334155" stroke-width="1"/>
+  <line x1="600" y1="410" x2="600" y2="460" stroke="#334155" stroke-width="1"/>
+  <line x1="840" y1="410" x2="840" y2="460" stroke="#334155" stroke-width="1"/>
+  <!-- URL -->
+  <text x="600" y="560" font-family="Arial, sans-serif" font-size="24" fill="#475569" text-anchor="middle">sitesensei.gasco.digital</text>
+</svg>
