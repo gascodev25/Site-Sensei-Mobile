@@ -10,9 +10,7 @@ import { storage } from "./storage";
 import { setupLocalAuth } from "./localAuth";
 import type { User } from "@shared/schema";
 
-if (!process.env.REPLIT_DOMAINS) {
-  throw new Error("Environment variable REPLIT_DOMAINS not provided");
-}
+const isReplitEnvironment = !!process.env.REPLIT_DOMAINS;
 
 const getOidcConfig = memoize(
   async () => {
@@ -79,30 +77,33 @@ export async function setupAuth(app: Express) {
   app.use(passport.initialize());
   app.use(passport.session());
 
-  const config = await getOidcConfig();
+  let oidcConfig: Awaited<ReturnType<typeof getOidcConfig>> | null = null;
 
-  const verify: VerifyFunction = async (
-    tokens: client.TokenEndpointResponse & client.TokenEndpointResponseHelpers,
-    verified: passport.AuthenticateCallback
-  ) => {
-    const user = {};
-    updateUserSession(user, tokens);
-    await upsertUser(tokens.claims());
-    verified(null, user);
-  };
+  if (isReplitEnvironment) {
+    oidcConfig = await getOidcConfig();
 
-  for (const domain of process.env
-    .REPLIT_DOMAINS!.split(",")) {
-    const strategy = new Strategy(
-      {
-        name: `replitauth:${domain}`,
-        config,
-        scope: "openid email profile offline_access",
-        callbackURL: `https://${domain}/api/callback`,
-      },
-      verify,
-    );
-    passport.use(strategy);
+    const verify: VerifyFunction = async (
+      tokens: client.TokenEndpointResponse & client.TokenEndpointResponseHelpers,
+      verified: passport.AuthenticateCallback
+    ) => {
+      const user = {};
+      updateUserSession(user, tokens);
+      await upsertUser(tokens.claims());
+      verified(null, user);
+    };
+
+    for (const domain of process.env.REPLIT_DOMAINS!.split(",")) {
+      const strategy = new Strategy(
+        {
+          name: `replitauth:${domain}`,
+          config: oidcConfig,
+          scope: "openid email profile offline_access",
+          callbackURL: `https://${domain}/api/callback`,
+        },
+        verify,
+      );
+      passport.use(strategy);
+    }
   }
 
   // Setup local authentication strategy
@@ -111,13 +112,9 @@ export async function setupAuth(app: Express) {
   // Update serialization to handle both OAuth and local users
   passport.serializeUser((user: Express.User, cb) => {
     const userData = user as any;
-    // For OAuth users, we store the session data
-    // For local users, we store the user ID
     if (userData.id) {
-      // Local user - store just the ID
       cb(null, { type: 'local', id: userData.id });
     } else {
-      // OAuth user - store the full session data
       cb(null, { type: 'oauth', data: user });
     }
   });
@@ -125,21 +122,17 @@ export async function setupAuth(app: Express) {
   passport.deserializeUser(async (serialized: any, cb) => {
     try {
       if (serialized && serialized.type === 'local') {
-        // Fetch local user from database
         const user = await storage.getUser(serialized.id);
         if (!user) {
           return cb(null, false);
         }
         cb(null, user);
       } else if (serialized && serialized.type === 'oauth') {
-        // OAuth user - return the stored session data
         cb(null, serialized.data);
       } else {
-        // Old session format or invalid - treat as OAuth for backwards compatibility
         cb(null, serialized);
       }
     } catch (error) {
-      // If deserialization fails, log out the user
       cb(null, false);
     }
   });
@@ -161,7 +154,6 @@ export async function setupAuth(app: Express) {
           return res.status(500).json({ message: "Login failed" });
         }
         console.log("Login successful for user:", user.email);
-        // Make sure session is saved before responding
         req.session.save((err) => {
           if (err) {
             console.error("Session save error:", err);
@@ -182,37 +174,37 @@ export async function setupAuth(app: Express) {
     })(req, res, next);
   });
 
-  // Replit OAuth login
-  app.get("/api/login/replit", (req, res, next) => {
-    passport.authenticate(`replitauth:${req.hostname}`, {
-      prompt: "login consent",
-      scope: ["openid", "email", "profile", "offline_access"],
-    })(req, res, next);
-  });
+  // Replit OAuth login (only available in Replit environment)
+  if (isReplitEnvironment) {
+    app.get("/api/login/replit", (req, res, next) => {
+      passport.authenticate(`replitauth:${req.hostname}`, {
+        prompt: "login consent",
+        scope: ["openid", "email", "profile", "offline_access"],
+      })(req, res, next);
+    });
 
-  app.get("/api/callback", (req, res, next) => {
-    passport.authenticate(`replitauth:${req.hostname}`, {
-      successReturnToOrRedirect: "/",
-      failureRedirect: "/",
-    })(req, res, next);
-  });
+    app.get("/api/callback", (req, res, next) => {
+      passport.authenticate(`replitauth:${req.hostname}`, {
+        successReturnToOrRedirect: "/",
+        failureRedirect: "/",
+      })(req, res, next);
+    });
+  }
 
   // Universal logout
   app.post("/api/logout", (req, res) => {
     const user = req.user as any;
-    const isOAuthUser = user && user.access_token;
+    const isOAuthUser = user && user.access_token && oidcConfig;
     
     req.logout(() => {
-      if (isOAuthUser) {
-        // OAuth user - redirect to Replit logout
+      if (isOAuthUser && oidcConfig) {
         res.json({ 
-          redirectUrl: client.buildEndSessionUrl(config, {
+          redirectUrl: client.buildEndSessionUrl(oidcConfig, {
             client_id: process.env.REPL_ID!,
             post_logout_redirect_uri: `${req.protocol}://${req.hostname}`,
           }).href
         });
       } else {
-        // Local user - just confirm logout
         res.json({ success: true });
       }
     });
@@ -226,13 +218,10 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
 
   const user = req.user as any;
 
-  // Local auth users don't have expires_at
   if (!user.expires_at) {
-    // This is a local auth user, just check if authenticated
     return next();
   }
 
-  // OAuth user - check token expiration and refresh if needed
   const now = Math.floor(Date.now() / 1000);
   if (now <= user.expires_at) {
     return next();

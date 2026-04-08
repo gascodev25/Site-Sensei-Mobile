@@ -6,6 +6,22 @@ This is a comprehensive warehouse and service management system designed specifi
 
 The system is built as a full-stack web application using modern technologies including React for the frontend, Express.js for the backend API, PostgreSQL with Drizzle ORM for data persistence, and comprehensive UI components for a professional user experience. All pricing is displayed in South African Rands (R) and the address search functionality is optimized for South African locations.
 
+## Deployment
+
+**Production (ITEX Server)**
+- URL: `https://sitesensei.gasco.digital`
+- Server: `154.65.101.96` (Ubuntu 24.04), SSH user: `ubuntu`
+- SSH key stored in Replit secret: `SITESENSEI_SSH_KEY`
+- Process manager: PM2 (runs as root), config at `/opt/sitesensei/ecosystem.config.cjs`
+- App dir: `/opt/sitesensei/`, env vars at `/opt/sitesensei/.env`
+- nginx reverse proxy → port 3000, Let's Encrypt SSL (auto-renews)
+- To redeploy after code changes: `bash scripts/deploy-itex.sh`
+
+**Replit Preview (Development)**
+- URL: Replit dev domain (port 5000)
+- Auth: Supports both Replit OAuth AND local username/password
+- `REPLIT_DOMAINS` env var controls which mode — if absent, Replit OAuth is skipped
+
 ## Recent Changes
 
 **Manager Field Report Alerts (March 2026)**
