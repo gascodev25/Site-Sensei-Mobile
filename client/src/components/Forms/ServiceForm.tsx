@@ -343,17 +343,9 @@ export default function ServiceForm({ service, initialDate, onSuccess, onCancel,
 
   const onSubmit = (data: InsertService) => {
     if (isEditing && service && isRecurring(service)) {
-      const originalPattern = service.recurrencePattern as { interval?: string } | null;
-      const newPattern = data.recurrencePattern as { interval?: string } | null;
-      const intervalChanged = !!originalPattern?.interval && !!newPattern?.interval && originalPattern.interval !== newPattern.interval;
-      const tagChanged = (service.serviceTag ?? null) !== (data.serviceTag ?? null);
-      const { consumablesChanged, equipmentChanged } = getItemsChanged(data);
-
-      if (consumablesChanged || equipmentChanged || intervalChanged || tagChanged) {
-        setPendingSubmitData(data);
-        setShowScopeDialog(true);
-        return;
-      }
+      setPendingSubmitData(data);
+      setShowScopeDialog(true);
+      return;
     }
 
     createServiceMutation.mutate(data);
