@@ -81,6 +81,14 @@ export default function ServiceForm({ service, initialDate, onSuccess, onCancel,
     enabled: isEditing && !!service?.id,
   });
 
+  // Fetch all services to find the parent when editing an override
+  const { data: allServices = [] } = useQuery<Service[]>({
+    queryKey: ["/api/services"],
+  });
+  const parentService = service?.originalServiceId
+    ? allServices.find((s) => s.id === service.originalServiceId) ?? null
+    : null;
+
   const form = useForm<InsertService>({
     resolver: zodResolver(insertServiceSchema),
     defaultValues: {
@@ -258,10 +266,42 @@ export default function ServiceForm({ service, initialDate, onSuccess, onCancel,
     },
   });
 
-  const isRecurring = (s?: Service) => {
+  // Returns true for genuinely recurring services AND for one-off overrides
+  // that belong to a recurring series (originalServiceId set).
+  const isPartOfSeries = (s?: Service) => {
     const p = s?.recurrencePattern as { interval?: string } | null;
-    return !!p?.interval;
+    return !!p?.interval || !!s?.originalServiceId;
   };
+
+  // True only when the service itself is a one-off override of a recurring series.
+  const isOverrideService = (s?: Service) => {
+    const p = s?.recurrencePattern as { interval?: string } | null;
+    return !!s?.originalServiceId && !p?.interval;
+  };
+
+  // Direct update to any service by id (used when updating the parent from an override)
+  const directUpdateMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: number; data: any }) => {
+      return await apiRequest("PUT", `/api/services/${id}`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/services"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/metrics"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/warehouse/consumables"] });
+      toast({ title: "Success", description: "Service updated successfully" });
+      onSuccess();
+    },
+    onError: (error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const deleteOverrideMutation = useMutation({
+    mutationFn: async (id: number) => {
+      return await apiRequest("DELETE", `/api/services/${id}`);
+    },
+    onError: () => {},
+  });
 
   const getItemsChanged = (data: InsertService) => {
     const originalConsumables = serviceWithStock?.consumableItems?.map((item: any) => ({
@@ -294,14 +334,8 @@ export default function ServiceForm({ service, initialDate, onSuccess, onCancel,
     setShowScopeDialog(false);
 
     const data = pendingSubmitData;
-    const originalPattern = service.recurrencePattern as { interval?: string } | null;
-    const newPattern = data.recurrencePattern as { interval?: string } | null;
-    const originalTag = service.serviceTag ?? null;
-    const newTag = data.serviceTag ?? null;
-    const tagChanged = originalTag !== newTag;
-    const intervalChanged = !!originalPattern?.interval && !!newPattern?.interval && originalPattern.interval !== newPattern.interval;
 
-    // Use initialDate if provided, otherwise fall back to service's installation date or today
+    // Use initialDate if provided, fall back to service's installationDate or today
     const effectiveDate = initialDate ?? (service.installationDate ? new Date(service.installationDate) : new Date());
     const year = effectiveDate.getFullYear();
     const month = String(effectiveDate.getMonth() + 1).padStart(2, '0');
@@ -310,16 +344,59 @@ export default function ServiceForm({ service, initialDate, onSuccess, onCancel,
 
     const { consumablesChanged, equipmentChanged, newConsumables, newEquipment } = getItemsChanged(data);
 
+    // --- Editing a one-off override that belongs to a recurring series ---
+    if (isOverrideService(service)) {
+      const parentPattern = parentService?.recurrencePattern as { interval?: string } | null;
+
+      if (scope === "this_event") {
+        // Just update this override service directly
+        createServiceMutation.mutate(data);
+      } else if (scope === "this_and_following") {
+        // Split the parent series from this date using the new consumables.
+        // Then remove this override (avoid duplicates on the same day).
+        splitServiceMutation.mutate(
+          {
+            serviceId: service.originalServiceId!,
+            splitDate: occurrenceDate,
+            newInterval: (data.recurrencePattern as any)?.interval || parentPattern?.interval || '30d',
+            newServiceTag: data.serviceTag ?? undefined,
+            newEquipmentItems: newEquipment.length > 0 ? newEquipment : undefined,
+            newConsumableItems: newConsumables.length > 0 ? newConsumables : undefined,
+          },
+          {
+            onSuccess: () => {
+              // Clean up the now-redundant override so there's no duplicate
+              deleteOverrideMutation.mutate(service.id);
+            },
+          }
+        );
+      } else {
+        // all_events — update the parent series AND this override
+        const parentData = { ...data, recurrencePattern: parentService?.recurrencePattern ?? data.recurrencePattern };
+        directUpdateMutation.mutate({ id: service.originalServiceId!, data: parentData });
+        // Also keep this override in sync
+        createServiceMutation.mutate(data);
+      }
+
+      setPendingSubmitData(null);
+      return;
+    }
+
+    // --- Editing a regular recurring service ---
+    const originalPattern = service.recurrencePattern as { interval?: string } | null;
+    const newPattern = data.recurrencePattern as { interval?: string } | null;
+    const originalTag = service.serviceTag ?? null;
+    const newTag = data.serviceTag ?? null;
+    const tagChanged = originalTag !== newTag;
+    const intervalChanged = !!originalPattern?.interval && !!newPattern?.interval && originalPattern.interval !== newPattern.interval;
+
     if (scope === "this_event") {
-      // Create a one-off override for this occurrence with the new consumables/equipment
-      // If interval/tag also changed, update those for the entire series separately
       overrideOccurrenceMutation.mutate({
         serviceId: service.id,
         occurrenceDate,
         consumableItems: consumablesChanged ? newConsumables : undefined,
         equipmentItems: equipmentChanged ? newEquipment : undefined,
       });
-      // If structural properties (interval/tag) also changed, update those for all events
       if (intervalChanged || tagChanged) {
         const { consumableItems: _c, equipmentItems: _e, ...structuralData } = data as any;
         createServiceMutation.mutate({ ...structuralData } as InsertService);
@@ -342,7 +419,7 @@ export default function ServiceForm({ service, initialDate, onSuccess, onCancel,
   };
 
   const onSubmit = (data: InsertService) => {
-    if (isEditing && service && isRecurring(service)) {
+    if (isEditing && service && isPartOfSeries(service)) {
       setPendingSubmitData(data);
       setShowScopeDialog(true);
       return;
@@ -823,7 +900,7 @@ export default function ServiceForm({ service, initialDate, onSuccess, onCancel,
             type="button"
             variant="outline"
             onClick={onCancel}
-            disabled={createServiceMutation.isPending || overrideOccurrenceMutation.isPending || splitServiceMutation.isPending}
+            disabled={createServiceMutation.isPending || overrideOccurrenceMutation.isPending || splitServiceMutation.isPending || directUpdateMutation.isPending}
             data-testid="button-cancel"
           >
             Cancel
@@ -833,7 +910,7 @@ export default function ServiceForm({ service, initialDate, onSuccess, onCancel,
               type="button"
               variant="destructive"
               onClick={onDelete}
-              disabled={createServiceMutation.isPending || overrideOccurrenceMutation.isPending || splitServiceMutation.isPending}
+              disabled={createServiceMutation.isPending || overrideOccurrenceMutation.isPending || splitServiceMutation.isPending || directUpdateMutation.isPending}
               data-testid="button-delete"
             >
               Delete
@@ -843,7 +920,7 @@ export default function ServiceForm({ service, initialDate, onSuccess, onCancel,
             <Button
               type="button"
               onClick={onComplete}
-              disabled={createServiceMutation.isPending || overrideOccurrenceMutation.isPending || splitServiceMutation.isPending}
+              disabled={createServiceMutation.isPending || overrideOccurrenceMutation.isPending || splitServiceMutation.isPending || directUpdateMutation.isPending}
               className="bg-green-600 hover:bg-green-700 text-white"
               data-testid="button-complete"
             >
@@ -852,10 +929,10 @@ export default function ServiceForm({ service, initialDate, onSuccess, onCancel,
           )}
           <Button
             type="submit"
-            disabled={createServiceMutation.isPending || overrideOccurrenceMutation.isPending || splitServiceMutation.isPending}
+            disabled={createServiceMutation.isPending || overrideOccurrenceMutation.isPending || splitServiceMutation.isPending || directUpdateMutation.isPending}
             data-testid="button-submit"
           >
-            {(createServiceMutation.isPending || overrideOccurrenceMutation.isPending || splitServiceMutation.isPending) ? "Saving..." : isEditing ? "Update" : "Create"}
+            {(createServiceMutation.isPending || overrideOccurrenceMutation.isPending || splitServiceMutation.isPending || directUpdateMutation.isPending || deleteOverrideMutation.isPending) ? "Saving..." : isEditing ? "Update" : "Create"}
           </Button>
         </div>
       </form>
