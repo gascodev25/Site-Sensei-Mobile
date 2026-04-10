@@ -1284,6 +1284,91 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Override a single occurrence of a recurring service (consumables/equipment only for that date)
+  app.post('/api/services/:id/override-occurrence', isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { occurrenceDate, consumableItems, equipmentItems } = req.body;
+
+      if (!occurrenceDate) {
+        return res.status(400).json({ message: "occurrenceDate is required" });
+      }
+
+      const originalService = await storage.getService(id);
+      if (!originalService) {
+        return res.status(404).json({ message: "Service not found" });
+      }
+
+      const recurrencePattern = originalService.recurrencePattern as { interval?: string; end_date?: string } | null;
+      if (!recurrencePattern || !recurrencePattern.interval) {
+        return res.status(400).json({ message: "Can only override occurrences of recurring services" });
+      }
+
+      const originalServiceWithStock = await storage.getServiceWithStockItems(id);
+
+      // Use new items if provided, otherwise copy from original
+      const finalConsumableItems = consumableItems ?? 
+        (originalServiceWithStock?.consumableItems?.map((item: any) => ({
+          id: item.id,
+          quantity: item.quantity
+        })) || []);
+
+      const finalEquipmentItems = equipmentItems ?? 
+        (originalServiceWithStock?.equipmentItems?.map((item: any) => ({
+          id: item.id,
+          quantity: item.quantity
+        })) || []);
+
+      // Add the occurrence date to the parent's excludedDates
+      const existingExcluded = (originalService.excludedDates as string[]) || [];
+      if (!existingExcluded.includes(occurrenceDate)) {
+        await storage.updateService(id, {
+          excludedDates: [...existingExcluded, occurrenceDate]
+        });
+      }
+
+      // Create a one-off service for this single occurrence with the overridden consumables
+      const overrideServiceData: any = {
+        clientId: originalService.clientId,
+        type: originalService.type,
+        installationDate: new Date(occurrenceDate),
+        teamId: originalService.teamId,
+        status: 'scheduled',
+        recurrencePattern: null,
+        contractLengthMonths: originalService.contractLengthMonths,
+        servicePriority: originalService.servicePriority,
+        serviceTag: originalService.serviceTag,
+        estimatedDuration: originalService.estimatedDuration,
+        originalServiceId: id,
+        splitFromDate: occurrenceDate,
+        completedDates: [],
+        excludedDates: [],
+        consumableItems: finalConsumableItems,
+        equipmentItems: finalEquipmentItems,
+      };
+
+      const overrideService = await storage.createService(overrideServiceData);
+
+      await storage.createAuditLog({
+        userId: req.user?.claims?.sub,
+        action: 'override_occurrence',
+        entityType: 'service',
+        entityId: id,
+        metadata: {
+          occurrenceDate,
+          overrideServiceId: overrideService.id,
+          consumableItemsChanged: !!consumableItems,
+          equipmentItemsChanged: !!equipmentItems,
+        }
+      });
+
+      res.json({ originalService: await storage.getService(id), overrideService });
+    } catch (error) {
+      console.error("Error overriding service occurrence:", error);
+      res.status(500).json({ message: "Failed to override service occurrence" });
+    }
+  });
+
   app.delete('/api/services/:id', isAuthenticated, async (req, res) => {
     try {
       const id = parseInt(req.params.id);

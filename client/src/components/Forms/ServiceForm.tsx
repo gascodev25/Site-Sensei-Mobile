@@ -16,6 +16,7 @@ import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useEffect, useState } from "react";
 import FieldReportPanel from "@/components/FieldReportPanel";
+import RecurrenceScopeDialog, { type RecurrenceScope } from "@/components/Dialogs/RecurrenceScopeDialog";
 
 interface ServiceFormProps {
   service?: Service;
@@ -103,6 +104,8 @@ export default function ServiceForm({ service, initialDate, onSuccess, onCancel,
 
   const [equipmentSearch, setEquipmentSearch] = useState("");
   const [consumableSearch, setConsumableSearch] = useState("");
+  const [showScopeDialog, setShowScopeDialog] = useState(false);
+  const [pendingSubmitData, setPendingSubmitData] = useState<InsertService | null>(null);
 
   const filteredEquipment = equipment.filter((item) =>
     equipmentSearch === "" ||
@@ -218,77 +221,141 @@ export default function ServiceForm({ service, initialDate, onSuccess, onCancel,
     },
   });
 
+  const overrideOccurrenceMutation = useMutation({
+    mutationFn: async ({
+      serviceId,
+      occurrenceDate,
+      consumableItems,
+      equipmentItems,
+    }: {
+      serviceId: number;
+      occurrenceDate: string;
+      consumableItems?: { id: number; quantity: number }[];
+      equipmentItems?: { id: number; quantity: number }[];
+    }) => {
+      return await apiRequest("POST", `/api/services/${serviceId}/override-occurrence`, {
+        occurrenceDate,
+        consumableItems,
+        equipmentItems,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/services"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/metrics"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/warehouse/consumables"] });
+      toast({
+        title: "Success",
+        description: "Changes applied to this occurrence only. The rest of the series is unchanged.",
+      });
+      onSuccess();
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const isRecurring = (s?: Service) => {
+    const p = s?.recurrencePattern as { interval?: string } | null;
+    return !!p?.interval;
+  };
+
+  const getItemsChanged = (data: InsertService) => {
+    const originalConsumables = serviceWithStock?.consumableItems?.map((item: any) => ({
+      id: item.id,
+      quantity: item.quantity
+    })) || [];
+    const originalEquipment = serviceWithStock?.equipmentItems?.map((item: any) => ({
+      id: item.id,
+      quantity: item.quantity
+    })) || [];
+    const newConsumables = data.consumableItems || [];
+    const newEquipment = data.equipmentItems || [];
+
+    const consumablesChanged = JSON.stringify(
+      [...originalConsumables].sort((a: any, b: any) => a.id - b.id)
+    ) !== JSON.stringify(
+      [...newConsumables].sort((a: any, b: any) => a.id - b.id)
+    );
+    const equipmentChanged = JSON.stringify(
+      [...originalEquipment].sort((a: any, b: any) => a.id - b.id)
+    ) !== JSON.stringify(
+      [...newEquipment].sort((a: any, b: any) => a.id - b.id)
+    );
+
+    return { consumablesChanged, equipmentChanged, originalConsumables, originalEquipment, newConsumables, newEquipment };
+  };
+
+  const handleScopeSelect = (scope: RecurrenceScope) => {
+    if (!pendingSubmitData || !service) return;
+    setShowScopeDialog(false);
+
+    const data = pendingSubmitData;
+    const originalPattern = service.recurrencePattern as { interval?: string } | null;
+    const newPattern = data.recurrencePattern as { interval?: string } | null;
+    const originalTag = service.serviceTag ?? null;
+    const newTag = data.serviceTag ?? null;
+    const tagChanged = originalTag !== newTag;
+    const intervalChanged = !!originalPattern?.interval && !!newPattern?.interval && originalPattern.interval !== newPattern.interval;
+
+    // Use initialDate if provided, otherwise fall back to service's installation date or today
+    const effectiveDate = initialDate ?? (service.installationDate ? new Date(service.installationDate) : new Date());
+    const year = effectiveDate.getFullYear();
+    const month = String(effectiveDate.getMonth() + 1).padStart(2, '0');
+    const day = String(effectiveDate.getDate()).padStart(2, '0');
+    const occurrenceDate = `${year}-${month}-${day}`;
+
+    const { consumablesChanged, equipmentChanged, newConsumables, newEquipment } = getItemsChanged(data);
+
+    if (scope === "this_event") {
+      // Create a one-off override for this occurrence with the new consumables/equipment
+      // If interval/tag also changed, update those for the entire series separately
+      overrideOccurrenceMutation.mutate({
+        serviceId: service.id,
+        occurrenceDate,
+        consumableItems: consumablesChanged ? newConsumables : undefined,
+        equipmentItems: equipmentChanged ? newEquipment : undefined,
+      });
+      // If structural properties (interval/tag) also changed, update those for all events
+      if (intervalChanged || tagChanged) {
+        const { consumableItems: _c, equipmentItems: _e, ...structuralData } = data as any;
+        createServiceMutation.mutate({ ...structuralData } as InsertService);
+      }
+    } else if (scope === "this_and_following") {
+      splitServiceMutation.mutate({
+        serviceId: service.id,
+        splitDate: occurrenceDate,
+        newInterval: (newPattern?.interval || originalPattern?.interval)!,
+        newServiceTag: tagChanged ? newTag : undefined,
+        newEquipmentItems: equipmentChanged ? newEquipment : undefined,
+        newConsumableItems: consumablesChanged ? newConsumables : undefined,
+      });
+    } else {
+      // all_events — update the whole series
+      createServiceMutation.mutate(data);
+    }
+
+    setPendingSubmitData(null);
+  };
+
   const onSubmit = (data: InsertService) => {
-    if (isEditing && service && initialDate) {
+    if (isEditing && service && isRecurring(service)) {
       const originalPattern = service.recurrencePattern as { interval?: string } | null;
       const newPattern = data.recurrencePattern as { interval?: string } | null;
-      
-      const intervalChanged = originalPattern?.interval && 
-          newPattern?.interval && 
-          originalPattern.interval !== newPattern.interval;
+      const intervalChanged = !!originalPattern?.interval && !!newPattern?.interval && originalPattern.interval !== newPattern.interval;
+      const tagChanged = (service.serviceTag ?? null) !== (data.serviceTag ?? null);
+      const { consumablesChanged, equipmentChanged } = getItemsChanged(data);
 
-      const originalTag = service.serviceTag ?? null;
-      const newTag = data.serviceTag ?? null;
-      const tagChanged = originalTag !== newTag;
-      
-      if (originalPattern?.interval && (intervalChanged || tagChanged)) {
-        let changeDescription = '';
-        if (intervalChanged && tagChanged) {
-          changeDescription = `You're changing the service interval and tag.`;
-        } else if (intervalChanged) {
-          changeDescription = `You're changing the service interval from ${originalPattern.interval} to ${newPattern?.interval}.`;
-        } else {
-          changeDescription = `You're changing the service tag from "${originalTag || 'none'}" to "${newTag || 'none'}".`;
-        }
-
-        const shouldSplit = confirm(
-          `${changeDescription}\n\n` +
-          `Would you like to:\n` +
-          `- YES: Apply changes from ${format(initialDate, 'PPP')} forward only (recommended)\n` +
-          `- NO: Change for entire series (affects past dates)`
-        );
-        
-        if (shouldSplit) {
-          const year = initialDate.getFullYear();
-          const month = String(initialDate.getMonth() + 1).padStart(2, '0');
-          const day = String(initialDate.getDate()).padStart(2, '0');
-          const splitDate = `${year}-${month}-${day}`;
-          
-          const originalEquipment = serviceWithStock?.equipmentItems?.map((item: any) => ({
-            id: item.id,
-            quantity: item.quantity
-          })) || [];
-          const originalConsumables = serviceWithStock?.consumableItems?.map((item: any) => ({
-            id: item.id,
-            quantity: item.quantity
-          })) || [];
-          const newEquipment = data.equipmentItems || [];
-          const newConsumables = data.consumableItems || [];
-          
-          const equipmentChanged = JSON.stringify(
-            [...originalEquipment].sort((a: any, b: any) => a.id - b.id)
-          ) !== JSON.stringify(
-            [...newEquipment].sort((a: any, b: any) => a.id - b.id)
-          );
-          const consumablesChanged = JSON.stringify(
-            [...originalConsumables].sort((a: any, b: any) => a.id - b.id)
-          ) !== JSON.stringify(
-            [...newConsumables].sort((a: any, b: any) => a.id - b.id)
-          );
-          
-          splitServiceMutation.mutate({
-            serviceId: service.id,
-            splitDate,
-            newInterval: (newPattern?.interval || originalPattern.interval)!,
-            newServiceTag: tagChanged ? newTag : undefined,
-            newEquipmentItems: equipmentChanged ? newEquipment : undefined,
-            newConsumableItems: consumablesChanged ? newConsumables : undefined
-          });
-          return;
-        }
+      if (consumablesChanged || equipmentChanged || intervalChanged || tagChanged) {
+        setPendingSubmitData(data);
+        setShowScopeDialog(true);
+        return;
       }
     }
-    
+
     createServiceMutation.mutate(data);
   };
 
@@ -764,7 +831,7 @@ export default function ServiceForm({ service, initialDate, onSuccess, onCancel,
             type="button"
             variant="outline"
             onClick={onCancel}
-            disabled={createServiceMutation.isPending}
+            disabled={createServiceMutation.isPending || overrideOccurrenceMutation.isPending || splitServiceMutation.isPending}
             data-testid="button-cancel"
           >
             Cancel
@@ -774,7 +841,7 @@ export default function ServiceForm({ service, initialDate, onSuccess, onCancel,
               type="button"
               variant="destructive"
               onClick={onDelete}
-              disabled={createServiceMutation.isPending}
+              disabled={createServiceMutation.isPending || overrideOccurrenceMutation.isPending || splitServiceMutation.isPending}
               data-testid="button-delete"
             >
               Delete
@@ -784,7 +851,7 @@ export default function ServiceForm({ service, initialDate, onSuccess, onCancel,
             <Button
               type="button"
               onClick={onComplete}
-              disabled={createServiceMutation.isPending}
+              disabled={createServiceMutation.isPending || overrideOccurrenceMutation.isPending || splitServiceMutation.isPending}
               className="bg-green-600 hover:bg-green-700 text-white"
               data-testid="button-complete"
             >
@@ -793,10 +860,10 @@ export default function ServiceForm({ service, initialDate, onSuccess, onCancel,
           )}
           <Button
             type="submit"
-            disabled={createServiceMutation.isPending}
+            disabled={createServiceMutation.isPending || overrideOccurrenceMutation.isPending || splitServiceMutation.isPending}
             data-testid="button-submit"
           >
-            {createServiceMutation.isPending ? "Saving..." : isEditing ? "Update" : "Create"}
+            {(createServiceMutation.isPending || overrideOccurrenceMutation.isPending || splitServiceMutation.isPending) ? "Saving..." : isEditing ? "Update" : "Create"}
           </Button>
         </div>
       </form>
@@ -808,6 +875,17 @@ export default function ServiceForm({ service, initialDate, onSuccess, onCancel,
         occurrenceDate={initialDate ? `${initialDate.getFullYear()}-${String(initialDate.getMonth() + 1).padStart(2, '0')}-${String(initialDate.getDate()).padStart(2, '0')}` : undefined}
       />
     )}
+
+    <RecurrenceScopeDialog
+      open={showScopeDialog}
+      onClose={() => { setShowScopeDialog(false); setPendingSubmitData(null); }}
+      onSelect={handleScopeSelect}
+      occurrenceDate={(() => {
+        const d = initialDate ?? (service?.installationDate ? new Date(service.installationDate) : null);
+        return d ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` : undefined;
+      })()}
+      isPending={overrideOccurrenceMutation.isPending || splitServiceMutation.isPending || createServiceMutation.isPending}
+    />
   </div>
   );
 }
