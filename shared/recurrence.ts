@@ -55,6 +55,14 @@ export function normalizeAnchorToWeekday(anchor: Date): Date {
  *   endDate       — recurrence end_date from the pattern (also a hard stop)
  *   excludedDates — array of ISO date strings (YYYY-MM-DD) to skip
  */
+/** Format a Date as a local YYYY-MM-DD string (timezone-safe). */
+function toLocalDateStr(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
 export function generateOccurrences(
   anchor: Date,
   intervalStr: string,
@@ -84,7 +92,7 @@ export function generateOccurrences(
 
     const inRange =
       (!rangeStart || current >= rangeStart) && current >= normalizedAnchor;
-    const dateStr = current.toISOString().split("T")[0];
+    const dateStr = toLocalDateStr(current);
 
     if (inRange && !excludedSet.has(dateStr)) {
       occurrences.push(new Date(current));

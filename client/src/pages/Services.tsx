@@ -279,7 +279,7 @@ export default function Services() {
 
     // Add the original date to the recurring service's excluded dates
     const currentExcludedDates = (service.excludedDates as string[]) || [];
-    const originalDateString = originalDate.toISOString().split('T')[0]; // YYYY-MM-DD format
+    const originalDateString = `${originalDate.getFullYear()}-${String(originalDate.getMonth() + 1).padStart(2, '0')}-${String(originalDate.getDate()).padStart(2, '0')}`;
     const updatedExcludedDates = [...currentExcludedDates, originalDateString];
 
     try {
