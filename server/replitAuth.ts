@@ -141,7 +141,7 @@ export async function setupAuth(app: Express) {
   app.post("/api/login/local", (req, res, next) => {
     passport.authenticate("local", (err: any, user: User | false, info: any) => {
       if (err) {
-        console.error("Authentication error:", err);
+        console.error("Authentication error (full):", JSON.stringify({ message: err?.message, stack: err?.stack, code: err?.code }));
         return res.status(500).json({ message: "Internal server error" });
       }
       if (!user) {

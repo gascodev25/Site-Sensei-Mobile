@@ -12,24 +12,31 @@ export async function setupLocalAuth() {
     },
     async (email, password, done) => {
       try {
+        console.log("[localAuth] Looking up user:", email);
         const user = await storage.getUserByEmail(email);
         
         if (!user) {
+          console.log("[localAuth] User not found:", email);
           return done(null, false, { message: "Invalid credentials" });
         }
 
         if (!user.passwordHash) {
+          console.log("[localAuth] User has no password hash:", email);
           return done(null, false, { message: "Invalid credentials" });
         }
 
+        console.log("[localAuth] Comparing password for:", email);
         const isValidPassword = await bcrypt.compare(password, user.passwordHash);
         
         if (!isValidPassword) {
+          console.log("[localAuth] Invalid password for:", email);
           return done(null, false, { message: "Invalid credentials" });
         }
 
+        console.log("[localAuth] Login success for:", email);
         return done(null, user);
-      } catch (error) {
+      } catch (error: any) {
+        console.error("[localAuth] Strategy error:", JSON.stringify({ message: error?.message, code: error?.code, stack: error?.stack }));
         return done(error);
       }
     }
