@@ -100,6 +100,14 @@ app.use("/api", (req: Request, res: Response, next: NextFunction) => {
   next();
 });
 
+// ── No-cache for SPA HTML shell (assets have content-hashed filenames) ───────
+app.use((req: Request, res: Response, next: NextFunction) => {
+  if (!req.path.startsWith("/api") && !req.path.includes(".")) {
+    res.setHeader("Cache-Control", "no-store");
+  }
+  next();
+});
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
