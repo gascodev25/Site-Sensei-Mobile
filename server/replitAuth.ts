@@ -153,7 +153,7 @@ export async function setupAuth(app: Express) {
           console.error("Login session error:", err);
           return res.status(500).json({ message: "Login failed" });
         }
-        console.log("Login successful for user:", user.email);
+        console.log("[auth] Login successful");
         req.session.save((err) => {
           if (err) {
             console.error("Session save error:", err);

@@ -38,13 +38,14 @@ scp -i ~/.ssh/itex_key -o StrictHostKeyChecking=no /tmp/itex_server_env ubuntu@1
 echo "=== Deploying on server ==="
 ssh -i ~/.ssh/itex_key -o StrictHostKeyChecking=no ubuntu@154.65.101.96 "
   cd /opt/sitesensei
-  tar -xzf deploy.tar.gz
-  rm deploy.tar.gz
+  sudo tar -xzf deploy.tar.gz
+  sudo rm deploy.tar.gz
   sudo cp /tmp/itex_server_env /opt/sitesensei/.env
   sudo chmod 600 /opt/sitesensei/.env
   rm /tmp/itex_server_env
+  echo '--- Restarting server ---'
   sudo pm2 restart sitesensei
-  sleep 3
+  sleep 5
   sudo pm2 status
   curl -s -o /dev/null -w 'HTTP: %{http_code}\n' http://localhost:3000/
 "
