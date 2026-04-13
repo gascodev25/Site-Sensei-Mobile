@@ -4,7 +4,9 @@ import { drizzle as drizzleWs } from 'drizzle-orm/neon-serverless';
 import ws from 'ws';
 import * as schema from "@shared/schema";
 
-const dbUrl = process.env.DATABASE_URL;
+// Always prefer NEON_DATABASE_URL (the ITEX production database — source of truth).
+// Fall back to DATABASE_URL (Replit Helium) only if NEON_DATABASE_URL is absent.
+const dbUrl = process.env.NEON_DATABASE_URL || process.env.DATABASE_URL;
 
 if (!dbUrl) {
   throw new Error(
@@ -12,8 +14,7 @@ if (!dbUrl) {
   );
 }
 
-// Public Neon URLs (sitesensei.gasco.digital production) use the HTTP driver.
-// Internal/Replit Helium URLs use the WebSocket pool driver.
+// Public Neon URLs use the HTTP driver; internal Helium URLs use the WebSocket pool.
 function createDb() {
   if (dbUrl!.includes('neon.tech')) {
     const sql = neon(dbUrl!);

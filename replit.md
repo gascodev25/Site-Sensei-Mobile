@@ -24,15 +24,15 @@ The system is built as a full-stack web application using modern technologies in
 
 ## Recent Changes
 
-**Production Data Migration & Database Architecture Fix (April 2026)**
-- Root cause of production login failure: ITEX VPS pointed `DATABASE_URL` to Replit's internal `helium` hostname, which is inaccessible from external servers
-- Fixed `server/db.ts`: switched from WebSocket pool (`@neondatabase/serverless` ws) to Neon HTTP driver (`drizzle-orm/neon-http`) — more reliable for external/VPS environments
-- Updated ITEX server `/opt/sitesensei/.env` to use `NEON_DATABASE_URL` (public Neon endpoint) as `DATABASE_URL`
-- Ran `DATABASE_URL=$NEON_DATABASE_URL npm run db:push` to sync schema (Neon DB was missing newer columns like `linked_team_id`)
-- Migrated all data from Helium (dev DB) to Neon (prod DB): 9 users, 231 clients, 308 services, 79 consumables, 128 equipment, 4 teams, etc.
-- Login on `sitesensei.gasco.digital` now returns HTTP 200 and all data is accessible
-- Updated `scripts/deploy-itex.sh` to automatically write the correct `.env` on every deployment (sources `NEON_DATABASE_URL` + `SESSION_SECRET` from Replit secrets)
-- **CRITICAL DB RULE**: Never use `DATABASE_URL` (Helium) when targeting the ITEX production database — always use `DATABASE_URL=$NEON_DATABASE_URL npm run db:push` for prod schema changes
+**Single Database Architecture — ITEX is Data Master (April 2026)**
+- **Architecture**: Both the Replit dev workspace AND ITEX production (`sitesensei.gasco.digital`) now connect to the SAME Neon PostgreSQL database
+- `server/db.ts` updated to prefer `NEON_DATABASE_URL` (set as Replit secret) over `DATABASE_URL` (Helium). On ITEX the `.env` sets `DATABASE_URL` to the Neon URL directly
+- Neon database is the single source of truth — data entered on ITEX is immediately visible in the dev workspace and vice versa
+- **WARNING**: Changes made in the Replit dev preview affect live production data (same database). Be careful with deletes or bulk operations during development
+- Full data sync performed: pulled correct data from published Replit app (source of truth at that time) into Neon: 223 clients, 307 services, 995 stock-issued records, correct team names (Thabo & Dineo, Nhlanhla & Simphiwe, Lesego & Njabulo, Test Team), 122 equipment items, 79 consumables
+- To deploy code changes to ITEX: `bash scripts/deploy-itex.sh`
+- To push schema changes to production: `DATABASE_URL=$NEON_DATABASE_URL npm run db:push`
+- Added `Cache-Control: no-store` headers for all HTML page responses to prevent browser caching stale UI
 
 **Manager Field Report Alerts (March 2026)**
 - Added `GET /api/field-reports/batch?serviceIds=...` endpoint for efficient batch flag retrieval
