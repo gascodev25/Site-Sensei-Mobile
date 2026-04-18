@@ -24,6 +24,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
   await setupAuth(app);
   await setupLocalAuth();
 
+  // Startup reconciliation: ensure every field report has its completion date
+  // reflected in the parent service's completedDates array.
+  // This heals any services where the field report was created but the
+  // completedDates update failed (e.g. mobile retry edge case).
+  (async () => {
+    try {
+      const allServices = await storage.getServices();
+      const serviceIds = allServices.map(s => s.id);
+      if (serviceIds.length === 0) return;
+
+      const flags = await storage.getFieldReportOccurrenceFlags(serviceIds);
+      if (flags.length === 0) return;
+
+      const serviceMap = new Map(allServices.map(s => [s.id, s]));
+
+      for (const flag of flags) {
+        const svc = serviceMap.get(flag.serviceId);
+        if (!svc) continue;
+
+        const isRecurring =
+          svc.recurrencePattern &&
+          typeof svc.recurrencePattern === 'object' &&
+          'interval' in (svc.recurrencePattern as object);
+
+        if (!isRecurring) continue;
+
+        const completedDates = (svc.completedDates as string[]) || [];
+        const normalizedDate = flag.completionDate.substring(0, 10);
+        const alreadyRecorded = completedDates.some(d => d.substring(0, 10) === normalizedDate);
+
+        if (!alreadyRecorded) {
+          console.log(`[reconcile] Service ${svc.id} missing completedDate ${normalizedDate} — healing from field report.`);
+          await storage.updateService(svc.id, {
+            completedDates: [...completedDates, normalizedDate],
+          });
+          // Update local map so subsequent flags for the same service are consistent
+          svc.completedDates = [...completedDates, normalizedDate];
+        }
+      }
+    } catch (err) {
+      console.error('[reconcile] Field report reconciliation failed:', err);
+    }
+  })();
+
   // Bootstrap superuser endpoint (can be called multiple times to ensure Gavin's account)
   app.post('/api/auth/bootstrap', async (req, res) => {
     try {
@@ -2225,6 +2269,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           hasAdjustments,
           notes: body.notes ?? null,
         });
+
+        // Also ensure the service status reflects this completion in case a previous
+        // attempt created the report but failed before updating the service's completedDates.
+        // coreUpdateServiceStatus is idempotent — it won't add the date twice.
+        await coreUpdateServiceStatus(service, body.completionDate);
       } else {
         // CREATE: first submission
         // Step A — create the report record first (stockDeducted=true to mark intent)
