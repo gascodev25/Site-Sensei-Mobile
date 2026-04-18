@@ -167,9 +167,12 @@ export default function FieldCompletionScreen() {
   async function handleSubmit() {
     setIsSubmitting(true);
     try {
+      const cleanDate = occurrenceDate && occurrenceDate.length >= 10
+        ? occurrenceDate.substring(0, 10)
+        : new Date().toISOString().substring(0, 10);
       const payload = {
         serviceId: service.id,
-        completionDate: occurrenceDate,
+        completionDate: cleanDate,
         actualConsumables: consumables,
         teamSignature: teamSignature || undefined,
         clientSignature: clientSignature || undefined,
