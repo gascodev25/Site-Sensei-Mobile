@@ -491,7 +491,15 @@ function ReviewStep({
         <Text style={styles.reviewLabel}>Client</Text>
         <Text style={styles.reviewValue}>{service.client.name}</Text>
         <Text style={styles.reviewLabel}>Service Date</Text>
-        <Text style={styles.reviewValue}>{occurrenceDate}</Text>
+        <Text style={styles.reviewValue}>{
+          (() => {
+            const raw = occurrenceDate || '';
+            const d = new Date(raw.length === 10 ? raw + 'T00:00:00' : raw);
+            return isNaN(d.getTime())
+              ? raw
+              : d.toLocaleDateString('en-ZA', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+          })()
+        }</Text>
         <Text style={styles.reviewLabel}>Team Signature</Text>
         <Text style={[styles.reviewValue, { color: hasTeamSig ? '#059669' : '#ef4444' }]}>
           {hasTeamSig ? 'Captured' : 'Missing'}

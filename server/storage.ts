@@ -1811,7 +1811,12 @@ export class DatabaseStorage implements IStorage {
       allOccurrenceDates: string[];
     })[] = [];
 
-    const toDateString = (d: Date) => d.toISOString().substring(0, 10);
+    // generateOccurrences returns midnight-SAST dates as UTC values
+    // (e.g. 2026-04-16T22:00:00Z represents April 17 SAST midnight).
+    // Adding the SAST offset recovers the correct SAST calendar date string.
+    const SAST_MS = 2 * 60 * 60 * 1000;
+    const toDateString = (d: Date) =>
+      new Date(d.getTime() + SAST_MS).toISOString().substring(0, 10);
 
     for (const row of teamServices) {
       const svc = row.service;
