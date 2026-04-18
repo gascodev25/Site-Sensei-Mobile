@@ -130,7 +130,16 @@ export default function ServiceListScreen() {
     if (service.pendingOccurrenceDates.length > 0) {
       return service.pendingOccurrenceDates.map(date => ({ ...service, occurrenceDate: date }));
     }
-    return [{ ...service, occurrenceDate: service.installationDate ?? '' }];
+    // Completed services: use the actual occurrence dates from the range (proper YYYY-MM-DD strings).
+    // Do NOT fall back to installationDate — it is a timestamp object and renders as "Invalid Date".
+    if (service.occurrenceDatesInRange.length > 0) {
+      return service.occurrenceDatesInRange.map(date => ({ ...service, occurrenceDate: date }));
+    }
+    // Absolute last resort: format installationDate safely
+    const iso = service.installationDate
+      ? new Date(service.installationDate).toISOString().substring(0, 10)
+      : '';
+    return [{ ...service, occurrenceDate: iso }];
   });
 
   const q = searchQuery.trim().toLowerCase();
