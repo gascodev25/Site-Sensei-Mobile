@@ -16,7 +16,6 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RouteProp } from '@react-navigation/native';
 import SignatureCanvas from 'react-native-signature-canvas';
 import * as ImagePicker from 'expo-image-picker';
-import * as FileSystem from 'expo-file-system';
 import { submitFieldReport, type MobileService } from '../api/client';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
@@ -80,13 +79,25 @@ export default function FieldCompletionScreen() {
     return consumables.some(c => c.actualQty !== c.plannedQty);
   }
 
+  async function uriToBase64(uri: string): Promise<string> {
+    const response = await fetch(uri);
+    const blob = await response.blob();
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const result = reader.result as string;
+        resolve(result.split(',')[1]);
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  }
+
   async function addPhotoAsset(asset: ImagePicker.ImagePickerAsset) {
     let base64 = asset.base64 ?? null;
     if (!base64 && asset.uri) {
       try {
-        base64 = await FileSystem.readAsStringAsync(asset.uri, {
-          encoding: FileSystem.EncodingType.Base64,
-        });
+        base64 = await uriToBase64(asset.uri);
       } catch {
         Alert.alert('Error', 'Could not read the selected photo. Please try again.');
         return;
