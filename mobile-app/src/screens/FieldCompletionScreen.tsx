@@ -36,6 +36,7 @@ type Photo = {
 
 type SignatureCanvasRef = {
   clearSignature: () => void;
+  readSignature: () => void;
 };
 
 const STEPS = ['Consumables', 'Team Signature', 'Client Signature', 'Photos', 'Review'];
@@ -300,6 +301,7 @@ function SignatureStep({
           ref={sigRef}
           onOK={onSign}
           onEmpty={() => onSign('')}
+          onEnd={() => sigRef.current?.readSignature()}
           descriptionText=""
           clearText="Clear"
           confirmText="Save"
@@ -313,7 +315,7 @@ function SignatureStep({
       </View>
       {currentSig ? (
         <View style={styles.sigPreview}>
-          <Text style={styles.sigSaved}>Signature saved</Text>
+          <Text style={styles.sigSaved}>Signature captured</Text>
           <TouchableOpacity onPress={onClear}>
             <Text style={styles.clearLink}>Clear & redo</Text>
           </TouchableOpacity>
