@@ -295,30 +295,43 @@ function SignatureStep({
   return (
     <View style={styles.padded}>
       <Text style={styles.sectionHeader}>{title}</Text>
-      <Text style={styles.hint}>Sign in the box below using your finger.</Text>
+      <Text style={styles.hint}>Sign in the box below using your finger, then tap Save.</Text>
       <View style={styles.signatureBox}>
         <SignatureCanvas
           ref={sigRef}
           onOK={onSign}
           onEmpty={() => onSign('')}
-          onEnd={() => sigRef.current?.readSignature()}
           descriptionText=""
-          clearText="Clear"
-          confirmText="Save"
           webStyle={`
             .m-signature-pad { box-shadow: none; border: none; }
             .m-signature-pad--body { border: none; }
-            .m-signature-pad--footer .button { background-color: #1e40af; color: white; }
+            .m-signature-pad--footer { display: none; }
           `}
           style={styles.flex1}
         />
       </View>
+
+      <View style={styles.sigButtonRow}>
+        <TouchableOpacity
+          style={styles.sigClearBtn}
+          onPress={() => {
+            sigRef.current?.clearSignature();
+            onClear();
+          }}
+        >
+          <Text style={styles.sigClearBtnText}>Clear</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.sigSaveBtn}
+          onPress={() => sigRef.current?.readSignature()}
+        >
+          <Text style={styles.sigSaveBtnText}>Save Signature</Text>
+        </TouchableOpacity>
+      </View>
+
       {currentSig ? (
         <View style={styles.sigPreview}>
-          <Text style={styles.sigSaved}>Signature captured</Text>
-          <TouchableOpacity onPress={onClear}>
-            <Text style={styles.clearLink}>Clear & redo</Text>
-          </TouchableOpacity>
+          <Text style={styles.sigSaved}>✓ Signature saved</Text>
         </View>
       ) : null}
     </View>
@@ -553,13 +566,33 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     backgroundColor: '#fff',
   },
-  sigPreview: {
+  sigButtonRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 10,
+    gap: 10,
+    marginTop: 12,
   },
-  sigSaved: { color: '#059669', fontWeight: '600' },
+  sigClearBtn: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    borderRadius: 10,
+    padding: 13,
+    alignItems: 'center',
+  },
+  sigClearBtnText: { color: '#374151', fontWeight: '600', fontSize: 14 },
+  sigSaveBtn: {
+    flex: 2,
+    backgroundColor: '#1e40af',
+    borderRadius: 10,
+    padding: 13,
+    alignItems: 'center',
+  },
+  sigSaveBtnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
+  sigPreview: {
+    marginTop: 10,
+    alignItems: 'center',
+  },
+  sigSaved: { color: '#059669', fontWeight: '700', fontSize: 14 },
   clearLink: { color: '#ef4444', fontSize: 13 },
   commentInput: {
     borderWidth: 1,
