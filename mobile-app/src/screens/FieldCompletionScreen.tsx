@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RouteProp } from '@react-navigation/native';
 import SignatureCanvas from 'react-native-signature-canvas';
@@ -45,6 +46,7 @@ export default function FieldCompletionScreen() {
   const navigation = useNavigation<Nav>();
   const route = useRoute<Route>();
   const { service, occurrenceDate } = route.params;
+  const insets = useSafeAreaInsets();
 
   const [step, setStep] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -233,7 +235,7 @@ export default function FieldCompletionScreen() {
         )}
       </ScrollView>
 
-      <View style={styles.footer}>
+      <View style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
         {step > 0 && (
           <TouchableOpacity style={styles.backBtn} onPress={goBack} disabled={isSubmitting}>
             <Text style={styles.backBtnText}>Back</Text>
@@ -519,7 +521,8 @@ const styles = StyleSheet.create({
   flex1: { flex: 1 },
   footer: {
     flexDirection: 'row',
-    padding: 16,
+    paddingTop: 16,
+    paddingHorizontal: 16,
     backgroundColor: '#fff',
     borderTopWidth: 1,
     borderTopColor: '#e5e7eb',
