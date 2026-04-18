@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ChevronDown, ChevronUp, AlertTriangle, Camera, FileText, User, CheckCircle } from "lucide-react";
+import { ChevronDown, ChevronUp, AlertTriangle, Camera, FileText, User, CheckCircle, Printer } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { FieldReport } from "@shared/schema";
@@ -8,10 +8,121 @@ import type { FieldReport } from "@shared/schema";
 interface FieldReportPanelProps {
   serviceId: number;
   occurrenceDate?: string;
+  defaultExpanded?: boolean;
+  clientName?: string;
 }
 
-export default function FieldReportPanel({ serviceId, occurrenceDate }: FieldReportPanelProps) {
-  const [expanded, setExpanded] = useState(false);
+function printReport(report: FieldReport, clientName?: string, occurrenceDate?: string) {
+  const consumables = (report.actualConsumables as {
+    id: number; name: string; plannedQty: number; actualQty: number;
+  }[]) ?? [];
+
+  const photos = (report.photos as {
+    dataUrl: string; comment: string; timestamp: string;
+  }[]) ?? [];
+
+  const reportDate = occurrenceDate ?? report.completionDate;
+  const formattedDate = reportDate
+    ? new Date(reportDate + "T00:00:00").toLocaleDateString("en-ZA", { day: "2-digit", month: "long", year: "numeric" })
+    : "—";
+
+  const consumablesHtml = consumables.length > 0 ? `
+    <h3 style="font-size:14px;font-weight:600;color:#374151;margin:20px 0 8px;">Consumables Used</h3>
+    <table style="width:100%;border-collapse:collapse;font-size:13px;">
+      <thead>
+        <tr style="background:#f3f4f6;">
+          <th style="text-align:left;padding:8px 12px;border:1px solid #e5e7eb;">Item</th>
+          <th style="text-align:center;padding:8px 12px;border:1px solid #e5e7eb;">Planned</th>
+          <th style="text-align:center;padding:8px 12px;border:1px solid #e5e7eb;">Actual</th>
+          <th style="text-align:center;padding:8px 12px;border:1px solid #e5e7eb;">Difference</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${consumables.map(c => {
+          const diff = c.actualQty - c.plannedQty;
+          const rowStyle = diff !== 0 ? "background:#fffbeb;" : "";
+          const diffStyle = diff !== 0 ? "color:#d97706;font-weight:600;" : "color:#9ca3af;";
+          return `<tr style="${rowStyle}">
+            <td style="padding:7px 12px;border:1px solid #e5e7eb;">${c.name}</td>
+            <td style="text-align:center;padding:7px 12px;border:1px solid #e5e7eb;">${c.plannedQty}</td>
+            <td style="text-align:center;padding:7px 12px;border:1px solid #e5e7eb;">${c.actualQty}</td>
+            <td style="text-align:center;padding:7px 12px;border:1px solid #e5e7eb;${diffStyle}">${diff > 0 ? "+" + diff : diff === 0 ? "—" : diff}</td>
+          </tr>`;
+        }).join("")}
+      </tbody>
+    </table>` : "";
+
+  const sigsHtml = (report.teamSignature || report.clientSignature) ? `
+    <h3 style="font-size:14px;font-weight:600;color:#374151;margin:20px 0 8px;">Signatures</h3>
+    <div style="display:flex;gap:24px;">
+      ${report.teamSignature ? `<div style="flex:1;">
+        <p style="font-size:12px;color:#6b7280;margin-bottom:4px;font-weight:600;">TEAM MEMBER</p>
+        <div style="border:1px solid #e5e7eb;border-radius:6px;padding:4px;background:#fff;max-width:200px;">
+          <img src="${report.teamSignature}" alt="Team signature" style="width:100%;height:80px;object-fit:contain;" />
+        </div>
+      </div>` : ""}
+      ${report.clientSignature ? `<div style="flex:1;">
+        <p style="font-size:12px;color:#6b7280;margin-bottom:4px;font-weight:600;">CLIENT</p>
+        <div style="border:1px solid #e5e7eb;border-radius:6px;padding:4px;background:#fff;max-width:200px;">
+          <img src="${report.clientSignature}" alt="Client signature" style="width:100%;height:80px;object-fit:contain;" />
+        </div>
+      </div>` : ""}
+    </div>` : "";
+
+  const photosHtml = photos.length > 0 ? `
+    <h3 style="font-size:14px;font-weight:600;color:#374151;margin:20px 0 8px;">Site Photos (${photos.length})</h3>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;">
+      ${photos.map((p, i) => `
+        <div style="border:1px solid #e5e7eb;border-radius:6px;overflow:hidden;">
+          <img src="${p.dataUrl}" alt="Photo ${i + 1}" style="width:100%;aspect-ratio:1;object-fit:cover;" />
+          ${p.comment ? `<p style="font-size:11px;color:#374151;padding:4px 6px;margin:0;background:#f9fafb;">${p.comment}</p>` : ""}
+          <p style="font-size:10px;color:#9ca3af;padding:2px 6px 4px;margin:0;background:#f9fafb;">
+            ${new Date(p.timestamp).toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit" })}
+          </p>
+        </div>`).join("")}
+    </div>` : "";
+
+  const notesHtml = report.notes ? `
+    <h3 style="font-size:14px;font-weight:600;color:#374151;margin:20px 0 8px;">Notes</h3>
+    <p style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:6px;padding:10px 14px;font-size:13px;color:#374151;margin:0;">${report.notes}</p>` : "";
+
+  const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Service Report — ${clientName ?? "Client"} — ${formattedDate}</title>
+  <style>
+    body { font-family: Arial, sans-serif; color: #111827; padding: 32px; max-width: 780px; margin: 0 auto; }
+    @media print { body { padding: 16px; } }
+  </style>
+</head>
+<body>
+  <div style="display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid #1e40af;padding-bottom:12px;margin-bottom:16px;">
+    <div>
+      <h1 style="font-size:20px;font-weight:700;color:#1e40af;margin:0;">Service Completion Report</h1>
+      <p style="color:#6b7280;font-size:13px;margin:4px 0 0;">${clientName ? `Client: <strong>${clientName}</strong> &nbsp;|&nbsp;` : ""}Date: <strong>${formattedDate}</strong>${report.hasAdjustments ? ' &nbsp;|&nbsp; <span style="color:#d97706;">⚠ Consumable adjustments made</span>' : ""}</p>
+    </div>
+  </div>
+  ${consumablesHtml}
+  ${sigsHtml}
+  ${notesHtml}
+  ${photosHtml}
+  <p style="margin-top:32px;font-size:11px;color:#9ca3af;border-top:1px solid #e5e7eb;padding-top:8px;">
+    Generated ${new Date().toLocaleString("en-ZA")}
+  </p>
+  <script>window.onload = function(){ window.print(); }<\/script>
+</body>
+</html>`;
+
+  const win = window.open("", "_blank");
+  if (win) {
+    win.document.write(html);
+    win.document.close();
+  }
+}
+
+export default function FieldReportPanel({ serviceId, occurrenceDate, defaultExpanded = false, clientName }: FieldReportPanelProps) {
+  const [expanded, setExpanded] = useState(defaultExpanded);
   const [expandedPhotos, setExpandedPhotos] = useState(false);
 
   const url = occurrenceDate
@@ -74,12 +185,12 @@ export default function FieldReportPanel({ serviceId, occurrenceDate }: FieldRep
 
   return (
     <div className="border-t border-border pt-4 mt-4">
-      <Button
-        variant="ghost"
-        className="w-full flex items-center justify-between px-0 hover:bg-transparent"
-        onClick={() => setExpanded(v => !v)}
-      >
-        <div className="flex items-center gap-2">
+      <div className="flex items-center justify-between">
+        <Button
+          variant="ghost"
+          className="flex items-center gap-2 px-0 hover:bg-transparent"
+          onClick={() => setExpanded(v => !v)}
+        >
           <FileText className="h-4 w-4 text-muted-foreground" />
           <span className="font-semibold text-sm">Field Report</span>
           {report.hasAdjustments && (
@@ -92,9 +203,20 @@ export default function FieldReportPanel({ serviceId, occurrenceDate }: FieldRep
           {!occurrenceDate && (
             <span className="text-xs text-muted-foreground italic">(latest)</span>
           )}
-        </div>
-        {expanded ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
-      </Button>
+          {expanded ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+        </Button>
+
+        <Button
+          variant="outline"
+          size="sm"
+          className="flex items-center gap-1.5 h-7 text-xs"
+          onClick={() => printReport(report, clientName, occurrenceDate)}
+          title="Print or save report as PDF"
+        >
+          <Printer className="h-3.5 w-3.5" />
+          Download
+        </Button>
+      </div>
 
       {expanded && (
         <div className="mt-3 space-y-5">

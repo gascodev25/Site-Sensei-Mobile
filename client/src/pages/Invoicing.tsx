@@ -10,7 +10,8 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { CheckCircle, FileText, Clock, Receipt, Search, MapPin, Calendar, User, Repeat, Wrench, Package } from "lucide-react";
+import { CheckCircle, FileText, Clock, Receipt, Search, MapPin, Calendar, User, Repeat, Wrench, Package, ClipboardCheck } from "lucide-react";
+import FieldReportPanel from "@/components/FieldReportPanel";
 import {
   format, parseISO,
   startOfMonth, endOfMonth,
@@ -86,6 +87,21 @@ export default function Invoicing() {
       return res.json();
     },
   });
+
+  const serviceIds = [...new Set(fetchedServices.map(s => s.id))];
+  type ReportFlag = { serviceId: number; hasAdjustments: boolean; completionDate: string };
+  const { data: reportFlags = [] } = useQuery<ReportFlag[]>({
+    queryKey: ["/api/field-reports/batch", serviceIds.join(",")],
+    enabled: serviceIds.length > 0,
+    queryFn: async () => {
+      const res = await fetch(`/api/field-reports/batch?serviceIds=${serviceIds.join(",")}`, { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+  });
+  const reportFlagMap = new Map<string, boolean>(
+    reportFlags.map(f => [`${f.serviceId}:${f.completionDate.substring(0, 10)}`, true])
+  );
 
   // Date range helpers
   const getDateRange = () => {
@@ -356,7 +372,7 @@ export default function Invoicing() {
 
         {/* Service Detail Dialog */}
         <Dialog open={selectedServiceRow !== null} onOpenChange={() => setSelectedServiceRow(null)}>
-          <DialogContent className="max-w-md">
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Service Details</DialogTitle>
             </DialogHeader>
@@ -477,6 +493,13 @@ export default function Invoicing() {
                     </Button>
                   </div>
                 )}
+
+                <FieldReportPanel
+                  serviceId={selectedServiceRow!.id}
+                  occurrenceDate={selectedServiceRow!.occurrenceDate}
+                  defaultExpanded={true}
+                  clientName={selectedServiceRow!.clientName}
+                />
               </div>
             ) : null}
           </DialogContent>
@@ -530,45 +553,64 @@ export default function Invoicing() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredServices.map(service => (
-                    <TableRow
-                      key={rowKey(service)}
-                      className="cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-950 transition-colors"
-                      onClick={() => setSelectedServiceRow(service)}
-                    >
-                      <TableCell className="font-medium">{service.clientName}</TableCell>
-                      <TableCell className="capitalize">{service.type?.replace(/_/g, " ") ?? "—"}</TableCell>
-                      <TableCell>{formatDate(service.installationDate)}</TableCell>
-                      <TableCell>
-                        {service.occurrenceDate
-                          ? formatDate(service.occurrenceDate)
-                          : formatDate(service.completedAt)}
-                      </TableCell>
-                      <TableCell>{getInvoicedBadge(service.invoicedStatus)}</TableCell>
-                      <TableCell className="text-right">
-                        {service.invoicedStatus !== "invoiced" ? (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            disabled={markInvoicedMutation.isPending}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              markInvoicedMutation.mutate({
-                                serviceId: service.id,
-                                occurrenceDate: service.occurrenceDate,
-                              });
-                            }}
-                            data-testid={`button-mark-invoiced-${rowKey(service)}`}
-                          >
-                            <CheckCircle className="h-4 w-4 mr-1" />
-                            Mark as Invoiced
-                          </Button>
-                        ) : (
-                          <span className="text-sm text-muted-foreground italic">Invoiced</span>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {filteredServices.map(service => {
+                    const completionDateKey = service.occurrenceDate
+                      ? service.occurrenceDate.substring(0, 10)
+                      : service.completedAt
+                        ? String(service.completedAt).substring(0, 10)
+                        : null;
+                    const hasReport = completionDateKey
+                      ? reportFlagMap.has(`${service.id}:${completionDateKey}`)
+                      : false;
+
+                    return (
+                      <TableRow
+                        key={rowKey(service)}
+                        className="cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-950 transition-colors"
+                        onClick={() => setSelectedServiceRow(service)}
+                      >
+                        <TableCell className="font-medium">{service.clientName}</TableCell>
+                        <TableCell className="capitalize">{service.type?.replace(/_/g, " ") ?? "—"}</TableCell>
+                        <TableCell>{formatDate(service.installationDate)}</TableCell>
+                        <TableCell>
+                          {service.occurrenceDate
+                            ? formatDate(service.occurrenceDate)
+                            : formatDate(service.completedAt)}
+                        </TableCell>
+                        <TableCell>{getInvoicedBadge(service.invoicedStatus)}</TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            {hasReport && (
+                              <Badge className="bg-blue-50 border-blue-200 text-blue-700 text-xs gap-1 cursor-pointer">
+                                <ClipboardCheck className="h-3 w-3" />
+                                Report
+                              </Badge>
+                            )}
+                            {service.invoicedStatus !== "invoiced" ? (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                disabled={markInvoicedMutation.isPending}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  markInvoicedMutation.mutate({
+                                    serviceId: service.id,
+                                    occurrenceDate: service.occurrenceDate,
+                                  });
+                                }}
+                                data-testid={`button-mark-invoiced-${rowKey(service)}`}
+                              >
+                                <CheckCircle className="h-4 w-4 mr-1" />
+                                Mark as Invoiced
+                              </Button>
+                            ) : (
+                              <span className="text-sm text-muted-foreground italic">Invoiced</span>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             )}
