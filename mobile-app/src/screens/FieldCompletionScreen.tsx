@@ -77,29 +77,58 @@ export default function FieldCompletionScreen() {
     return consumables.some(c => c.actualQty !== c.plannedQty);
   }
 
-  async function pickPhoto() {
-    if (photos.length >= 10) {
-      Alert.alert('Limit reached', 'Maximum 10 photos allowed.');
-      return;
-    }
+  function addPhotoAsset(asset: ImagePicker.ImagePickerAsset) {
+    const dataUrl = `data:image/jpeg;base64,${asset.base64}`;
+    setPhotos(prev => [
+      ...prev,
+      { dataUrl, comment: newPhotoComment.trim(), timestamp: new Date().toISOString() },
+    ]);
+    setNewPhotoComment('');
+  }
+
+  async function launchCamera() {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== 'granted') {
       Alert.alert('Permission required', 'Camera access is needed to take photos.');
       return;
     }
-    const result = await ImagePicker.launchCameraAsync({
+    const result = await ImagePicker.launchCameraAsync({ base64: true, quality: 0.6 });
+    if (!result.canceled && result.assets[0]) {
+      addPhotoAsset(result.assets[0]);
+    }
+  }
+
+  async function launchGallery() {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission required', 'Gallery access is needed to select photos.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
       base64: true,
       quality: 0.6,
     });
     if (!result.canceled && result.assets[0]) {
-      const asset = result.assets[0];
-      const dataUrl = `data:image/jpeg;base64,${asset.base64}`;
-      setPhotos(prev => [
-        ...prev,
-        { dataUrl, comment: newPhotoComment.trim(), timestamp: new Date().toISOString() },
-      ]);
-      setNewPhotoComment('');
+      addPhotoAsset(result.assets[0]);
     }
+  }
+
+  function pickPhoto() {
+    if (photos.length >= 10) {
+      Alert.alert('Limit reached', 'Maximum 10 photos allowed.');
+      return;
+    }
+    Alert.alert(
+      'Add Photo',
+      'Choose a source',
+      [
+        { text: 'Camera', onPress: launchCamera },
+        { text: 'Gallery', onPress: launchGallery },
+        { text: 'Cancel', style: 'cancel' },
+      ],
+      { cancelable: true }
+    );
   }
 
   function removePhoto(index: number) {
@@ -359,7 +388,7 @@ function PhotoStep({
   return (
     <View style={styles.padded}>
       <Text style={styles.sectionHeader}>Site Photos</Text>
-      <Text style={styles.hint}>Add a comment (optional), then capture a photo. Max 10 photos.</Text>
+      <Text style={styles.hint}>Add a comment (optional), then add a photo from camera or gallery. Max 10 photos.</Text>
 
       <TextInput
         style={styles.commentInput}
@@ -374,7 +403,7 @@ function PhotoStep({
         onPress={onPickPhoto}
         disabled={photos.length >= 10}
       >
-        <Text style={styles.cameraBtnText}>Take Photo ({photos.length}/10)</Text>
+        <Text style={styles.cameraBtnText}>Add Photo ({photos.length}/10)</Text>
       </TouchableOpacity>
 
       {rows.map((row, rowIdx) => (
