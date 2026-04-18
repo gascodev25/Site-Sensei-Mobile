@@ -28,7 +28,10 @@ const TABS: { key: TabRange; label: string }[] = [
 ];
 
 function formatDate(dateStr: string) {
-  const d = new Date(dateStr + 'T00:00:00');
+  if (!dateStr) return '';
+  // Handle both YYYY-MM-DD (append local midnight) and full ISO timestamps
+  const d = dateStr.length === 10 ? new Date(dateStr + 'T00:00:00') : new Date(dateStr);
+  if (isNaN(d.getTime())) return '';
   return d.toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', weekday: 'short' });
 }
 
