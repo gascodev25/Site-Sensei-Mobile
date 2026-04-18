@@ -1759,25 +1759,31 @@ export class DatabaseStorage implements IStorage {
    * The mobile app should use pendingOccurrenceDates to build its work queue.
    */
   async getMobileServices(teamId: number | null, range: 'today' | 'week' | 'month'): Promise<any[]> {
-    const now = new Date();
-    const startOfToday = new Date(now);
-    startOfToday.setHours(0, 0, 0, 0);
+    // All range dates are computed in SAST (UTC+2) so the server agrees with
+    // the browser and with generateOccurrences (which is also SAST-aware).
+    const SAST_OFFSET_MS = 2 * 60 * 60 * 1000;
+    const nowSAST = new Date(Date.now() + SAST_OFFSET_MS);
+    // Midnight SAST expressed as UTC (e.g. 2026-04-17 00:00 SAST = 2026-04-16 22:00 UTC)
+    const startOfTodaySAST = new Date(
+      Date.UTC(nowSAST.getUTCFullYear(), nowSAST.getUTCMonth(), nowSAST.getUTCDate()) - SAST_OFFSET_MS
+    );
 
     let rangeStart: Date;
     let rangeEnd: Date;
 
     if (range === 'today') {
-      rangeStart = startOfToday;
-      rangeEnd = new Date(startOfToday);
-      rangeEnd.setHours(23, 59, 59, 999);
+      rangeStart = startOfTodaySAST;
+      rangeEnd = new Date(startOfTodaySAST.getTime() + 24 * 60 * 60 * 1000 - 1);
     } else if (range === 'week') {
-      rangeStart = startOfToday;
-      rangeEnd = new Date(startOfToday);
-      rangeEnd.setDate(rangeEnd.getDate() + 7);
+      rangeStart = startOfTodaySAST;
+      rangeEnd = new Date(startOfTodaySAST.getTime() + 7 * 24 * 60 * 60 * 1000);
     } else {
-      rangeStart = startOfToday;
-      rangeEnd = new Date(startOfToday);
-      rangeEnd.setMonth(rangeEnd.getMonth() + 1);
+      rangeStart = startOfTodaySAST;
+      const endSAST = new Date(nowSAST);
+      endSAST.setUTCMonth(endSAST.getUTCMonth() + 1);
+      rangeEnd = new Date(
+        Date.UTC(endSAST.getUTCFullYear(), endSAST.getUTCMonth(), endSAST.getUTCDate()) - SAST_OFFSET_MS
+      );
     }
 
     // Fetch all services for this team (or all teams if teamId is null)
