@@ -16,6 +16,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RouteProp } from '@react-navigation/native';
 import SignatureCanvas from 'react-native-signature-canvas';
 import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system';
 import { submitFieldReport, type MobileService } from '../api/client';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
@@ -79,8 +80,23 @@ export default function FieldCompletionScreen() {
     return consumables.some(c => c.actualQty !== c.plannedQty);
   }
 
-  function addPhotoAsset(asset: ImagePicker.ImagePickerAsset) {
-    const dataUrl = `data:image/jpeg;base64,${asset.base64}`;
+  async function addPhotoAsset(asset: ImagePicker.ImagePickerAsset) {
+    let base64 = asset.base64 ?? null;
+    if (!base64 && asset.uri) {
+      try {
+        base64 = await FileSystem.readAsStringAsync(asset.uri, {
+          encoding: FileSystem.EncodingType.Base64,
+        });
+      } catch {
+        Alert.alert('Error', 'Could not read the selected photo. Please try again.');
+        return;
+      }
+    }
+    if (!base64) {
+      Alert.alert('Error', 'Photo data was empty. Please try again.');
+      return;
+    }
+    const dataUrl = `data:image/jpeg;base64,${base64}`;
     setPhotos(prev => [
       ...prev,
       { dataUrl, comment: newPhotoComment.trim(), timestamp: new Date().toISOString() },
@@ -95,8 +111,8 @@ export default function FieldCompletionScreen() {
       return;
     }
     const result = await ImagePicker.launchCameraAsync({ base64: true, quality: 0.6 });
-    if (!result.canceled && result.assets[0]) {
-      addPhotoAsset(result.assets[0]);
+    if (!result.canceled && result.assets?.[0]) {
+      await addPhotoAsset(result.assets[0]);
     }
   }
 
@@ -111,8 +127,8 @@ export default function FieldCompletionScreen() {
       base64: true,
       quality: 0.6,
     });
-    if (!result.canceled && result.assets[0]) {
-      addPhotoAsset(result.assets[0]);
+    if (!result.canceled && result.assets?.[0]) {
+      await addPhotoAsset(result.assets[0]);
     }
   }
 
@@ -125,8 +141,8 @@ export default function FieldCompletionScreen() {
       'Add Photo',
       'Choose a source',
       [
-        { text: 'Camera', onPress: launchCamera },
-        { text: 'Gallery', onPress: launchGallery },
+        { text: 'Camera', onPress: () => setTimeout(launchCamera, 400) },
+        { text: 'Gallery', onPress: () => setTimeout(launchGallery, 400) },
         { text: 'Cancel', style: 'cancel' },
       ],
       { cancelable: true }
