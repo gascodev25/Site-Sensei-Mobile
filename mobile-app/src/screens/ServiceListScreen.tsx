@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   RefreshControl,
   Alert,
+  TextInput,
 } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -86,6 +87,7 @@ export default function ServiceListScreen() {
   const [services, setServices] = useState<MobileService[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const isSuperuser = user?.roles?.includes('superuser') || user?.roles?.includes('manager');
 
@@ -124,12 +126,22 @@ export default function ServiceListScreen() {
     load(tab, true);
   }
 
-  const flatListData: ServiceListItem[] = services.flatMap(service => {
+  const allListData: ServiceListItem[] = services.flatMap(service => {
     if (service.pendingOccurrenceDates.length > 0) {
       return service.pendingOccurrenceDates.map(date => ({ ...service, occurrenceDate: date }));
     }
     return [{ ...service, occurrenceDate: service.installationDate ?? '' }];
   });
+
+  const q = searchQuery.trim().toLowerCase();
+  const flatListData: ServiceListItem[] = q
+    ? allListData.filter(item => {
+        const name = item.client.name?.toLowerCase() ?? '';
+        const address = item.client.addressText?.toLowerCase() ?? '';
+        const city = item.client.city?.toLowerCase() ?? '';
+        return name.includes(q) || address.includes(q) || city.includes(q);
+      })
+    : allListData;
 
   if (!isSuperuser && !user?.linkedTeamId) {
     return (
@@ -168,6 +180,24 @@ export default function ServiceListScreen() {
         ))}
       </View>
 
+      <View style={styles.searchRow}>
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Search by client, address or city..."
+          placeholderTextColor="#9ca3af"
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          returnKeyType="search"
+          clearButtonMode="while-editing"
+          autoCorrect={false}
+        />
+        {searchQuery.length > 0 && (
+          <TouchableOpacity style={styles.searchClear} onPress={() => setSearchQuery('')}>
+            <Text style={styles.searchClearText}>✕</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+
       {isLoading ? (
         <View style={styles.centered}>
           <ActivityIndicator size="large" color="#1e40af" />
@@ -190,8 +220,12 @@ export default function ServiceListScreen() {
           )}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
-              <Text style={styles.emptyTitle}>No services scheduled</Text>
-              <Text style={styles.emptySubtitle}>Pull down to refresh or check another tab.</Text>
+              <Text style={styles.emptyTitle}>
+                {q ? 'No results found' : 'No services scheduled'}
+              </Text>
+              <Text style={styles.emptySubtitle}>
+                {q ? `No services match "${searchQuery}".` : 'Pull down to refresh or check another tab.'}
+              </Text>
             </View>
           }
           refreshControl={
@@ -226,6 +260,32 @@ const styles = StyleSheet.create({
   tabActive: { borderBottomWidth: 2, borderBottomColor: '#1e40af' },
   tabText: { color: '#6b7280', fontWeight: '500', fontSize: 14 },
   tabTextActive: { color: '#1e40af', fontWeight: '700' },
+  searchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+  },
+  searchInput: {
+    flex: 1,
+    backgroundColor: '#f3f4f6',
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    fontSize: 14,
+    color: '#111827',
+  },
+  searchClear: {
+    marginLeft: 10,
+    padding: 4,
+  },
+  searchClearText: {
+    color: '#6b7280',
+    fontSize: 16,
+  },
   card: {
     backgroundColor: '#fff',
     borderRadius: 12,
